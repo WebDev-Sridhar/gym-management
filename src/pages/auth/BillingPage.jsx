@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
-import { createSubscription, updateGymOnboardingStep } from '../../services/userService'
+import { createSubscriptionLink } from '../../services/subscriptionService'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
 
 const PLANS = [
@@ -57,12 +57,28 @@ const PLANS = [
 ]
 
 export default function BillingPage() {
-  const { profile, isAuthenticated, isOnboarded, loading, gymId, refreshProfile } = useAuth()
+  const { profile, subscription, hasActiveSubscription, isAuthenticated, isOnboarded, loading, gymId, refreshProfile } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [selectedPlan, setSelectedPlan] = useState(1) // Pro by default
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
+
+  // Handle Razorpay callback redirect
+  useEffect(() => {
+    const status = searchParams.get('razorpay_payment_link_status')
+    if (status === 'paid') {
+      setPaymentSuccess(true)
+      // Give webhook a moment to process, then refresh profile
+      const timer = setTimeout(async () => {
+        await refreshProfile()
+        navigate('/owner-dashboard', { replace: true })
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
 
   // Not authenticated → signup
   if (!loading && !isAuthenticated) {
@@ -81,24 +97,43 @@ export default function BillingPage() {
     try {
       const plan = PLANS[selectedPlan]
 
-      // In production, integrate Razorpay/Stripe here.
-      // For now, we create the subscription directly (simulating payment success).
-      await createSubscription({
+      const result = await createSubscriptionLink({
         gymId,
         planName: plan.name,
-        amount: plan.price,
+        price: plan.price,
         durationDays: plan.durationDays,
+        callbackUrl: `${window.location.origin}/billing`,
       })
 
-      await updateGymOnboardingStep(gymId, 'subscribed')
-      await refreshProfile()
-
-      navigate('/owner-dashboard', { replace: true })
+      // Redirect to Razorpay payment page
+      window.location.href = result.paymentLinkUrl
     } catch (err) {
-      setError(err.message || 'Failed to activate subscription')
+      setError(err.message || 'Failed to generate payment link')
     } finally {
       setProcessing(false)
     }
+  }
+
+  const handleGoToDashboard = () => {
+    navigate('/owner-dashboard', { replace: true })
+  }
+
+  // Payment success screen — show while webhook processes
+  if (paymentSuccess) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm max-w-md w-full text-center">
+          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
+          <p className="text-sm text-gray-500 mb-6">Activating your subscription. Redirecting to dashboard...</p>
+          <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -109,28 +144,123 @@ export default function BillingPage() {
     )
   }
 
+  // If already subscribed, show subscription status
+  if (hasActiveSubscription && subscription) {
+    const expiresAt = new Date(subscription.expires_at)
+    const daysLeft = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24))
+    const isExpiringSoon = daysLeft <= 7
+
+    return (
+      <div className="min-h-screen bg-gray-50 px-4 py-12">
+        <div className="max-w-lg mx-auto">
+          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="text-xl font-bold text-gray-900">Subscription Active</h1>
+              <p className="text-sm text-gray-500 mt-1">Your gym dashboard is fully operational</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Plan</span>
+                <span className="text-sm font-semibold text-gray-900">{subscription.plan_name}</span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Amount</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {'\u20B9'}{Number(subscription.amount).toLocaleString('en-IN')}/month
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Status</span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
+                  Active
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Expires</span>
+                <span className={`text-sm font-semibold ${isExpiringSoon ? 'text-amber-600' : 'text-gray-900'}`}>
+                  {expiresAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {isExpiringSoon && ` (${daysLeft} day${daysLeft !== 1 ? 's' : ''} left)`}
+                </span>
+              </div>
+            </div>
+
+            {isExpiringSoon && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-6">
+                <p className="text-sm text-amber-800 font-medium">Your subscription expires soon</p>
+                <p className="text-xs text-amber-600 mt-1">Renew now to avoid losing access to your dashboard.</p>
+                <button
+                  onClick={handleActivate}
+                  disabled={processing}
+                  className="mt-3 w-full py-2.5 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
+                >
+                  {processing ? 'Generating link...' : 'Renew Now'}
+                </button>
+              </div>
+            )}
+
+            <button
+              onClick={handleGoToDashboard}
+              className="w-full mt-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors text-sm cursor-pointer"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show renewal view for expired subscriptions
+  const isExpired = subscription && subscription.status === 'expired'
+
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
       <div className="max-w-4xl mx-auto">
-        <OnboardingProgress currentStep={4} />
+        {!isExpired && <OnboardingProgress currentStep={4} />}
 
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-2xl font-bold text-gray-900">Activate Your Gym Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isExpired ? 'Renew Your Subscription' : 'Activate Your Gym Dashboard'}
+          </h1>
           <p className="text-gray-500 text-sm mt-2">
-            Choose a plan to start tracking members, payments, and more
+            {isExpired
+              ? 'Your subscription has expired. Renew to regain access to your dashboard.'
+              : 'Choose a plan to start tracking members, payments, and more'
+            }
           </p>
         </div>
 
-        {/* Urgency banner */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8 text-center max-w-lg mx-auto">
-          <p className="text-sm text-amber-800 font-medium">
-            Activate now to start tracking members today
-          </p>
-          <p className="text-xs text-amber-600 mt-1">
-            14-day free trial included — no charge until trial ends
-          </p>
-        </div>
+        {/* Expired banner */}
+        {isExpired && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-8 text-center max-w-lg mx-auto">
+            <p className="text-sm text-red-800 font-medium">
+              Your {subscription.plan_name} plan expired on{' '}
+              {new Date(subscription.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+            <p className="text-xs text-red-600 mt-1">
+              Select a plan below to restore access
+            </p>
+          </div>
+        )}
+
+        {/* First-time banner */}
+        {!isExpired && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8 text-center max-w-lg mx-auto">
+            <p className="text-sm text-amber-800 font-medium">
+              Activate now to start tracking members today
+            </p>
+            <p className="text-xs text-amber-600 mt-1">
+              14-day free trial included — no charge until trial ends
+            </p>
+          </div>
+        )}
 
         {/* Plans grid */}
         <div className="grid md:grid-cols-3 gap-5 mb-8">
@@ -164,7 +294,7 @@ export default function BillingPage() {
 
               {/* Price */}
               <div className="mt-4 mb-5">
-                <span className="text-3xl font-extrabold text-gray-900">₹{plan.price.toLocaleString('en-IN')}</span>
+                <span className="text-3xl font-extrabold text-gray-900">{'\u20B9'}{plan.price.toLocaleString('en-IN')}</span>
                 <span className="text-sm text-gray-500">{plan.period}</span>
               </div>
 
@@ -204,7 +334,12 @@ export default function BillingPage() {
             disabled={processing}
             className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-blue-500 text-white font-bold rounded-xl hover:opacity-90 transition-opacity cursor-pointer text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-200"
           >
-            {processing ? 'Activating...' : `Activate ${PLANS[selectedPlan].name} Plan — Start Free Trial`}
+            {processing
+              ? 'Generating payment link...'
+              : isExpired
+                ? `Renew with ${PLANS[selectedPlan].name} Plan — ${'\u20B9'}${PLANS[selectedPlan].price.toLocaleString('en-IN')}/month`
+                : `Activate ${PLANS[selectedPlan].name} Plan — Start Free Trial`
+            }
           </button>
 
           <p className="text-center text-xs text-gray-400 mt-4">

@@ -52,7 +52,13 @@ export default function Navbar() {
         </div>
 
         {/* Desktop CTA */}
-        <div className="hidden md:block">
+        <div className="hidden md:flex items-center gap-4">
+          <a
+            href="/login"
+            className="text-text-secondary hover:text-text-primary transition-colors duration-300 text-sm font-medium"
+          >
+            Login
+          </a>
           <Button size="sm" href="/signup">Start Free Trial</Button>
         </div>
 
@@ -97,6 +103,13 @@ export default function Navbar() {
                   {link.label}
                 </a>
               ))}
+              <a
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="text-text-secondary hover:text-text-primary transition-colors text-base font-medium py-2"
+              >
+                Login
+              </a>
               <Button size="sm" href="/signup" className="mt-2 w-full">
                 Start Free Trial
               </Button>

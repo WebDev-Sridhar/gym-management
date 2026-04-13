@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient'
+import { supabaseData as supabase } from './supabaseClient'
 
 /**
  * Fetch user profile from the users table by auth uid.

@@ -14,6 +14,10 @@ import OwnerDashboard from './pages/owner/OwnerDashboard'
 import PlansPage from './pages/owner/PlansPage'
 import MembersPage from './pages/owner/MembersPage'
 import PaymentsPage from './pages/owner/PaymentsPage'
+import AttendancePage from './pages/owner/AttendancePage'
+import AnalyticsPage from './pages/owner/AnalyticsPage'
+import TrainersPage from './pages/owner/TrainersPage'
+import SettingsPage from './pages/owner/SettingsPage'
 import TrainerDashboard from './pages/trainer/TrainerDashboard'
 import MemberApp from './pages/member/MemberApp'
 import CheckinPage from './pages/checkin/CheckinPage'
@@ -78,6 +82,10 @@ export default function App() {
             <Route path="plans" element={<PlansPage />} />
             <Route path="members" element={<MembersPage />} />
             <Route path="payments" element={<PaymentsPage />} />
+            <Route path="trainers" element={<TrainersPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="checkin" element={<AttendancePage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
 
           {/* Trainer dashboard — protected, trainer only */}

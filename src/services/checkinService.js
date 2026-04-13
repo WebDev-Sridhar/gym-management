@@ -1,4 +1,4 @@
-import { supabase, supabaseAnon } from './supabaseClient'
+import { supabaseData, supabaseAnon } from './supabaseClient'
 
 /**
  * Perform a gym check-in via the server-side RPC function.
@@ -6,7 +6,7 @@ import { supabase, supabaseAnon } from './supabaseClient'
  * attendance insert, and members.last_checkin update — all atomically.
  */
 export async function performCheckin(gymId) {
-  const { data, error } = await supabase.rpc('perform_checkin', {
+  const { data, error } = await supabaseData.rpc('perform_checkin', {
     p_gym_id: gymId,
   })
 

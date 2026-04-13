@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient'
+import { supabaseData as supabase } from './supabaseClient'
 
 /**
  * Create a Razorpay payment link for a member via edge function.
@@ -44,4 +44,23 @@ export async function fetchPayments(gymId) {
 
   if (error) throw error
   return data || []
+}
+
+/**
+ * Mark a pending payment as paid (manual/UPI collection).
+ */
+export async function markPaymentPaid({ paymentId, paymentMethod }) {
+  const { data, error } = await supabase
+    .from('payments')
+    .update({
+      status: 'paid',
+      payment_method: paymentMethod || 'cash',
+      payment_date: new Date().toISOString(),
+    })
+    .eq('id', paymentId)
+    .select('*, member:members(id, name, phone, email), plan:plans(id, name, price, duration_days)')
+    .single()
+
+  if (error) throw error
+  return data
 }

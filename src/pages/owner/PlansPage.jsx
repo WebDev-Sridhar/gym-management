@@ -16,20 +16,26 @@ export default function PlansPage() {
   const [durationDays, setDurationDays] = useState('')
 
   useEffect(() => {
-    if (!gymId) return
-    loadPlans()
-  }, [gymId])
-
-  async function loadPlans() {
-    try {
-      const data = await fetchPlans(gymId)
-      setPlans(data)
-    } catch (err) {
-      console.error('Failed to load plans:', err)
-    } finally {
+    if (!gymId) {
       setLoading(false)
+      return
     }
-  }
+
+    setLoading(true)
+    let cancelled = false
+
+    fetchPlans(gymId)
+      .then((data) => {
+        if (cancelled) return
+        setPlans(data)
+      })
+      .catch((err) => console.error('Failed to load plans:', err))
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [gymId])
 
   async function handleCreate(e) {
     e.preventDefault()

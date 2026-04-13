@@ -30,6 +30,9 @@ export async function fetchGymContent(gymId) {
 
 /**
  * Fetch public pricing plans for a gym.
+ * Tries gym_plans first (rich public plans with features/badges).
+ * Falls back to the internal plans table so owners don't have to
+ * manage plans in two places — dashboard plans auto-show on the website.
  */
 export async function fetchGymPlans(gymId) {
   const { data, error } = await supabaseAnon
@@ -39,7 +42,37 @@ export async function fetchGymPlans(gymId) {
     .order('sort_order')
 
   if (error) throw error
-  return data || []
+  if (data && data.length > 0) return data
+
+  // Fallback: read from the internal plans table
+  const { data: internal, error: intErr } = await supabaseAnon
+    .from('plans')
+    .select('id, name, price, duration_days')
+    .eq('gym_id', gymId)
+    .order('price')
+
+  if (intErr) throw intErr
+
+  // Map to the shape PricingCard expects
+  return (internal || []).map((p, i) => ({
+    id: p.id,
+    name: p.name,
+    price: Number(p.price),
+    duration_label: formatDuration(p.duration_days),
+    features: [],
+    is_popular: i === Math.floor((internal.length - 1) / 2), // middle plan is "popular"
+    sort_order: i,
+  }))
+}
+
+function formatDuration(days) {
+  if (!days) return ''
+  if (days === 1) return '1 day'
+  if (days < 30) return `${days} days`
+  const months = Math.round(days / 30)
+  if (months === 1) return '1 month'
+  if (months === 12) return '1 year'
+  return `${months} months`
 }
 
 /**

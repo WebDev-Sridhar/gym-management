@@ -1,13 +1,20 @@
+import { motion } from 'framer-motion'
+import { fadeUp, hoverLift } from '../../lib/animations'
+
 export default function TestimonialCard({ testimonial, themeColor }) {
   return (
-    <div className="bg-gray-50 rounded-2xl p-6 flex flex-col">
+    <motion.div
+      variants={fadeUp}
+      whileHover={hoverLift}
+      className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 flex flex-col border border-gray-100/80 shadow-sm hover:shadow-xl transition-shadow duration-300"
+    >
       {/* Stars */}
       <div className="flex gap-0.5 mb-4">
         {Array.from({ length: 5 }).map((_, i) => (
           <svg
             key={i}
             className="w-5 h-5"
-            style={{ color: i < testimonial.rating ? themeColor : '#D1D5DB' }}
+            style={{ color: i < testimonial.rating ? (themeColor || 'var(--gym-primary)') : '#D1D5DB' }}
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -16,21 +23,26 @@ export default function TestimonialCard({ testimonial, themeColor }) {
         ))}
       </div>
 
+      {/* Quote icon */}
+      <svg className="w-8 h-8 mb-3 opacity-10" style={{ color: 'var(--gym-primary, ' + themeColor + ')' }} fill="currentColor" viewBox="0 0 24 24">
+        <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H14.017zM0 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151C7.546 6.068 5.983 8.789 5.983 11H10v10H0z" />
+      </svg>
+
       {/* Message */}
       <p className="text-gray-600 text-sm leading-relaxed flex-1">
         "{testimonial.message}"
       </p>
 
       {/* Author */}
-      <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-200">
+      <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
         <div
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
-          style={{ backgroundColor: themeColor }}
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm"
+          style={{ background: 'var(--gym-gradient, ' + themeColor + ')' }}
         >
           {testimonial.name.charAt(0).toUpperCase()}
         </div>
-        <span className="font-medium text-gray-900 text-sm">{testimonial.name}</span>
+        <span className="font-semibold text-gray-900 text-sm">{testimonial.name}</span>
       </div>
-    </div>
+    </motion.div>
   )
 }
