@@ -30,10 +30,7 @@ export default function FinalCTA() {
           variants={fadeUp}
           className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-text-primary leading-tight tracking-tight"
         >
-          Start Managing Your Gym{' '}
-          <span className="bg-gradient-to-r from-accent-purple via-accent-blue to-accent-cyan bg-clip-text text-transparent">
-            the Smart Way
-          </span>
+          Start Managing Your Gym the Smart Way
         </motion.h2>
 
         <motion.p
@@ -47,7 +44,7 @@ export default function FinalCTA() {
           variants={fadeUp}
           className="flex flex-wrap justify-center gap-4 mt-10"
         >
-          <Button size="lg" href="/signup" className="shadow-[0_0_40px_rgba(139,92,246,0.35)]">
+          <Button size="lg" href="/signup">
             Start Your Free Trial
           </Button>
           <Button variant="secondary" size="lg" href="#features">

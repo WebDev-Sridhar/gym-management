@@ -15,16 +15,18 @@ export default function Button({
     'relative inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-300 cursor-pointer'
 
   const sizeStyles = {
-    sm: 'px-5 py-2.5 text-sm',
-    md: 'px-7 py-3.5 text-base',
-    lg: 'px-9 py-4 text-lg',
+    sm: 'px-4 py-2 text-sm',
+    md: 'px-5 py-2.5 text-base',
+    lg: 'px-6 py-3 text-lg',
   }
 
   const variantStyles = {
     primary:
-      'bg-gradient-to-r from-accent-purple to-accent-blue text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_35px_rgba(139,92,246,0.5)]',
+      'bg-white text-black hover:bg-zinc-100 active:bg-zinc-200',
     secondary:
-      'bg-transparent border border-border text-text-primary hover:border-accent-purple/50 hover:bg-accent-purple/5',
+      'bg-transparent border border-white/20 text-text-primary hover:bg-white/5 hover:border-white/30',
+    glass:
+      'bg-white/5 border border-white/25 text-white backdrop-blur-md hover:bg-white/10 hover:border-white/40',
     ghost:
       'bg-transparent text-text-secondary hover:text-text-primary',
   }

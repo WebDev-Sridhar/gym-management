@@ -81,14 +81,11 @@ export default function Solution() {
           <span className="inline-block text-sm font-medium text-accent-purple uppercase tracking-widest mb-4">
             The Solution
           </span>
-          <GradientText
-            as="h2"
-            className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-6"
-          >
+          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-6 text-text-primary">
             One Platform. Zero Chaos.
-          </GradientText>
+          </h2>
           <p className="text-text-secondary text-lg mb-8 leading-relaxed">
-            GymOS replaces your spreadsheets, WhatsApp reminders, and guesswork with a single intelligent system.
+            Gymmobius replaces your spreadsheets, WhatsApp reminders, and guesswork with a single intelligent system.
           </p>
 
           <div className="space-y-5">

@@ -6,7 +6,7 @@ import { supabaseAnon } from './supabaseClient'
 export async function fetchGymBySlug(slug) {
   const { data, error } = await supabaseAnon
     .from('gyms')
-    .select('id, name, slug, logo_url, theme_color, description, city')
+.select('id, name, slug, logo_url, theme_color, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, description, city, phone, email, address')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -20,7 +20,7 @@ export async function fetchGymBySlug(slug) {
 export async function fetchGymContent(gymId) {
   const { data, error } = await supabaseAnon
     .from('gym_content')
-    .select('hero_title, hero_subtitle, about_text')
+    .select('*')
     .eq('gym_id', gymId)
     .maybeSingle()
 

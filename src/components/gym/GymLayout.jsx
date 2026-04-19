@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { GymProvider, useGym } from '../../store/GymContext'
 import GymNavbar from './GymNavbar'
-import { getThemeCSSVars } from '../../lib/gymTheme'
+import { getFullThemeCSSVars, getFontStack } from '../../lib/gymTheme'
 
 export default function GymLayout() {
   return (
@@ -16,10 +16,10 @@ function GymLayoutInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#080808' }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-white/40 text-sm tracking-widest uppercase font-sans">Loading</p>
         </div>
       </div>
     )
@@ -27,21 +27,16 @@ function GymLayoutInner() {
 
   if (error || !gym) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#080808' }}>
         <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-5">
-            <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Gym Not Found</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            The gym you're looking for doesn't exist or may have been removed.
-          </p>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center px-6 py-3 bg-violet-600 text-white font-semibold rounded-lg hover:bg-violet-700 transition-colors text-sm"
-          >
+          <h1 className="text-3xl font-display text-white mb-3">GYM NOT FOUND</h1>
+          <p className="text-white/40 text-sm mb-8">This gym doesn't exist or has been removed.</p>
+          <a href="/" className="inline-flex items-center justify-center px-8 py-3 bg-white text-black font-semibold rounded-lg text-sm hover:bg-white/90 transition-colors">
             Go to Homepage
           </a>
         </div>
@@ -49,64 +44,68 @@ function GymLayoutInner() {
     )
   }
 
-  const themeColor = gym.theme_color || '#8B5CF6'
-  const themeVars = getThemeCSSVars(themeColor)
+  const themeVars = getFullThemeCSSVars(gym)
   const base = `/${gym.slug}`
-
-  const footerLinks = [
-    { to: base, label: 'Home' },
-    { to: `${base}/about`, label: 'About' },
-    { to: `${base}/pricing`, label: 'Pricing' },
-    { to: `${base}/trainers`, label: 'Trainers' },
-  ]
+  const fontStack = getFontStack(gym.font_family)
 
   return (
     <div
-      className="min-h-screen bg-white"
-      style={themeVars}
+      data-gym-theme={gym.theme_mode || 'dark'}
+      style={{ ...themeVars, background: 'var(--gym-bg)', color: 'var(--gym-text)', '--font-display': fontStack }}
+      className="min-h-screen"
     >
+      {/* Scoped font override — guarantees the custom font applies on all devices
+          even when Tailwind v4 @theme CSS variable registration interferes */}
+      {gym.font_family && gym.font_family !== 'default' && (
+        <style>{`[data-gym-theme] .font-display { font-family: ${fontStack} !important; }`}</style>
+      )}
       <GymNavbar />
       <main>
         <Outlet />
       </main>
 
-      {/* Premium Footer */}
-      <footer className="relative border-t border-gray-100">
-        {/* Gradient accent line */}
-        <div
-          className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: themeVars['--gym-gradient'] }}
-        />
-
-        <div className="max-w-6xl mx-auto px-4 py-12">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-            {/* Brand */}
-            <div className="sm:col-span-2 lg:col-span-2">
-              <div className="flex items-center gap-3 mb-4">
+      {/* Theme-aware footer */}
+      <footer style={{ background: 'var(--gym-surface)', borderTop: '1px solid var(--gym-border)' }}>
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
+            {/* Brand col */}
+            <div className="md:col-span-5">
+              <div className="flex items-center gap-3 mb-5">
                 {gym.logo_url ? (
                   <img src={gym.logo_url} alt={gym.name} className="w-10 h-10 rounded-xl object-cover" />
                 ) : (
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm"
-                    style={{ backgroundColor: themeVars['--gym-primary'] }}
-                  >
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white" style={{ background: 'var(--gym-gradient)' }}>
                     {gym.name.charAt(0).toUpperCase()}
                   </div>
                 )}
-                <span className="font-bold text-gray-900 text-lg">{gym.name}</span>
+                <span className="font-display text-xl tracking-wider" style={{ color: 'var(--gym-text)' }}>
+                  {gym.name.toUpperCase()}
+                </span>
               </div>
-              <p className="text-sm text-gray-500 max-w-sm leading-relaxed">
-                {gym.description || `Premium fitness facility${gym.city ? ` in ${gym.city}` : ''}. Transform your body, elevate your life.`}
+              <p className="text-sm leading-relaxed max-w-xs" style={{ color: 'var(--gym-text-muted)' }}>
+                {gym.description || `Premium fitness facility${gym.city ? ` in ${gym.city}` : ''}. Built for those who refuse to settle.`}
               </p>
             </div>
 
-            {/* Quick Links */}
-            <div>
-              <h4 className="font-semibold text-gray-900 text-sm mb-4">Quick Links</h4>
-              <ul className="space-y-2.5">
-                {footerLinks.map((link) => (
+            {/* Links */}
+            <div className="md:col-span-3 md:col-start-7">
+              <h4 className="text-xs tracking-[0.2em] uppercase mb-5 font-sans font-bold" style={{ color: 'var(--gym-text-muted)' }}>Navigate</h4>
+              <ul className="space-y-3">
+                {[
+                  { to: base, label: 'Home' },
+                  { to: `${base}/about`, label: 'About' },
+                  { to: `${base}/pricing`, label: 'Pricing' },
+                  { to: `${base}/trainers`, label: 'Trainers' },
+                  { to: `${base}/contact`, label: 'Contact' },
+                ].map(link => (
                   <li key={link.to}>
-                    <a href={link.to} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                    <a
+                      href={link.to}
+                      className="text-sm transition-colors duration-200"
+                      style={{ color: 'var(--gym-text-secondary)' }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
+                    >
                       {link.label}
                     </a>
                   </li>
@@ -114,28 +113,63 @@ function GymLayoutInner() {
               </ul>
             </div>
 
-            {/* Contact */}
-            <div>
-              <h4 className="font-semibold text-gray-900 text-sm mb-4">Location</h4>
-              {gym.city && (
-                <p className="text-sm text-gray-500 flex items-start gap-2">
-                  <svg className="w-4 h-4 mt-0.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                  </svg>
-                  {gym.city}
-                </p>
-              )}
+            {/* Contact info */}
+            <div className="md:col-span-3">
+              <h4 className="text-xs tracking-[0.2em] uppercase mb-5 font-sans font-bold" style={{ color: 'var(--gym-text-muted)' }}>Contact</h4>
+              <div className="space-y-3">
+                {gym.phone && (
+                  <a
+                    href={`tel:${gym.phone}`}
+                    className="flex items-start gap-2 text-sm transition-colors"
+                    style={{ color: 'var(--gym-text-secondary)' }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
+                  >
+                    <svg className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--gym-primary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                    </svg>
+                    {gym.phone}
+                  </a>
+                )}
+                {gym.email && (
+                  <a
+                    href={`mailto:${gym.email}`}
+                    className="flex items-start gap-2 text-sm transition-colors"
+                    style={{ color: 'var(--gym-text-secondary)' }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
+                  >
+                    <svg className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--gym-primary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                    </svg>
+                    {gym.email}
+                  </a>
+                )}
+                {(gym.address || gym.city) && (
+                  <div className="flex items-start gap-2 text-sm" style={{ color: 'var(--gym-text-secondary)' }}>
+                    <svg className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--gym-primary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                    </svg>
+                    <span className="whitespace-pre-line">{gym.address || gym.city}</span>
+                  </div>
+                )}
+                {!gym.phone && !gym.email && !gym.address && !gym.city && (
+                  <p className="text-sm italic" style={{ color: 'var(--gym-text-muted)' }}>No contact details set</p>
+                )}
+              </div>
+              {/* Gradient line accent */}
+              <div className="mt-8 h-px w-16" style={{ background: 'var(--gym-gradient)' }} />
             </div>
           </div>
 
           {/* Bottom bar */}
-          <div className="pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs text-gray-400">
+          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-3" style={{ borderTop: '1px solid var(--gym-border)' }}>
+            <p className="text-xs" style={{ color: 'var(--gym-text-muted)' }}>
               &copy; {new Date().getFullYear()} {gym.name}. All rights reserved.
             </p>
-            <p className="text-xs text-gray-300">
-              Powered by <span className="font-medium text-gray-400">GymOS</span>
+            <p className="text-xs" style={{ color: 'var(--gym-text-muted)' }}>
+              Powered by <span className="font-medium" style={{ color: 'var(--gym-text-secondary)' }}>Gymmobius</span>
             </p>
           </div>
         </div>

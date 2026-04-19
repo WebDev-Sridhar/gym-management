@@ -339,7 +339,7 @@ export default function SignupPage() {
         {/* Trust signal */}
         <div className="text-center mt-6">
           <p className="text-xs text-gray-400">
-            Join 500+ gym owners already using GymOS
+            Join 500+ gym owners already using Gymmobius
           </p>
           <p className="text-xs text-gray-400 mt-1">
             By signing up, you agree to our Terms & Privacy Policy

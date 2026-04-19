@@ -18,6 +18,7 @@ import AttendancePage from './pages/owner/AttendancePage'
 import AnalyticsPage from './pages/owner/AnalyticsPage'
 import TrainersPage from './pages/owner/TrainersPage'
 import SettingsPage from './pages/owner/SettingsPage'
+import WebsitePage from './pages/owner/WebsitePage'
 import TrainerDashboard from './pages/trainer/TrainerDashboard'
 import MemberApp from './pages/member/MemberApp'
 import CheckinPage from './pages/checkin/CheckinPage'
@@ -26,6 +27,7 @@ import GymHome from './pages/gym/GymHome'
 import GymAbout from './pages/gym/GymAbout'
 import GymPricing from './pages/gym/GymPricing'
 import GymTrainers from './pages/gym/GymTrainers'
+import GymContact from './pages/gym/GymContact'
 
 const ownerLinks = [
   { to: '/owner-dashboard', icon: 'dashboard', label: 'Dashboard' },
@@ -35,7 +37,7 @@ const ownerLinks = [
   { to: '/owner-dashboard/trainers', icon: 'trainers', label: 'Trainers' },
   { to: '/owner-dashboard/analytics', icon: 'analytics', label: 'Analytics' },
   { to: '/owner-dashboard/checkin', icon: 'checkin', label: 'Check-in' },
-  { to: '/owner-dashboard/settings', icon: 'settings', label: 'Settings' },
+  { to: '/owner-dashboard/website', icon: 'website', label: 'Website' },
 ]
 
 const trainerLinks = [
@@ -86,6 +88,7 @@ export default function App() {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="checkin" element={<AttendancePage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="website" element={<WebsitePage />} />
           </Route>
 
           {/* Trainer dashboard — protected, trainer only */}
@@ -111,6 +114,7 @@ export default function App() {
             <Route path="about" element={<GymAbout />} />
             <Route path="pricing" element={<GymPricing />} />
             <Route path="trainers" element={<GymTrainers />} />
+            <Route path="contact" element={<GymContact />} />
           </Route>
         </Routes>
       </AuthProvider>

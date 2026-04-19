@@ -19,11 +19,11 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
           {/* Brand */}
           <motion.div variants={fadeUp} className="col-span-2 md:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-purple to-accent-blue flex items-center justify-center">
-                <span className="text-white font-bold text-sm">G</span>
+            <div className="flex items-center mb-4">
+              <div className="w-16 h-auto flex items-center justify-center">
+               <img src="/logo3.png" alt="Logo" className="w-full h-auto" />
               </div>
-              <span className="text-text-primary font-bold text-xl tracking-tight">GymOS</span>
+              <span className=" text-text-primary font-bold text-xl tracking-tight">Gymmobius</span>
             </div>
             <p className="text-text-muted text-sm leading-relaxed max-w-xs">
               The complete operating system for modern gyms. Manage, grow, and retain — all in one platform.
@@ -56,7 +56,7 @@ export default function Footer() {
           className="mt-14 pt-8 border-t border-border/30 flex flex-col md:flex-row items-center justify-between gap-4"
         >
           <p className="text-text-muted text-sm">
-            &copy; {new Date().getFullYear()} GymOS. All rights reserved.
+            &copy; {new Date().getFullYear()} Gymmobius. All rights reserved.
           </p>
           <div className="flex gap-6">
             {['Twitter', 'LinkedIn', 'Instagram'].map((social) => (

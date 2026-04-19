@@ -7,8 +7,8 @@ import { TESTIMONIALS } from '../../lib/constants'
 
 function TestimonialCard({ testimonial }) {
   return (
-    <div className="min-w-[320px] sm:min-w-[380px] p-[1px] rounded-2xl bg-gradient-to-br from-border/50 via-transparent to-border/20 shrink-0">
-      <div className="bg-bg-card/80 backdrop-blur-xl rounded-2xl p-6 h-full flex flex-col">
+    <div className="min-w-[320px] sm:min-w-[380px] border border-border/40 rounded-2xl bg-bg-card/80 backdrop-blur-xl shrink-0">
+      <div className="rounded-2xl p-6 h-full flex flex-col">
         {/* Stars */}
         <div className="flex gap-1 mb-4">
           {[...Array(5)].map((_, i) => (
@@ -25,7 +25,7 @@ function TestimonialCard({ testimonial }) {
 
         {/* Author */}
         <div className="flex items-center gap-3 pt-4 border-t border-border/30">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-purple to-accent-blue flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
             <span className="text-white text-xs font-bold">{testimonial.initials}</span>
           </div>
           <div>

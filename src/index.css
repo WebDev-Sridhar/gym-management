@@ -3,9 +3,9 @@
 
 
 @theme {
-  --color-bg: #0B0B0F;
-  --color-bg-elevated: #12121A;
-  --color-bg-card: #16161F;
+  --color-bg: #000000;
+  --color-bg-elevated: #0a0a0a;
+  --color-bg-card: #0f0f0f;
   --color-surface: #1E1E2A;
   --color-border: #2A2A3A;
   --color-border-glow: #7C3AED;
@@ -21,7 +21,8 @@
   --color-glow-purple: rgba(139, 92, 246, 0.15);
   --color-glow-blue: rgba(59, 130, 246, 0.12);
 
-  --font-sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Lexend Deca', system-ui, -apple-system, sans-serif;
+  --font-display: 'Anton', sans-serif;
 }
 
 /* Global resets */
@@ -82,6 +83,58 @@ html.lenis body {
   background-color: rgba(139, 92, 246, 0.3);
   color: var(--color-text-primary);
 }
+
+/* ─── Gym public site: light mode text overrides ──────────────────────────────
+   Replaces hardcoded text-white* Tailwind classes with themed CSS-var colors
+   when [data-gym-theme="light"] is set on the gym layout root.
+   Elements on always-dark surfaces (hero photo, gradient CTAs, navbar, footer)
+   opt out by adding the [data-force-white] attribute.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+[data-gym-theme="light"] .text-white              { color: var(--gym-text); }
+[data-gym-theme="light"] .text-white\/80,
+[data-gym-theme="light"] .text-white\/75,
+[data-gym-theme="light"] .text-white\/70,
+[data-gym-theme="light"] .text-white\/65,
+[data-gym-theme="light"] .text-white\/60,
+[data-gym-theme="light"] .text-white\/55,
+[data-gym-theme="light"] .text-white\/50,
+[data-gym-theme="light"] .text-white\/45          { color: var(--gym-text-secondary); }
+[data-gym-theme="light"] .text-white\/40,
+[data-gym-theme="light"] .text-white\/35,
+[data-gym-theme="light"] .text-white\/30,
+[data-gym-theme="light"] .text-white\/25,
+[data-gym-theme="light"] .text-white\/20,
+[data-gym-theme="light"] .text-white\/15          { color: var(--gym-text-muted); }
+[data-gym-theme="light"] .placeholder-white\/20::placeholder,
+[data-gym-theme="light"] .placeholder-white\/25::placeholder { color: var(--gym-text-muted); opacity: 1; }
+
+/* Elements with gym gradient backgrounds always display white text */
+[data-gym-theme="light"] [style*="var(--gym-gradient"] { color: white; }
+[data-gym-theme="light"] [style*="var(--gym-gradient"] .text-white { color: white !important; }
+[data-gym-theme="light"] [style*="var(--gym-gradient"] .text-white\/80 { color: rgba(255,255,255,0.80) !important; }
+[data-gym-theme="light"] [style*="var(--gym-gradient"] .text-white\/75 { color: rgba(255,255,255,0.75) !important; }
+[data-gym-theme="light"] [style*="var(--gym-gradient"] .text-white\/70 { color: rgba(255,255,255,0.70) !important; }
+[data-gym-theme="light"] [style*="var(--gym-gradient"] .text-white\/65 { color: rgba(255,255,255,0.65) !important; }
+[data-gym-theme="light"] [style*="var(--gym-gradient"] .text-white\/40 { color: rgba(255,255,255,0.40) !important; }
+
+/* Restore white text inside [data-force-white] regions (always-dark surfaces) */
+[data-gym-theme="light"] [data-force-white] .text-white              { color: white !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/80          { color: rgba(255,255,255,0.80) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/75          { color: rgba(255,255,255,0.75) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/70          { color: rgba(255,255,255,0.70) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/65          { color: rgba(255,255,255,0.65) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/60          { color: rgba(255,255,255,0.60) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/55          { color: rgba(255,255,255,0.55) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/50          { color: rgba(255,255,255,0.50) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/45          { color: rgba(255,255,255,0.45) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/40          { color: rgba(255,255,255,0.40) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/35          { color: rgba(255,255,255,0.35) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/30          { color: rgba(255,255,255,0.30) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/25          { color: rgba(255,255,255,0.25) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/20          { color: rgba(255,255,255,0.20) !important; }
+[data-gym-theme="light"] [data-force-white] .text-white\/15          { color: rgba(255,255,255,0.15) !important; }
+[data-gym-theme="light"] [data-force-white] .placeholder-white\/20::placeholder { color: rgba(255,255,255,0.20) !important; opacity: 1; }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {

@@ -1,22 +1,83 @@
+const UNS = 'https://images.unsplash.com/photo-'
+const fit = '?w=800&q=80&auto=format&fit=crop'
+const fitWide = '?w=1920&q=80&auto=format&fit=crop'
+
+
+
 export function getDefaultContent(gymName = 'Our Gym', gymCity = '') {
+  const city = gymCity ? ` in ${gymCity}` : ''
   return {
     hero: {
-      title: `Transform Your Body. Elevate Your Life.`,
-      subtitle: `Premium training programs, expert coaches, and a community built for results — all at ${gymName}.`,
-      badge: 'Now Open',
+      badge: 'Now Enrolling',
+      title: 'FORGE YOUR\nSTRONGEST SELF',
+      subtitle: 'Premium equipment. Expert coaching. A community that pushes you further than you thought possible.',
       primaryCTA: { label: 'View Plans', path: 'pricing' },
-      secondaryCTA: { label: 'Learn More', path: 'about' },
+      secondaryCTA: { label: 'Meet Our Trainers', path: 'trainers' },
+      // backgroundImage: `${UNS}1534438327276-14e5300c3a48${fitWide}`,
+      backgroundImage: `${UNS}1728486145245-d4cb0c9c3470${fitWide}`,
     },
+    stats: [
+      { value: '500+', label: 'Active Members' },
+      { value: '15+', label: 'Expert Trainers' },
+      { value: '50+', label: 'Weekly Classes' },
+      { value: '10+', label: 'Years of Excellence' },
+    ],
     about: {
-      heading: `Why ${gymName}?`,
-      description: `At ${gymName}, we believe fitness is more than a workout — it's a lifestyle. Our state-of-the-art facility${gymCity ? ` in ${gymCity}` : ''} is designed to help you push boundaries, build confidence, and achieve results that last. From world-class equipment to expert-led programs, everything is built around your success.`,
-      stats: [
-        { value: '500+', label: 'Active Members' },
-        { value: '15+', label: 'Expert Trainers' },
-        { value: '50+', label: 'Weekly Classes' },
-        { value: '10+', label: 'Years Experience' },
+      superLabel: 'Our Story',
+      heading: `This Is ${gymName}`,
+      description: `${gymName}${city} was built for people who refuse to settle. Whether you're just starting out or chasing a personal record, our facility gives you every tool you need — world-class equipment, certified coaches, and a training environment that demands your best.`,
+      image: `${UNS}1571019614242-c5c5dee9f50b${fit}`,
+      features: [
+        { icon: 'dumbbell', text: 'State-of-the-art equipment updated yearly' },
+        { icon: 'award',    text: 'Certified personal trainers on-floor daily' },
+        { icon: 'target',   text: '50+ group classes every week' },
+        { icon: 'users',    text: 'Nutrition & recovery programs included' },
       ],
     },
+    workoutPrograms: [
+      {
+        id: 'wp-1',
+        category: 'STRENGTH',
+        title: 'Iron Weight Training',
+        description: 'Build raw power and lean muscle',
+        image: `${UNS}1581009146145-b5ef050c2e1e${fit}`,
+      },
+      {
+        id: 'wp-2',
+        category: 'HIIT',
+        title: 'High Intensity Circuit',
+        description: 'Maximum burn in minimum time',
+        image: `${UNS}1599058917212-d750089bc07e${fit}`,
+      },
+      {
+        id: 'wp-3',
+        category: 'YOGA',
+        title: 'Power Yoga Flow',
+        description: 'Strength through mindful movement',
+        image: `${UNS}1544367567-0f2fcb009e0b${fit}`,
+      },
+      {
+        id: 'wp-4',
+        category: 'BOXING',
+        title: 'Combat Fitness',
+        description: 'Hit harder, move faster',
+        image: `${UNS}1549719386-74dfcbf7dbed${fit}`,
+      },
+      {
+        id: 'wp-5',
+        category: 'CROSSFIT',
+        title: 'CrossFit WOD',
+        description: 'Push every limit every day',
+        image: `${UNS}1526401485004-46910ecc8e51${fit}`,
+      },
+      {
+        id: 'wp-6',
+        category: 'CARDIO',
+        title: 'Speed Endurance',
+        description: 'Run further, breathe easier',
+        image: `${UNS}1538805060514-97d9cc17730c${fit}`,
+      },
+    ],
     programs: {
       heading: 'Our Programs',
       subtitle: 'Choose the plan that matches your fitness ambitions',
@@ -26,7 +87,7 @@ export function getDefaultContent(gymName = 'Our Gym', gymCity = '') {
           name: 'Starter',
           price: 999,
           duration_label: 'per month',
-          features: ['Full gym access', 'Locker facility', 'Basic equipment training', 'Fitness assessment'],
+          features: ['Full gym access', 'Locker facility', 'Fitness assessment', 'Group classes (3/week)'],
           is_popular: false,
         },
         {
@@ -34,7 +95,7 @@ export function getDefaultContent(gymName = 'Our Gym', gymCity = '') {
           name: 'Pro',
           price: 1999,
           duration_label: 'per month',
-          features: ['Everything in Starter', 'Personal trainer sessions', 'Diet & nutrition plan', 'All group classes', 'Progress tracking'],
+          features: ['Everything in Starter', '4 PT sessions/month', 'Nutrition plan', 'Unlimited group classes', 'Progress tracking'],
           is_popular: true,
         },
         {
@@ -42,32 +103,41 @@ export function getDefaultContent(gymName = 'Our Gym', gymCity = '') {
           name: 'Elite',
           price: 3499,
           duration_label: 'per month',
-          features: ['Everything in Pro', 'Unlimited PT sessions', 'Spa & recovery access', 'Priority class booking', 'Guest passes included'],
+          features: ['Everything in Pro', 'Unlimited PT sessions', 'Spa & recovery access', 'Priority booking', 'Guest passes'],
           is_popular: false,
         },
       ],
     },
     trainers: {
-      heading: 'Meet Our Trainers',
-      subtitle: 'Expert coaches dedicated to helping you reach your goals',
+      heading: 'MEET THE COACHES',
+      subtitle: 'World-class experts. Real results. Built for you.',
       fallbackTrainers: [
-        { id: 'dt-1', name: 'Alex Rivera', specialization: 'Strength & Conditioning', bio: 'NSCA-certified coach with 8+ years helping athletes and beginners build functional strength.' },
-        { id: 'dt-2', name: 'Priya Sharma', specialization: 'Yoga & Mobility', bio: 'RYT-500 certified instructor specializing in power yoga, flexibility, and mindful movement.' },
-        { id: 'dt-3', name: 'Marcus Chen', specialization: 'HIIT & Cardio', bio: 'High-energy trainer known for dynamic workouts that burn fat, build endurance, and keep you coming back.' },
+        { id: 'dt-1', name: 'Alex Rivera', specialization: 'Strength & Conditioning', bio: 'NSCA-certified with 8+ years transforming athletes and beginners into their strongest selves.', image_url: '' },
+        { id: 'dt-2', name: 'Priya Sharma', specialization: 'Yoga & Mobility', bio: 'RYT-500 certified. Builds flexibility, balance, and mental clarity through power yoga.', image_url: '' },
+        { id: 'dt-3', name: 'Marcus Chen', specialization: 'HIIT & Cardio', bio: 'Explosive workouts, real results. Marcus has trained over 200+ athletes to peak fitness.', image_url: '' },
       ],
     },
     testimonials: {
-      heading: 'What Our Members Say',
-      subtitle: 'Real stories from real people who changed their lives',
+      heading: 'REAL PEOPLE.\nREAL RESULTS.',
+      subtitle: 'Stories from members who changed everything',
       fallbackTestimonials: [
-        { id: 'ft-1', name: 'Rahul M.', message: `Joining ${gymName} was the best decision I made this year. The trainers genuinely care about your progress, and the facility is world-class.`, rating: 5 },
-        { id: 'ft-2', name: 'Sneha K.', message: 'I have tried multiple gyms before, but nothing compares. The community here keeps me motivated and the results speak for themselves.', rating: 5 },
-        { id: 'ft-3', name: 'Arjun P.', message: 'Clean facility, modern equipment, and trainers who actually know what they are doing. Five stars is not enough.', rating: 5 },
+        { id: 'ft-1', name: 'Rahul M.', role: 'Member since 2022', message: `Joining ${gymName} was the best decision I made. The trainers genuinely care about your progress. I lost 18kg in 6 months.`, rating: 5 },
+        { id: 'ft-2', name: 'Sneha K.', role: 'Pro Member', message: 'Nothing compares to this place. The community keeps you accountable and the results speak for themselves. Life-changing.', rating: 5 },
+        { id: 'ft-3', name: 'Arjun P.', role: 'Elite Member', message: 'World-class equipment, expert trainers, and an atmosphere that pushes you to do more every single day. Five stars isn\'t enough.', rating: 5 },
       ],
     },
+    gallery: [
+      { id: 'g-1', src: `${UNS}1534438327276-14e5300c3a48${fit}`, alt: 'Gym floor' },
+      { id: 'g-2', src: `${UNS}1571019614242-c5c5dee9f50b${fit}`, alt: 'CrossFit' },
+      { id: 'g-3', src: `${UNS}1581009146145-b5ef050c2e1e${fit}`, alt: 'Strength training' },
+      { id: 'g-4', src: `${UNS}1599058917212-d750089bc07e${fit}`, alt: 'Cardio' },
+      { id: 'g-5', src: `${UNS}1549719386-74dfcbf7dbed${fit}`, alt: 'Boxing' },
+      { id: 'g-6', src: `${UNS}1526401485004-46910ecc8e51${fit}`, alt: 'CrossFit equipment' },
+    ],
     cta: {
-      heading: 'Ready to Start Your Transformation?',
-      subtitle: `Join ${gymName} today and take the first step toward the best version of yourself.`,
+      preHeading: 'READY TO TRANSFORM?',
+      heading: 'ARE YOU IN?',
+      subtitle: `Join ${gymName} today. Stop waiting. Start building the body you want.`,
       buttonLabel: 'Get Started Now',
       buttonPath: 'pricing',
     },

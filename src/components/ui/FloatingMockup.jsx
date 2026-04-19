@@ -66,7 +66,7 @@ export default function FloatingMockup() {
             <div className="w-2.5 h-2.5 rounded-full bg-amber-500/70" />
             <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
           </div>
-          <span className="text-text-muted text-[10px] ml-2 font-medium">GymOS Dashboard</span>
+          <span className="text-text-muted text-[10px] ml-2 font-medium">Gymmobius Dashboard</span>
         </div>
 
         <div className="p-4 space-y-4">

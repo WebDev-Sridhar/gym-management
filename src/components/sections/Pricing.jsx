@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
 import SectionWrapper from '../layout/SectionWrapper'
-import GradientText from '../ui/GradientText'
 import Button from '../ui/Button'
 import { fadeUp } from '../../lib/animations'
 import { PRICING_PLANS } from '../../lib/constants'
@@ -13,31 +12,27 @@ function PricingCard({ plan }) {
       variants={fadeUp}
       whileHover={{ scale: 1.03, transition: { duration: 0.25 } }}
       className={`
-        relative rounded-2xl p-[1px] overflow-hidden
+        relative rounded-2xl overflow-hidden border
         ${isHighlighted
-          ? 'bg-gradient-to-br from-accent-purple via-accent-blue to-accent-cyan shadow-[0_0_40px_rgba(139,92,246,0.2)]'
-          : 'bg-gradient-to-br from-border/60 via-transparent to-border/30'
+          ? 'border-white/20 bg-bg-card/95'
+          : 'border-border/40 bg-bg-card/80'
         }
+        backdrop-blur-xl p-8 h-full flex flex-col
       `}
     >
       {/* Popular badge */}
       {isHighlighted && (
         <div className="absolute top-0 right-0 z-10">
-          <div className="bg-gradient-to-r from-accent-purple to-accent-blue text-white text-xs font-bold px-4 py-1.5 rounded-bl-xl">
+          <div className="bg-white text-black text-xs font-bold px-4 py-1.5 rounded-bl-xl">
             Most Popular
           </div>
         </div>
       )}
 
-      <div className={`
-        relative rounded-2xl p-8 h-full flex flex-col
-        ${isHighlighted ? 'bg-bg-card/95' : 'bg-bg-card/80'}
-        backdrop-blur-xl
-      `}>
-        <div className="mb-6">
-          <h3 className="text-text-primary font-bold text-xl mb-2">{plan.name}</h3>
-          <p className="text-text-muted text-sm">{plan.description}</p>
-        </div>
+      <div className="mb-6">
+        <h3 className="text-text-primary font-bold text-xl mb-2">{plan.name}</h3>
+        <p className="text-text-muted text-sm">{plan.description}</p>
+      </div>
 
         <div className="flex items-baseline gap-1 mb-8">
           <span className="text-text-primary font-extrabold text-4xl tracking-tight">{plan.price}</span>
@@ -64,9 +59,8 @@ function PricingCard({ plan }) {
           className="w-full"
           href="/signup"
         >
-          {plan.cta}
-        </Button>
-      </div>
+        {plan.cta}
+      </Button>
     </motion.div>
   )
 }
@@ -82,12 +76,9 @@ export default function Pricing() {
         >
           Pricing
         </motion.span>
-        <GradientText
-          as="h2"
-          className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight"
-        >
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-text-primary">
           Simple, Transparent Pricing
-        </GradientText>
+        </h2>
         <motion.p
           variants={fadeUp}
           className="mt-4 text-text-secondary text-lg max-w-2xl mx-auto"

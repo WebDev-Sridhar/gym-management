@@ -252,7 +252,7 @@ export default function CheckinPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          Powered by GymOS
+          Powered by Gymmobius
         </p>
       </div>
     </div>

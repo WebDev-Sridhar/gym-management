@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
-import { fetchPlans, createPlan, deletePlan } from '../../services/membershipService'
+import { fetchPlans, createPlan, deletePlan, fetchMembers } from '../../services/membershipService'
 
 export default function PlansPage() {
   const { gymId } = useAuth()
   const [plans, setPlans] = useState([])
+  const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -24,10 +25,11 @@ export default function PlansPage() {
     setLoading(true)
     let cancelled = false
 
-    fetchPlans(gymId)
-      .then((data) => {
+    Promise.all([fetchPlans(gymId), fetchMembers(gymId)])
+      .then(([p, m]) => {
         if (cancelled) return
-        setPlans(data)
+        setPlans(p)
+        setMembers(m)
       })
       .catch((err) => console.error('Failed to load plans:', err))
       .finally(() => {
@@ -65,12 +67,19 @@ export default function PlansPage() {
     }
   }
 
-  async function handleDelete(planId) {
+  async function handleDelete(plan) {
+    const assignedCount = members.filter((m) => m.plan_id === plan.id).length
+    const warning = assignedCount > 0
+      ? `${assignedCount} member${assignedCount !== 1 ? 's are' : ' is'} currently on "${plan.name}". Deleting will unassign them and set their status to inactive. Continue?`
+      : `Delete plan "${plan.name}"?`
+
+    if (!confirm(warning)) return
+
     try {
-      await deletePlan(planId)
-      setPlans((prev) => prev.filter((p) => p.id !== planId))
+      await deletePlan(plan.id)
+      setPlans((prev) => prev.filter((p) => p.id !== plan.id))
     } catch (err) {
-      alert(err.message || 'Failed to delete plan. It may be assigned to members.')
+      alert(err.message || 'Failed to delete plan')
     }
   }
 
@@ -181,7 +190,7 @@ export default function PlansPage() {
               </p>
               <div className="mt-auto pt-4">
                 <button
-                  onClick={() => handleDelete(plan.id)}
+                  onClick={() => handleDelete(plan)}
                   className="text-xs text-red-500 hover:text-red-700 transition-colors cursor-pointer"
                 >
                   Delete plan

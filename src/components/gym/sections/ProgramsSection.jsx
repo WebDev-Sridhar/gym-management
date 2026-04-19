@@ -11,7 +11,7 @@ export default function ProgramsSection({ plans, defaults, themeColor }) {
       initial="hidden"
       whileInView="visible"
       viewport={scrollViewport}
-      className="bg-gray-50 border-t border-gray-100"
+      style={{ background: 'var(--gym-surface)', borderTop: '1px solid var(--gym-border)' }}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-24">
         {/* Section header */}
@@ -22,10 +22,10 @@ export default function ProgramsSection({ plans, defaults, themeColor }) {
           >
             Membership
           </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">
+          <h2 className="text-3xl sm:text-4xl font-extrabold mb-3" style={{ color: 'var(--gym-text)' }}>
             {defaults.programs.heading}
           </h2>
-          <p className="text-gray-500 max-w-lg mx-auto">
+          <p className="max-w-lg mx-auto" style={{ color: 'var(--gym-text-muted)' }}>
             {defaults.programs.subtitle}
           </p>
         </motion.div>

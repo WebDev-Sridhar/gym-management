@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion'
 import SectionWrapper from '../layout/SectionWrapper'
 import Card from '../ui/Card'
-import GradientText from '../ui/GradientText'
 import { fadeUp } from '../../lib/animations'
 import { FEATURES } from '../../lib/constants'
 import { QrCodeIcon, CreditCardIcon, ChartBarIcon, UsersIcon } from '../ui/Icons'
@@ -29,12 +28,9 @@ export default function Features() {
         >
           Features
         </motion.span>
-        <GradientText
-          as="h2"
-          className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight"
-        >
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-text-primary">
           Everything You Need to Scale
-        </GradientText>
+        </h2>
         <motion.p
           variants={fadeUp}
           className="mt-4 text-text-secondary text-lg max-w-2xl mx-auto"

@@ -25,6 +25,22 @@ export async function createPlan({ gymId, name, price, durationDays }) {
 }
 
 export async function deletePlan(planId) {
+  // Unassign from members (members.plan_id FK)
+  const { error: membersErr } = await supabase
+    .from('members')
+    .update({ plan_id: null, status: 'inactive' })
+    .eq('plan_id', planId)
+
+  if (membersErr) throw membersErr
+
+  // Null out plan reference in payments (payments.plan_id FK)
+  const { error: paymentsErr } = await supabase
+    .from('payments')
+    .update({ plan_id: null })
+    .eq('plan_id', planId)
+
+  if (paymentsErr) throw paymentsErr
+
   const { error } = await supabase
     .from('plans')
     .delete()
@@ -320,13 +336,24 @@ export async function fetchGymDetails(gymId) {
   return data
 }
 
-export async function updateGymDetails({ gymId, name, city, description, logo_url, theme_color }) {
+export async function updateGymDetails({ gymId, name, city, description, logo_url, theme_color, phone, email, address, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size }) {
   const updates = {}
   if (name !== undefined) updates.name = name
   if (city !== undefined) updates.city = city
   if (description !== undefined) updates.description = description
   if (logo_url !== undefined) updates.logo_url = logo_url
   if (theme_color !== undefined) updates.theme_color = theme_color
+  if (phone !== undefined) updates.phone = phone
+  if (email !== undefined) updates.email = email
+  if (address !== undefined) updates.address = address
+  if (secondary_color !== undefined) updates.secondary_color = secondary_color
+  if (font_family !== undefined) updates.font_family = font_family
+  if (card_style !== undefined) updates.card_style = card_style
+  if (border_radius !== undefined) updates.border_radius = border_radius
+  if (shadow_intensity !== undefined) updates.shadow_intensity = shadow_intensity
+  if (spacing !== undefined) updates.spacing = spacing
+  if (theme_mode !== undefined) updates.theme_mode = theme_mode
+  if (heading_size !== undefined) updates.heading_size = heading_size
 
   const { data, error } = await supabase
     .from('gyms')

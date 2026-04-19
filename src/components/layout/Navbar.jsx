@@ -28,12 +28,12 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
         {/* Logo */}
-        <a href="#" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-purple to-accent-blue flex items-center justify-center">
-            <span className="text-white font-bold text-sm">G</span>
+        <a href="#" className="flex items-center group">
+          <div className="w-16 h-auto flex items-center justify-center">
+            <img src="/logo3.png" alt="Logo" className="w-full h-auto" />
           </div>
-          <span className="text-text-primary font-bold text-xl tracking-tight group-hover:text-accent-purple transition-colors duration-300">
-            GymOS
+          <span className=" text-text-primary font-bold text-xl tracking-tight">
+            Gymmobius
           </span>
         </a>
 
@@ -53,15 +53,13 @@ export default function Navbar() {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-4">
-          <a
-            href="/login"
-            className="text-text-secondary hover:text-text-primary transition-colors duration-300 text-sm font-medium"
-          >
-            Login
-          </a>
-          <Button size="sm" href="/signup">Start Free Trial</Button>
+          <Button variant="glass" size="sm" href="/login">Login</Button>
+          <Button size="sm" href="/signup">Get Started</Button>
         </div>
-
+        <div className="md:hidden flex items-center gap-2">
+        <Button size="sm" href="/signup" className="">
+              Get Started
+              </Button>
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -80,6 +78,7 @@ export default function Navbar() {
             className="w-5 h-[2px] bg-text-primary block transition-all"
           />
         </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}
@@ -103,16 +102,15 @@ export default function Navbar() {
                   {link.label}
                 </a>
               ))}
-              <a
-                href="/login"
+    <div className="flex items-center mt-2 gap-2">
+              <Button variant="glass" size="sm" href="/login"
                 onClick={() => setMobileOpen(false)}
-                className="text-text-secondary hover:text-text-primary transition-colors text-base font-medium py-2"
               >
-                Login
-              </a>
-              <Button size="sm" href="/signup" className="mt-2 w-full">
-                Start Free Trial
+            Login</Button>
+              <Button size="sm" href="/signup" >
+              Get Started
               </Button>
+              </div>
             </div>
           </motion.div>
         )}

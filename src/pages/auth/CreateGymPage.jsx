@@ -8,6 +8,7 @@ export default function CreateGymPage() {
   const { user, isAuthenticated, isOnboarded, loading, refreshProfile } = useAuth()
   const navigate = useNavigate()
 
+  const [ownerName, setOwnerName] = useState(sessionStorage.getItem('onboarding_name') || '')
   const [gymName, setGymName] = useState('')
   const [city, setCity] = useState('')
   const [error, setError] = useState('')
@@ -52,10 +53,9 @@ export default function CreateGymPage() {
       })
 
       // Create user profile as owner
-      const savedName = sessionStorage.getItem('onboarding_name') || 'Gym Owner'
       await createUserProfile({
         authId: user.id,
-        name: savedName,
+        name: ownerName.trim() || 'Gym Owner',
         phone: user.phone || null,
         email: user.email || null,
         role: 'owner',
@@ -103,6 +103,19 @@ export default function CreateGymPage() {
         {/* Card */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
           <form onSubmit={handleSubmit}>
+            {/* Owner Name */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
+              <input
+                type="text"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="Enter your full name"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
+                autoFocus
+              />
+            </div>
+
             {/* Gym Name */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Gym Name</label>
@@ -112,7 +125,6 @@ export default function CreateGymPage() {
                 onChange={(e) => setGymName(e.target.value)}
                 placeholder="e.g. Iron Paradise Fitness"
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
-                autoFocus
               />
               {slug && (
                 <p className="text-xs text-gray-400 mt-1.5">

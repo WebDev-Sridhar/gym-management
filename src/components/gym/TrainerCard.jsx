@@ -1,52 +1,61 @@
 import { motion } from 'framer-motion'
-import { fadeUp, hoverLift } from '../../lib/animations'
+import { fadeUp } from '../../lib/animations'
 
-export default function TrainerCard({ trainer, themeColor }) {
+export default function TrainerCard({ trainer }) {
+  const handleTilt = (e) => {
+    const el = e.currentTarget
+    const rect = el.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 12
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -12
+    el.style.transform = `perspective(900px) rotateX(${y}deg) rotateY(${x}deg) scale(1.03)`
+    el.style.transition = 'transform 0.1s ease-out'
+  }
+  const handleTiltLeave = (e) => {
+    e.currentTarget.style.transform = 'perspective(900px) rotateX(0) rotateY(0) scale(1)'
+    e.currentTarget.style.transition = 'transform 0.5s ease'
+  }
+
   return (
     <motion.div
       variants={fadeUp}
-      whileHover={hoverLift}
-      className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100/80 overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300"
+      onMouseMove={handleTilt}
+      onMouseLeave={handleTiltLeave}
+      className="group rounded-2xl overflow-hidden"
+      style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)', willChange: 'transform' }}
     >
       {/* Image */}
-      <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden group">
+      <div className="relative overflow-hidden" style={{ aspectRatio: '4/3' }}>
         {trainer.image_url ? (
           <img
             src={trainer.image_url}
             alt={trainer.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-108"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--gym-surface)' }}>
             <div
-              className="w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg"
-              style={{ background: 'var(--gym-gradient, ' + themeColor + ')' }}
+              className="w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl font-display"
+              style={{ background: 'var(--gym-gradient)' }}
             >
               {trainer.name.charAt(0).toUpperCase()}
             </div>
           </div>
         )}
-        {/* Gradient overlay on hover */}
-        <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300"
-          style={{ background: 'var(--gym-gradient)' }}
-        />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)' }} />
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500" style={{ background: 'var(--gym-gradient)' }} />
       </div>
 
       {/* Info */}
       <div className="p-5">
-        <h3 className="font-bold text-gray-900 text-lg">{trainer.name}</h3>
+        <h3 className="font-display text-white tracking-wider text-xl">{trainer.name.toUpperCase()}</h3>
         {trainer.specialization && (
-          <p
-            className="text-sm font-semibold mt-1"
-            style={{ color: 'var(--gym-primary, ' + themeColor + ')' }}
-          >
+          <p className="text-xs font-bold tracking-[0.15em] uppercase mt-1 font-sans" style={{ color: 'var(--gym-primary)' }}>
             {trainer.specialization}
           </p>
         )}
         {trainer.bio && (
-          <p className="text-sm text-gray-500 mt-2 line-clamp-3 leading-relaxed">{trainer.bio}</p>
+          <p className="text-white/45 text-sm font-sans leading-relaxed mt-3 line-clamp-2">{trainer.bio}</p>
         )}
       </div>
     </motion.div>
