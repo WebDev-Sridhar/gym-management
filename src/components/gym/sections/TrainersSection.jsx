@@ -21,8 +21,8 @@ function TiltCard({ trainer }) {
       variants={fadeUp}
       onMouseMove={handleTilt}
       onMouseLeave={handleTiltLeave}
-      className="group rounded-2xl overflow-hidden relative cursor-pointer"
-      style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)', willChange: 'transform' }}
+      className="group overflow-hidden relative cursor-pointer"
+      style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)', borderRadius: 'var(--gym-card-radius)', boxShadow: 'var(--gym-shadow)', willChange: 'transform' }}
     >
       {/* Image area */}
       <div className="relative overflow-hidden" style={{ aspectRatio: '3/4' }}>
@@ -78,7 +78,7 @@ function TiltCard({ trainer }) {
   )
 }
 
-export default function TrainersSection({ gym, trainers, defaults }) {
+export default function TrainersSection({ gym, trainers, defaults, content }) {
   const displayTrainers = trainers.length > 0 ? trainers : defaults.trainers.fallbackTrainers
   const slug = gym?.slug
 
@@ -90,19 +90,19 @@ export default function TrainersSection({ gym, trainers, defaults }) {
       viewport={scrollViewport}
       style={{ background: 'var(--gym-surface)', borderTop: '1px solid var(--gym-border)' }}
     >
-      <div className="max-w-6xl mx-auto px-6 py-24">
+      <div className="max-w-6xl mx-auto px-6" style={{ paddingBlock: "var(--gym-section-py)" }}>
         {/* Header */}
         <motion.div variants={fadeUp} className="mb-14 flex items-end justify-between flex-wrap gap-6">
           <div>
             <p className="text-xs font-bold tracking-[0.25em] uppercase mb-3 font-sans" style={{ color: 'var(--gym-primary)' }}>
-              Expert Coaches
+              {content?.trainers_section_label || 'Expert Coaches'}
             </p>
-            <h2 className="font-display text-white tracking-wide leading-none" style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}>
-              {defaults.trainers.heading}
+            <h2 className="font-display text-white tracking-wide leading-none" style={{ fontSize: 'var(--gym-h2-size)' }}>
+              {(content?.trainers_section_heading || defaults.trainers.heading).toUpperCase()}
             </h2>
           </div>
           <p className="text-white/40 text-sm font-sans max-w-xs leading-relaxed">
-            {defaults.trainers.subtitle}
+            {content?.trainers_section_subtitle || defaults.trainers.subtitle}
           </p>
         </motion.div>
 

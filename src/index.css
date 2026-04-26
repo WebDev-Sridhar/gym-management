@@ -78,6 +78,21 @@ html.lenis body {
   overflow: hidden;
 }
 
+/* CMS sidebar scrollbar */
+.cms-sidebar-inner::-webkit-scrollbar {
+  width: 4px;
+}
+.cms-sidebar-inner::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cms-sidebar-inner::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+.cms-sidebar-inner::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
 /* Selection styling */
 ::selection {
   background-color: rgba(139, 92, 246, 0.3);
@@ -138,18 +153,18 @@ html.lenis body {
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-bg);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
+  background: #d1d5db;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
+  background: #9ca3af;
 }

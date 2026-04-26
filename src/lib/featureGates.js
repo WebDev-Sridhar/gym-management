@@ -16,12 +16,15 @@ export function normalizePlan(planName) {
 
 // ─── Feature Access Rules ──────────────────────────────────────────────────────
 const FEATURE_RULES = {
-  edit_headings:   ['pro', 'premium'],  // text editing beyond Hero
-  live_preview:    ['pro', 'premium'],  // split-screen preview panel
-  font_controls:   ['pro', 'premium'],  // font family + card style
-  card_style:      ['pro', 'premium'],
-  advanced_design: ['premium'],         // radius / spacing / shadow
-  section_reorder: ['premium'],
+  edit_headings:    ['pro', 'premium'],  // text editing beyond Hero
+  live_preview:     ['pro', 'premium'],  // split-screen preview panel
+  font_controls:    ['pro', 'premium'],  // font family + card style
+  card_style:       ['pro', 'premium'],
+  advanced_design:  ['premium'],         // radius / spacing / shadow
+  section_reorder:  ['premium'],
+  page_hero_image:      ['premium'],     // background image on page heroes
+  page_hero_align:      ['premium'],     // text alignment on page heroes
+  section_visibility:   ['premium'],     // hide/show sections from CMS
 }
 
 /**

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { upsertCmsContent } from '../../../../services/gymCmsService'
+import { useCMSImageList } from '../../../../hooks/useCMSImage'
 import ImageUploader from '../components/ImageUploader'
 import FeatureGate from '../components/FeatureGate'
 
@@ -49,80 +50,79 @@ function SuccessMsg({ msg }) {
   )
 }
 
-const STAT_PLACEHOLDERS = [
-  { value: '500+', label: 'Members' },
-  { value: '15+',  label: 'Trainers' },
-  { value: '50+',  label: 'Classes/Week' },
-  { value: '10+',  label: 'Years Running' },
-]
-
-const WHY_US_PLACEHOLDERS = [
-  { title: 'World-Class Equipment', description: 'Over 200 pieces of premium equipment, updated every year.' },
-  { title: 'Expert Coaching',       description: 'Every trainer is certified and passionate about your results.' },
-  { title: 'Proven Programs',       description: '50+ structured classes per week — from beginner to elite.' },
-  { title: 'Real Community',        description: 'Over 500 members who push each other to be better.' },
+const FEATURE_PLACEHOLDERS = [
+  'World-Class Equipment',
+  'Expert Coaching',
+  'Proven Programs',
+  'Real Community',
 ]
 
 /**
- * AboutForm — all About page content with FeatureGate on text editing.
- * Image upload available to all plans (within limits).
- *
- * Props:
- *   content        object
- *   gymId          string
- *   planName       string
- *   onSave         fn
- *   setPreviewData fn
+ * AboutForm — home page About section content.
+ * Edits: description, feature point titles (shown as bullet list below desc),
+ * about image, and stats.
+ * Why Us cards (with descriptions) and Vision & Mission are in the About Page CMS.
  */
 export default function AboutForm({ content, gymId, planName, onSave, setPreviewData }) {
-  // Story
+  const [sectionLabel,   setSectionLabel]   = useState(content?.about_section_label   || '')
+  const [sectionHeading, setSectionHeading] = useState(content?.about_section_heading || '')
   const [aboutText, setAboutText] = useState(content?.about_text || '')
-  const [aboutImage, setAboutImage] = useState(content?.about_image || '')
-  const [aboutImages, setAboutImages] = useState(content?.about_images || [])
+  const [selectedImage, setSelectedImage] = useState(content?.about_image || '')
 
-  // Stats
-  const [stats, setStats] = useState(() =>
-    content?.stats?.length >= 4
-      ? content.stats.slice(0, 4).map(s => ({ value: s.value || '', label: s.label || '' }))
-      : [{ value: '', label: '' }, { value: '', label: '' }, { value: '', label: '' }, { value: '', label: '' }]
+  const aboutImgs = useCMSImageList({
+    gymId,
+    fieldKey: 'about_images',
+    section: 'about',
+    initialList: content?.about_images || [],
+  })
+
+  // 4 feature point titles stored in home_features (separate from why_us)
+  const [pointTitles, setPointTitles] = useState(() =>
+    Array.from({ length: 4 }, (_, i) => content?.home_features?.[i] || '')
   )
-
-  // Why Us
-  const [whyUs, setWhyUs] = useState(() =>
-    content?.why_us?.length >= 4
-      ? content.why_us.slice(0, 4).map(w => ({ title: w.title || '', description: w.description || '' }))
-      : [{ title: '', description: '' }, { title: '', description: '' }, { title: '', description: '' }, { title: '', description: '' }]
-  )
-
-  // Vision & Mission
-  const [vision, setVision] = useState(content?.vision || '')
-  const [mission, setMission] = useState(content?.mission || '')
 
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
 
+  function handleLabelChange(val) {
+    setSectionLabel(val)
+    setPreviewData?.(prev => ({ ...prev, about_section_label: val || undefined }))
+  }
+  function handleHeadingChange(val) {
+    setSectionHeading(val)
+    setPreviewData?.(prev => ({ ...prev, about_section_heading: val || undefined }))
+  }
   function handleTextChange(val) {
     setAboutText(val)
     setPreviewData?.(prev => ({ ...prev, about_text: val }))
   }
 
-  function handleImageChange(url) {
-    setAboutImage(url)
+  function handleSelectedChange(url) {
+    setSelectedImage(url)
     setPreviewData?.(prev => ({ ...prev, about_image: url }))
   }
 
-  function patchStat(i, key, val) {
-    setStats(prev => {
-      const next = prev.map((s, idx) => idx === i ? { ...s, [key]: val } : s)
-      setPreviewData?.(p => ({ ...p, stats: next }))
-      return next
-    })
+  // Called by ImageUploader when list changes via URL-add or delete buttons
+  function handleListChange(newList) {
+    const deleted = aboutImgs.list.filter(u => !newList.includes(u))
+    if (deleted.length > 0) {
+      deleted.forEach(u => aboutImgs.handleDelete(u))
+      if (selectedImage && deleted.includes(selectedImage)) {
+        setSelectedImage(newList[0] ?? '')
+      }
+      return
+    }
+    const added = newList.filter(u => !aboutImgs.list.includes(u))
+    added.forEach(u => aboutImgs.handleUrlAdd(u))
   }
 
-  function patchWhyUs(i, key, val) {
-    setWhyUs(prev => {
-      const next = prev.map((w, idx) => idx === i ? { ...w, [key]: val } : w)
-      setPreviewData?.(p => ({ ...p, why_us: next }))
+  function patchPointTitle(i, val) {
+    setPointTitles(prev => {
+      const next = prev.map((t, idx) => idx === i ? val : t)
+      setPreviewData?.(p => ({
+        ...p,
+        home_features: next.map((t, idx) => t || FEATURE_PLACEHOLDERS[idx]),
+      }))
       return next
     })
   }
@@ -130,16 +130,20 @@ export default function AboutForm({ content, gymId, planName, onSave, setPreview
   async function save() {
     setSaving(true); setSuccess('')
     try {
-      const hasStats = stats.some(s => s.value.trim() || s.label.trim())
-      const hasWhyUs = whyUs.some(w => w.title.trim() || w.description.trim())
+      const finalList = await aboutImgs.commitList()
+      const selectedIdx = aboutImgs.list.indexOf(selectedImage)
+      const finalSelected = selectedIdx >= 0
+        ? (finalList[selectedIdx] ?? finalList[0] ?? '')
+        : (finalList.includes(selectedImage) ? selectedImage : (finalList[0] ?? ''))
+
+      const hasPoints = pointTitles.some(t => t.trim())
       const updated = await upsertCmsContent(gymId, {
-        about_text:   aboutText.trim() || null,
-        about_image:  aboutImage.trim() || null,
-        about_images: aboutImages.length ? aboutImages : null,
-        stats:        hasStats ? stats.map(s => ({ value: s.value.trim(), label: s.label.trim() })) : null,
-        why_us:       hasWhyUs ? whyUs.map(w => ({ title: w.title.trim(), description: w.description.trim() })) : null,
-        vision:       vision.trim() || null,
-        mission:      mission.trim() || null,
+        about_section_label:   sectionLabel.trim()   || null,
+        about_section_heading: sectionHeading.trim() || null,
+        about_text:    aboutText.trim() || null,
+        about_image:   finalSelected || null,
+        about_images:  finalList.length ? finalList : null,
+        home_features: hasPoints ? pointTitles.map(t => t.trim()) : null,
       })
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
@@ -149,7 +153,22 @@ export default function AboutForm({ content, gymId, planName, onSave, setPreview
 
   return (
     <div className="space-y-1">
-      {/* Story */}
+      {/* Section Header */}
+      <FeatureGate feature="edit_headings" planName={planName}>
+        <div>
+          <SubSectionDivider title="Section Header" description="Label and heading for the About section on the home page." />
+          <div className="space-y-2">
+            <Field label="Label" hint='Small badge above heading. Default: "Our Story"'>
+              <input type="text" value={sectionLabel} onChange={e => handleLabelChange(e.target.value)} placeholder="Our Story" className={inputCls} />
+            </Field>
+            <Field label="Heading" hint='Large section title. Default: "This Is [Gym Name]"'>
+              <input type="text" value={sectionHeading} onChange={e => handleHeadingChange(e.target.value)} placeholder="This Is Your Gym" className={inputCls} />
+            </Field>
+          </div>
+        </div>
+      </FeatureGate>
+
+      {/* Description */}
       <FeatureGate feature="edit_headings" planName={planName}>
         <Field label="About Description" hint="2–3 sentences about your gym, culture, and mission.">
           <textarea
@@ -162,75 +181,47 @@ export default function AboutForm({ content, gymId, planName, onSave, setPreview
         </Field>
       </FeatureGate>
 
+      {/* Feature point titles — shown as bullet list below the description on the home page */}
+      <FeatureGate feature="edit_headings" planName={planName}>
+        <div>
+          <SubSectionDivider
+            title="Feature Points"
+            description="4 bullet points shown below the description on the home page. Edit full cards (with descriptions) from About Page → Why Choose Us."
+          />
+          <div className="space-y-2">
+            {pointTitles.map((title, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white bg-violet-600">{i + 1}</span>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => patchPointTitle(i, e.target.value)}
+                  placeholder={FEATURE_PLACEHOLDERS[i]}
+                  className={inputCls}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </FeatureGate>
+
+      {/* About image */}
       <div className="pt-2">
         <ImageUploader
           gymId={gymId}
           section="about"
-          currentUrl={aboutImage}
-          onChange={handleImageChange}
-          imageList={aboutImages}
-          onListChange={setAboutImages}
+          currentUrl={selectedImage}
+          onChange={handleSelectedChange}
+          imageList={aboutImgs.list}
+          onListChange={handleListChange}
+          onFileSelected={aboutImgs.handleFile}
+          isPending={aboutImgs.isPending}
           planName={planName}
           label="About Section Images"
           hint="Upload multiple images and select one as the active photo for the About section."
         />
+        {aboutImgs.error && <p className="mt-1.5 text-xs text-red-500">{aboutImgs.error}</p>}
       </div>
-
-      {/* Stats */}
-      <FeatureGate feature="edit_headings" planName={planName}>
-        <div>
-          <SubSectionDivider title="Stats" description="4 numbers shown in the stats strip. Leave empty to use defaults." />
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-3">
-              <span className="text-xs font-medium text-gray-500">Value</span>
-              <span className="text-xs font-medium text-gray-500">Label</span>
-            </div>
-            {stats.map((stat, i) => (
-              <div key={i} className="grid grid-cols-2 gap-3">
-                <input type="text" value={stat.value} onChange={e => patchStat(i, 'value', e.target.value)} placeholder={STAT_PLACEHOLDERS[i].value} className={inputCls} />
-                <input type="text" value={stat.label} onChange={e => patchStat(i, 'label', e.target.value)} placeholder={STAT_PLACEHOLDERS[i].label} className={inputCls} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </FeatureGate>
-
-      {/* Why Us */}
-      <FeatureGate feature="edit_headings" planName={planName}>
-        <div>
-          <SubSectionDivider title="Why Choose Us" description="4 feature cards on the About page. Leave empty to use defaults." />
-          <div className="space-y-3">
-            {whyUs.map((item, i) => (
-              <div key={i} className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-2.5">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Card {i + 1}</p>
-                <input type="text" value={item.title} onChange={e => patchWhyUs(i, 'title', e.target.value)}
-                  placeholder={WHY_US_PLACEHOLDERS[i].title} className={inputCls} />
-                <textarea value={item.description} onChange={e => patchWhyUs(i, 'description', e.target.value)}
-                  placeholder={WHY_US_PLACEHOLDERS[i].description} rows={2} className={inputCls + ' resize-none'} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </FeatureGate>
-
-      {/* Vision & Mission */}
-      <FeatureGate feature="edit_headings" planName={planName}>
-        <div>
-          <SubSectionDivider title="Vision & Mission" description="Two statement cards on the About page." />
-          <div className="space-y-4">
-            <Field label="Our Vision" hint="Long-term aspirational statement — 1–2 sentences.">
-              <textarea value={vision} onChange={e => setVision(e.target.value)} rows={3}
-                placeholder="To be the city's most transformative fitness community — where every person achieves their strongest self."
-                className={inputCls + ' resize-none'} />
-            </Field>
-            <Field label="Our Mission" hint="Day-to-day purpose and operational goal.">
-              <textarea value={mission} onChange={e => setMission(e.target.value)} rows={3}
-                placeholder="To provide elite coaching, world-class facilities, and an unbreakable community that makes fitness accessible to all."
-                className={inputCls + ' resize-none'} />
-            </Field>
-          </div>
-        </div>
-      </FeatureGate>
 
       <div className="flex items-center gap-3 pt-4">
         <SaveBtn saving={saving} onClick={save} />

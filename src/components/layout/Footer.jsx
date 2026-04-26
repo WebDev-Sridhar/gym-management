@@ -1,12 +1,31 @@
 import { motion } from 'framer-motion'
 import { fadeUp, scrollViewport } from '../../lib/animations'
+import { Link } from 'react-router-dom'
 
 const footerLinks = {
   Product: ['Features', 'Pricing', 'Demo', 'Changelog'],
   Company: ['About', 'Blog', 'Careers', 'Contact'],
-  Legal: ['Privacy', 'Terms', 'Security'],
+  Legal: ['Privacy', 'Terms', 'Security','Refund'],
 }
+const routeMap = {
+  // Product
+  Features: '/features',
+  Pricing: '/pricing',
+  Demo: '/demo',
+  Changelog: '/changelog',
 
+  // Company
+  About: '/about',
+  Blog: '/blog',
+  Careers: '/careers',
+  Contact: '/contact',
+
+  // Legal
+  Privacy: '/privacy',
+  Terms: '/terms',
+  Security: '/security',
+  Refund : '/refund-policy',
+}
 export default function Footer() {
   return (
     <motion.footer
@@ -19,11 +38,11 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
           {/* Brand */}
           <motion.div variants={fadeUp} className="col-span-2 md:col-span-1">
-            <div className="flex items-center mb-4">
-              <div className="w-16 h-auto flex items-center justify-center">
-               <img src="/logo3.png" alt="Logo" className="w-full h-auto" />
+            <div className="flex items-center mb-4 gap-2">
+              <div className="w-12 h-auto flex items-center justify-center">
+               <img src="/logo.png" alt="Logo" className="w-full h-auto" />
               </div>
-              <span className=" text-text-primary font-bold text-xl tracking-tight">Gymmobius</span>
+              <span className="text-text-primary font-bold text-xl tracking-tight">Gymmobius</span>
             </div>
             <p className="text-text-muted text-sm leading-relaxed max-w-xs">
               The complete operating system for modern gyms. Manage, grow, and retain — all in one platform.
@@ -37,12 +56,12 @@ export default function Footer() {
               <ul className="space-y-3">
                 {links.map((link) => (
                   <li key={link}>
-                    <a
-                      href="#"
-                      className="text-text-muted hover:text-text-secondary transition-colors duration-300 text-sm"
-                    >
-                      {link}
-                    </a>
+                <Link
+  to={routeMap[link] || '#'}
+  className="text-text-muted hover:text-text-secondary transition-colors duration-300 text-sm"
+>
+  {link}
+</Link>
                   </li>
                 ))}
               </ul>

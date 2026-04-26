@@ -15,6 +15,7 @@ export function getDefaultContent(gymName = 'Our Gym', gymCity = '') {
       secondaryCTA: { label: 'Meet Our Trainers', path: 'trainers' },
       // backgroundImage: `${UNS}1534438327276-14e5300c3a48${fitWide}`,
       backgroundImage: `${UNS}1728486145245-d4cb0c9c3470${fitWide}`,
+      imageDescription: "Train harder. Get stronger. Stay consistent",
     },
     stats: [
       { value: '500+', label: 'Active Members' },
@@ -112,9 +113,9 @@ export function getDefaultContent(gymName = 'Our Gym', gymCity = '') {
       heading: 'MEET THE COACHES',
       subtitle: 'World-class experts. Real results. Built for you.',
       fallbackTrainers: [
-        { id: 'dt-1', name: 'Alex Rivera', specialization: 'Strength & Conditioning', bio: 'NSCA-certified with 8+ years transforming athletes and beginners into their strongest selves.', image_url: '' },
-        { id: 'dt-2', name: 'Priya Sharma', specialization: 'Yoga & Mobility', bio: 'RYT-500 certified. Builds flexibility, balance, and mental clarity through power yoga.', image_url: '' },
-        { id: 'dt-3', name: 'Marcus Chen', specialization: 'HIIT & Cardio', bio: 'Explosive workouts, real results. Marcus has trained over 200+ athletes to peak fitness.', image_url: '' },
+        { id: 'dt-1', name: 'Alex Rivera', specialization: 'Strength & Conditioning', bio: 'NSCA-certified with 8+ years transforming athletes and beginners into their strongest selves.', image_url: `${UNS}1701481080490-cb2e7f4fd5f8${fit}` },
+        { id: 'dt-2', name: 'Priya Sharma', specialization: 'Yoga & Mobility', bio: 'RYT-500 certified. Builds flexibility, balance, and mental clarity through power yoga.', image_url: `${UNS}1689897229406-0f600543bb8d${fit}` },
+        { id: 'dt-3', name: 'Marcus Chen', specialization: 'HIIT & Cardio', bio: 'Explosive workouts, real results. Marcus has trained over 200+ athletes to peak fitness.', image_url: `${UNS}1665851299249-2106aa4d725c${fit}` },
       ],
     },
     testimonials: {
@@ -123,7 +124,10 @@ export function getDefaultContent(gymName = 'Our Gym', gymCity = '') {
       fallbackTestimonials: [
         { id: 'ft-1', name: 'Rahul M.', role: 'Member since 2022', message: `Joining ${gymName} was the best decision I made. The trainers genuinely care about your progress. I lost 18kg in 6 months.`, rating: 5 },
         { id: 'ft-2', name: 'Sneha K.', role: 'Pro Member', message: 'Nothing compares to this place. The community keeps you accountable and the results speak for themselves. Life-changing.', rating: 5 },
-        { id: 'ft-3', name: 'Arjun P.', role: 'Elite Member', message: 'World-class equipment, expert trainers, and an atmosphere that pushes you to do more every single day. Five stars isn\'t enough.', rating: 5 },
+        { id: 'ft-3', name: 'Arjun P.', role: 'Elite Member', message: "World-class equipment, expert trainers, and an atmosphere that pushes you to do more every single day. Five stars isn't enough.", rating: 5 },
+        { id: 'ft-4', name: 'Divya R.', role: 'Starter Member', message: `I was nervous joining a gym for the first time, but ${gymName} made me feel at home from day one. Down 12kg and absolutely loving it.`, rating: 5 },
+        { id: 'ft-5', name: 'Karan S.', role: 'Pro Member', message: 'The HIIT classes here are absolutely brutal — in the best way possible. My endurance has skyrocketed in just three months.', rating: 5 },
+        { id: 'ft-6', name: 'Meera T.', role: 'Elite Member', message: 'Best investment I ever made in myself. The personal trainers design programs that actually fit your lifestyle and goals. Incredible team.', rating: 5 },
       ],
     },
     gallery: [

@@ -105,8 +105,8 @@ export default function GymNavbar() {
           <div className="flex items-center gap-3">
             <Link
               to={`${base}/pricing`}
-              className="hidden md:inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold rounded-lg text-white transition-all duration-300 hover:opacity-90 hover:-translate-y-0.5"
-              style={{ background: 'var(--gym-gradient)' }}
+              className="hidden md:inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:opacity-90 hover:-translate-y-0.5"
+              style={{ background: 'var(--gym-gradient)', borderRadius: 'var(--gym-card-radius)' }}
             >
               Join Now
             </Link>
@@ -173,8 +173,8 @@ export default function GymNavbar() {
                 <Link
                   to={`${base}/pricing`}
                   onClick={() => setMobileOpen(false)}
-                  className="block text-center px-4 py-3 rounded-lg text-sm font-semibold text-white"
-                  style={{ background: 'var(--gym-gradient)' }}
+                  className="block text-center px-4 py-3 text-sm font-semibold text-white"
+                  style={{ background: 'var(--gym-gradient)', borderRadius: 'var(--gym-card-radius)' }}
                 >
                   Join Now
                 </Link>

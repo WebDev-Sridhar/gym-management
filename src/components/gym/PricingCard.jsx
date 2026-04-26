@@ -9,11 +9,11 @@ export default function PricingCard({ plan }) {
       variants={fadeUp}
       whileHover={{ y: -6 }}
       transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-      className="relative rounded-2xl p-7 flex flex-col"
+      className="relative p-7 flex flex-col"
       style={
         isPopular
-          ? { background: 'var(--gym-card)', border: '1px solid var(--gym-primary)', boxShadow: '0 0 30px var(--gym-glow)' }
-          : { background: 'var(--gym-card)', border: '1px solid var(--gym-border)' }
+          ? { background: 'var(--gym-card)', border: '1px solid var(--gym-primary)', borderRadius: 'var(--gym-card-radius)', boxShadow: '0 0 30px var(--gym-glow), var(--gym-shadow)' }
+          : { background: 'var(--gym-card)', border: '1px solid var(--gym-border)', borderRadius: 'var(--gym-card-radius)', boxShadow: 'var(--gym-shadow)' }
       }
     >
       {/* Popular badge */}
@@ -63,11 +63,11 @@ export default function PricingCard({ plan }) {
       <motion.button
         whileHover={{ scale: 1.03 }}
         whileTap={{ scale: 0.98 }}
-        className="w-full py-4 rounded-xl font-bold text-sm font-sans transition-all duration-300 cursor-pointer"
+        className="w-full py-4 font-bold text-sm font-sans transition-all duration-300 cursor-pointer"
         style={
           isPopular
-            ? { background: 'var(--gym-gradient)', color: '#fff', boxShadow: '0 6px 20px var(--gym-glow)' }
-            : { border: '1px solid var(--gym-border-strong)', color: 'var(--gym-text)', background: 'transparent' }
+            ? { background: 'var(--gym-gradient)', color: '#fff', boxShadow: '0 6px 20px var(--gym-glow)', borderRadius: 'var(--gym-card-radius)' }
+            : { border: '1px solid var(--gym-border-strong)', color: 'var(--gym-text)', background: 'transparent', borderRadius: 'var(--gym-card-radius)' }
         }
       >
         Get Started

@@ -20,8 +20,8 @@ export default function TrainerCard({ trainer }) {
       variants={fadeUp}
       onMouseMove={handleTilt}
       onMouseLeave={handleTiltLeave}
-      className="group rounded-2xl overflow-hidden"
-      style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)', willChange: 'transform' }}
+      className="group overflow-hidden"
+      style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)', borderRadius: 'var(--gym-card-radius)', boxShadow: 'var(--gym-shadow)', willChange: 'transform' }}
     >
       {/* Image */}
       <div className="relative overflow-hidden" style={{ aspectRatio: '4/3' }}>

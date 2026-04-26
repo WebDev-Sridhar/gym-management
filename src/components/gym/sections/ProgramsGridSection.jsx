@@ -6,8 +6,8 @@ function ProgramCard({ program, index }) {
     <motion.div
       variants={fadeUp}
       data-force-white
-      className="group relative overflow-hidden rounded-2xl cursor-pointer"
-      style={{ aspectRatio: index === 1 || index === 4 ? '3/4' : '4/5' }}
+      className="group relative overflow-hidden cursor-pointer"
+      style={{ aspectRatio: index === 1 || index === 4 ? '3/4' : '4/5', borderRadius: 'var(--gym-card-radius)' }}
       whileHover={{ y: -6, scale: 1.01 }}
       transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
     >
@@ -81,18 +81,18 @@ export default function ProgramsGridSection({ content, defaults }) {
       viewport={scrollViewport}
       style={{ background: 'var(--gym-bg)' }}
     >
-      <div className="max-w-6xl mx-auto px-6 py-24">
+      <div className="max-w-6xl mx-auto px-6" style={{ paddingBlock: "var(--gym-section-py)" }}>
         {/* Header */}
         <motion.div variants={fadeUp} className="mb-14">
           <p className="text-xs font-bold tracking-[0.25em] uppercase mb-3 font-sans" style={{ color: 'var(--gym-primary)' }}>
-            Training Programs
+            {content?.programs_label || 'Training Programs'}
           </p>
           <div className="flex items-end justify-between flex-wrap gap-4">
-            <h2 className="font-display text-white text-5xl sm:text-6xl lg:text-7xl tracking-wide">
-              WHAT WE OFFER
+            <h2 className="font-display text-white tracking-wide" style={{ fontSize: 'var(--gym-h2-size)' }}>
+              {(content?.programs_heading || 'WHAT WE OFFER').toUpperCase()}
             </h2>
             <p className="text-white/45 text-sm font-sans max-w-xs leading-relaxed">
-              Elite programs designed to push every limit and build your best body.
+              {content?.programs_desc || 'Elite programs designed to push every limit and build your best body.'}
             </p>
           </div>
         </motion.div>

@@ -7,8 +7,8 @@ export default function TestimonialCard({ testimonial }) {
       variants={fadeUp}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.3 }}
-      className="rounded-2xl p-6 flex flex-col h-full"
-      style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)' }}
+      className="p-6 flex flex-col h-full"
+      style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)', borderRadius: 'var(--gym-card-radius)', boxShadow: 'var(--gym-shadow)' }}
     >
       {/* Stars */}
       <div className="flex gap-1 mb-4">

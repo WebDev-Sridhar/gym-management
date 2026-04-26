@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { AuthProvider } from './store/AuthContext'
+import { AuthProvider, useAuth } from './store/AuthContext'
 import DashboardLayout from './components/layout/DashboardLayout'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import PublicRoute from './components/layout/PublicRoute'
@@ -19,6 +19,7 @@ import AnalyticsPage from './pages/owner/AnalyticsPage'
 import TrainersPage from './pages/owner/TrainersPage'
 import SettingsPage from './pages/owner/SettingsPage'
 import WebsitePage from './pages/owner/WebsitePage'
+import StarterWebsitePage from './pages/owner/StarterWebsitePage'
 import TrainerDashboard from './pages/trainer/TrainerDashboard'
 import MemberApp from './pages/member/MemberApp'
 import CheckinPage from './pages/checkin/CheckinPage'
@@ -28,6 +29,25 @@ import GymAbout from './pages/gym/GymAbout'
 import GymPricing from './pages/gym/GymPricing'
 import GymTrainers from './pages/gym/GymTrainers'
 import GymContact from './pages/gym/GymContact'
+import FeaturesPage from './pages/landing/FeaturesPage'
+import PricingPage from './pages/landing/PricingPage'
+import DemoPage from './pages/landing/DemoPage'
+import ChangelogPage from './pages/landing/ChangelogPage'
+import AboutPage from './pages/landing/AboutPage'
+import BlogPage from './pages/landing/BlogPage'
+import CareersPage from './pages/landing/CareersPage'
+import ContactPage from './pages/landing/ContactPage'
+import PrivacyPage from './pages/landing/PrivacyPage'
+import TermsPage from './pages/landing/TermsPage'
+import SecurityPage from './pages/landing/SecurityPage'
+import RefundPolicyPage from './pages/landing/RefundPolicyPage'
+
+
+function WebsitePageRouter() {
+  const { subscription } = useAuth()
+  const planName = subscription?.plan_name ?? 'Starter'
+  return planName === 'Starter' ? <StarterWebsitePage /> : <WebsitePage />
+}
 
 const ownerLinks = [
   { to: '/owner-dashboard', icon: 'dashboard', label: 'Dashboard' },
@@ -61,6 +81,20 @@ export default function App() {
           {/* Public routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/checkin" element={<CheckinPage />} />
+          <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/demo" element={<DemoPage />} />
+        <Route path="/changelog" element={<ChangelogPage />} />
+
+<Route path="/about" element={<AboutPage />} />
+<Route path="/blog" element={<BlogPage />} />
+<Route path="/careers" element={<CareersPage />} />
+<Route path="/contact" element={<ContactPage />} />
+
+<Route path="/privacy" element={<PrivacyPage />} />
+<Route path="/terms" element={<TermsPage />} />
+<Route path="/security" element={<SecurityPage />} />
+<Route path="/refund-policy" element={<RefundPolicyPage />} />
 
           {/* Auth & onboarding flow */}
           <Route path="/login" element={
@@ -88,7 +122,7 @@ export default function App() {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="checkin" element={<AttendancePage />} />
             <Route path="settings" element={<SettingsPage />} />
-            <Route path="website" element={<WebsitePage />} />
+            <Route path="website" element={<WebsitePageRouter />} />
           </Route>
 
           {/* Trainer dashboard — protected, trainer only */}

@@ -5,19 +5,27 @@ import StatCounter from '../ui/StatCounter'
 
 const ICON_MAP = { dumbbell: Dumbbell, award: Award, target: Target, users: Users, check: Check }
 const FallbackIcon = Check
+const DEFAULT_ICONS = ['dumbbell', 'award', 'target', 'users']
 
 export default function AboutSection({ content, defaults }) {
   const description = content?.about_text || defaults.about.description
   const image       = content?.about_image || defaults.about.image
 
-  // Use CMS stats if set, else defaults
-  const stats = (content?.stats?.length ? content.stats : defaults.stats).slice(0, 4)
+  // Per-field fallback: use CMS field if typed, else fall back to that field's default
+  const stats = Array.from({ length: 4 }, (_, i) => {
+    const cms = content?.stats?.[i]
+    return {
+      value: cms?.value?.trim() || defaults.stats[i].value,
+      label: cms?.label?.trim() || defaults.stats[i].label,
+    }
+  })
 
-  // Use CMS why_us if set, else default features
-  // why_us: [{ title, description }], features: [{ icon, text }]
-  const whyUs = content?.why_us?.length
-    ? content.why_us.slice(0, 4).map(w => ({ icon: 'check', text: `${w.title}${w.description ? ' — ' + w.description : ''}` }))
-    : defaults.about.features
+  // Feature points: read from home_features (separate field, not shared with why_us)
+  // Per-item fallback: show typed value or default text — never blank
+  const whyUs = Array.from({ length: 4 }, (_, i) => ({
+    icon: DEFAULT_ICONS[i] ?? 'check',
+    text: content?.home_features?.[i] || defaults.about.features[i]?.text || '',
+  }))
 
   return (
     <motion.section
@@ -27,7 +35,7 @@ export default function AboutSection({ content, defaults }) {
       viewport={scrollViewport}
       style={{ background: 'var(--gym-bg)' }}
     >
-      <div className="max-w-6xl mx-auto px-6 py-24">
+      <div className="max-w-6xl mx-auto px-6" style={{ paddingBlock: "var(--gym-section-py)" }}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center">
 
           {/* Left: Text content */}
@@ -37,14 +45,14 @@ export default function AboutSection({ content, defaults }) {
               className="text-xs font-bold tracking-[0.25em] uppercase mb-4 font-sans"
               style={{ color: 'var(--gym-primary)' }}
             >
-              {defaults.about.superLabel}
+              {content?.about_section_label || defaults.about.superLabel}
             </motion.p>
             <motion.h2
               variants={slideInLeft}
               className="font-display text-white tracking-wide leading-none mb-8"
-              style={{ fontSize: 'clamp(2.8rem, 6vw, 5rem)' }}
+              style={{ fontSize: 'var(--gym-h2-size)' }}
             >
-              {defaults.about.heading.toUpperCase()}
+              {(content?.about_section_heading || defaults.about.heading).toUpperCase()}
             </motion.h2>
             <motion.p
               variants={fadeUp}
@@ -74,8 +82,8 @@ export default function AboutSection({ content, defaults }) {
             {/* Image */}
             <motion.div
               variants={slideInRight}
-              className="relative rounded-2xl overflow-hidden"
-              style={{ aspectRatio: '4/5' }}
+              className="relative overflow-hidden"
+              style={{ aspectRatio: '4/5', borderRadius: 'var(--gym-card-radius)' }}
             >
               <motion.img
                 src={image}
@@ -93,12 +101,12 @@ export default function AboutSection({ content, defaults }) {
 
             {/* Inline stats */}
             <div className="grid grid-cols-2 gap-3">
-              {stats.map(stat => (
+              {stats.map((stat, i) => (
                 <motion.div
-                  key={stat.label}
+                  key={i}
                   variants={fadeUp}
-                  className="rounded-xl p-5"
-                  style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)' }}
+                  className="p-5"
+                  style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)', borderRadius: 'var(--gym-card-radius)', boxShadow: 'var(--gym-shadow)' }}
                 >
                   <StatCounter value={stat.value} label={stat.label} />
                 </motion.div>

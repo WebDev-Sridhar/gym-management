@@ -40,12 +40,12 @@ function hexToRGB(hex) {
 
 export function generateGymTheme(primaryHex = '#8B5CF6') {
   const { h, s, l } = hexToHSL(primaryHex)
-  // Color safety: clamp luminance for dark-bg readability
-  const safeLightness = l > 65 ? 52 : l < 30 ? 48 : l
-  const safeSaturation = Math.min(Math.max(s, 60), 90)
+  // Only block near-black (<8) and near-white (>92) — all other shades pass through
+  const safeLightness = l > 92 ? 75 : l < 8 ? 15 : l
+  const safeSaturation = Math.min(Math.max(s, 40), 95)
   const safePrimary = hslToHex(h, safeSaturation, safeLightness)
-  // Secondary: 25° analogous shift (keeps gradient harmonious)
-  const secondary = hslToHex((h + 25) % 360, Math.min(safeSaturation, 85), Math.min(safeLightness + 8, 62))
+  // Secondary: 25° analogous shift, stays within a reasonable lightness band relative to primary
+  const secondary = hslToHex((h + 25) % 360, Math.min(safeSaturation, 88), Math.min(Math.max(safeLightness + 8, 20), 88))
   const primaryRGB = hexToRGB(safePrimary)
   // Glow variant (semi-transparent)
   const primaryGlow = `rgba(${primaryRGB}, 0.18)`
@@ -65,17 +65,24 @@ export function generateGymTheme(primaryHex = '#8B5CF6') {
 // ── Design Control Maps ──
 
 const HEADING_SIZES = {
-  sm: { h1: 'clamp(2.5rem, 6vw, 5rem)',    h2: 'clamp(2rem, 4vw, 3.5rem)'   },
-  md: { h1: 'clamp(3.5rem, 9vw, 8rem)',    h2: 'clamp(2.8rem, 6vw, 5rem)'   },
-  lg: { h1: 'clamp(4.5rem, 11vw, 10rem)',  h2: 'clamp(3.5rem, 8vw, 7rem)'   },
-  xl: { h1: 'clamp(5.5rem, 13vw, 12rem)',  h2: 'clamp(4rem, 9vw, 8rem)'     },
+  sm: { h1: 'clamp(2.5rem, 5.5vw, 5.5rem)',    h2: 'clamp(1.75rem, 3vw, 3rem)'      },
+  md: { h1: 'clamp(3rem, 7vw, 7rem)',           h2: 'clamp(2.25rem, 4vw, 4rem)'      },
+  lg: { h1: 'clamp(3.25rem, 7.5vw, 7.25rem)',  h2: 'clamp(2.35rem, 4.25vw, 4.25rem)' },
+  xl: { h1: 'clamp(3.5rem, 7.8vw, 7.8rem)',    h2: 'clamp(2.5rem, 4.5vw, 4.5rem)'   },
 }
 
-const SHADOW_MAP = {
+const SHADOW_MAP_DARK = {
   none: 'none',
-  sm:   '0 2px 8px rgba(0,0,0,0.12)',
-  md:   '0 8px 30px rgba(0,0,0,0.20)',
-  lg:   '0 20px 60px rgba(0,0,0,0.35)',
+  sm:   '0 2px 16px rgba(0,0,0,0.55)',
+  md:   '0 8px 40px rgba(0,0,0,0.70)',
+  lg:   '0 20px 70px rgba(0,0,0,0.88)',
+}
+
+const SHADOW_MAP_LIGHT = {
+  none: 'none',
+  sm:   '0 2px 8px rgba(0,0,0,0.07)',
+  md:   '0 8px 30px rgba(0,0,0,0.13)',
+  lg:   '0 20px 60px rgba(0,0,0,0.24)',
 }
 
 const SPACING_MAP = {
@@ -92,23 +99,28 @@ const SPACING_MAP = {
 export function getFullThemeCSSVars(gym = {}) {
   const t = generateGymTheme(gym.theme_color || '#8B5CF6')
 
-  // Use stored secondary if set, otherwise auto-generated
-  const secondary = gym.secondary_color || t.secondary
+  // Use stored secondary if set (run through same near-black/near-white guard), else auto-generated
+  const rawSecondary = gym.secondary_color
+  const secondary = rawSecondary ? (() => {
+    const { h, s, l } = hexToHSL(rawSecondary)
+    const sl = l > 92 ? 75 : l < 8 ? 15 : l
+    return hslToHex(h, Math.min(Math.max(s, 40), 95), sl)
+  })() : t.secondary
   const secRGB = hexToRGB(secondary)
 
   const gradient        = `linear-gradient(135deg, ${t.primary}, ${secondary})`
   const gradientDiag    = `linear-gradient(120deg, ${t.primary} 0%, ${secondary} 100%)`
   const gradientSubtle  = `linear-gradient(135deg, rgba(${t.primaryRGB},0.15), rgba(${secRGB},0.15))`
 
-  const sizes    = HEADING_SIZES[gym.heading_size] ?? HEADING_SIZES.md
-  const shadow   = SHADOW_MAP[gym.shadow_intensity]   ?? SHADOW_MAP.md
-  const sectionPy = SPACING_MAP[gym.spacing]          ?? SPACING_MAP.normal
+  const isDark    = (gym.theme_mode ?? 'dark') !== 'light'
+  const sizes     = HEADING_SIZES[gym.heading_size] ?? HEADING_SIZES.md
+  const shadowMap = isDark ? SHADOW_MAP_DARK : SHADOW_MAP_LIGHT
+  const shadow    = shadowMap[gym.shadow_intensity] ?? shadowMap.md
+  const sectionPy = SPACING_MAP[gym.spacing]        ?? SPACING_MAP.normal
   // card_style='sharp' overrides border_radius
   const cardRadius = gym.card_style === 'sharp'     ? '4px'
                    : gym.border_radius != null       ? `${gym.border_radius}px`
                    : '16px'
-
-  const isDark = (gym.theme_mode ?? 'dark') !== 'light'
   const themeColors = isDark ? {
     '--gym-bg':            '#080808',
     '--gym-surface':       '#0f0f0f',
@@ -120,7 +132,7 @@ export function getFullThemeCSSVars(gym = {}) {
     '--gym-text-secondary':'rgba(255,255,255,0.62)',
     '--gym-text-muted':    'rgba(255,255,255,0.35)',
   } : {
-    '--gym-bg':            '#FAFAFA',
+    '--gym-bg':            '#E8EDF2',
     '--gym-surface':       '#F3F4F6',
     '--gym-card':          '#FFFFFF',
     '--gym-card-hover':    '#F9FAFB',
@@ -153,10 +165,11 @@ export function getFullThemeCSSVars(gym = {}) {
 
 const FONT_STACKS = {
   default:  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  serif:    'Georgia, "Times New Roman", Times, serif',
+  serif:    'Georgia, "Palatino Linotype", Palatino, "Book Antiqua", serif',
   mono:     '"Courier New", Courier, "Lucida Console", monospace',
-  display:  'Impact, "Arial Narrow", "Franklin Gothic Medium", sans-serif',
-  humanist: '"Trebuchet MS", "Gill Sans", Arial, sans-serif',
+  // "Arial Black" is universally available on iOS & Android (heavy/bold look)
+  display:  '"Viga", "Arial Bold", Impact, sans-serif',
+  humanist: '"Port Lligat Slab", "Century Gothic", "Gill Sans MT", Arial, sans-serif',
 }
 
 export function getFontStack(fontFamily) {

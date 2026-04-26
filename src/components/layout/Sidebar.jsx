@@ -128,9 +128,9 @@ export default function Sidebar({ links = [], gymName = 'Gymmobius' }) {
       >
         {/* Logo */}
         <div className="h-16 px-5 flex items-center justify-between border-b border-gray-100 shrink-0">
-          <button className="flex items-center">
-            <div className="w-14 h-auto flex items-center justify-center">
-              <img src="/logo3.png" alt="Logo" className="w-full h-auto" />
+          <button className="flex items-center gap-2">
+            <div className="w-12 h-auto flex items-center justify-center">
+              <img src="/logo.png" alt="Logo" className="w-full h-auto" />
             </div>
             <span className="font-bold text-gray-900 text-lg tracking-tight">{gymName}</span>
           </button>

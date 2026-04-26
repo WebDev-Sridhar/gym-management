@@ -336,7 +336,7 @@ export async function fetchGymDetails(gymId) {
   return data
 }
 
-export async function updateGymDetails({ gymId, name, city, description, logo_url, theme_color, phone, email, address, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size }) {
+export async function updateGymDetails({ gymId, name, city, description, logo_url, theme_color, phone, email, address, lat, lng, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, hero_style, social_links, working_hours }) {
   const updates = {}
   if (name !== undefined) updates.name = name
   if (city !== undefined) updates.city = city
@@ -346,6 +346,8 @@ export async function updateGymDetails({ gymId, name, city, description, logo_ur
   if (phone !== undefined) updates.phone = phone
   if (email !== undefined) updates.email = email
   if (address !== undefined) updates.address = address
+  if (lat !== undefined) updates.lat = lat
+  if (lng !== undefined) updates.lng = lng
   if (secondary_color !== undefined) updates.secondary_color = secondary_color
   if (font_family !== undefined) updates.font_family = font_family
   if (card_style !== undefined) updates.card_style = card_style
@@ -354,6 +356,9 @@ export async function updateGymDetails({ gymId, name, city, description, logo_ur
   if (spacing !== undefined) updates.spacing = spacing
   if (theme_mode !== undefined) updates.theme_mode = theme_mode
   if (heading_size !== undefined) updates.heading_size = heading_size
+  if (hero_style !== undefined) updates.hero_style = hero_style
+  if (social_links !== undefined) updates.social_links = social_links
+  if (working_hours !== undefined) updates.working_hours = working_hours
 
   const { data, error } = await supabase
     .from('gyms')

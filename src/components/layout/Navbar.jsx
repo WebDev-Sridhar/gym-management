@@ -28,9 +28,9 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
         {/* Logo */}
-        <a href="#" className="flex items-center group">
-          <div className="w-16 h-auto flex items-center justify-center">
-            <img src="/logo3.png" alt="Logo" className="w-full h-auto" />
+        <a href="#" className="flex items-center group gap-2">
+          <div className="w-12 h-auto flex items-center justify-center">
+            <img src="/logo.png" alt="Logo" className="w-full h-auto" />
           </div>
           <span className=" text-text-primary font-bold text-xl tracking-tight">
             Gymmobius

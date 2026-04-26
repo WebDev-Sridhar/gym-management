@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { fadeUp, staggerContainer, scrollViewport } from '../../../lib/animations'
 import PricingCard from '../PricingCard'
 
-export default function ProgramsSection({ plans, defaults, themeColor }) {
+export default function ProgramsSection({ plans, defaults, themeColor, content }) {
   const displayPlans = plans.length > 0 ? plans : defaults.programs.fallbackPlans
 
   return (
@@ -20,13 +20,13 @@ export default function ProgramsSection({ plans, defaults, themeColor }) {
             className="inline-block text-sm font-semibold tracking-wider uppercase mb-3"
             style={{ color: 'var(--gym-primary)' }}
           >
-            Membership
+            {content?.plans_section_label || 'Membership'}
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold mb-3" style={{ color: 'var(--gym-text)' }}>
-            {defaults.programs.heading}
+            {content?.plans_section_heading || defaults.programs.heading}
           </h2>
           <p className="max-w-lg mx-auto" style={{ color: 'var(--gym-text-muted)' }}>
-            {defaults.programs.subtitle}
+            {content?.plans_section_subtitle || defaults.programs.subtitle}
           </p>
         </motion.div>
 

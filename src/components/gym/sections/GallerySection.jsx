@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion'
 import { staggerContainer, scrollViewport, fadeUp } from '../../../lib/animations'
 
-export default function GallerySection({ defaults }) {
-  const images = defaults.gallery
+export default function GallerySection({ defaults, content }) {
+  const images = content?.gallery_images?.length > 0
+    ? content.gallery_images.map((src, i) => ({ id: i, src, alt: '' }))
+    : defaults.gallery
 
   return (
     <motion.section
@@ -12,14 +14,14 @@ export default function GallerySection({ defaults }) {
       viewport={scrollViewport}
       style={{ background: 'var(--gym-surface)', borderTop: '1px solid var(--gym-border)' }}
     >
-      <div className="max-w-6xl mx-auto px-6 py-24">
+      <div className="max-w-6xl mx-auto px-6" style={{ paddingBlock: "var(--gym-section-py)" }}>
         {/* Header */}
         <motion.div variants={fadeUp} className="mb-12 flex items-end justify-between flex-wrap gap-4">
           <div>
             <p className="text-xs font-bold tracking-[0.25em] uppercase mb-3 font-sans" style={{ color: 'var(--gym-primary)' }}>
               Inside Look
             </p>
-            <h2 className="font-display text-white text-5xl sm:text-6xl tracking-wide">OUR SPACE</h2>
+            <h2 className="font-display text-white tracking-wide" style={{ fontSize: 'var(--gym-h2-size)' }}>OUR SPACE</h2>
           </div>
           <p className="text-white/40 text-sm font-sans max-w-xs leading-relaxed">
             See the facility where champions are made.
@@ -35,7 +37,8 @@ export default function GallerySection({ defaults }) {
               <motion.div
                 key={img.id}
                 variants={fadeUp}
-                className={`group relative overflow-hidden rounded-xl ${rowSpan}`}
+                className={`group relative overflow-hidden ${rowSpan}`}
+                style={{ borderRadius: 'var(--gym-card-radius)' }}
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.4 }}
               >

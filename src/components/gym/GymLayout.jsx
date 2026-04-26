@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { GymProvider, useGym } from '../../store/GymContext'
 import GymNavbar from './GymNavbar'
 import { getFullThemeCSSVars, getFontStack } from '../../lib/gymTheme'
+import { SocialIcon } from '../../lib/socialPlatforms.jsx'
 
 export default function GymLayout() {
   return (
@@ -13,6 +15,26 @@ export default function GymLayout() {
 
 function GymLayoutInner() {
   const { gym, loading, error } = useGym()
+
+  const fontStack = gym ? getFontStack(gym.font_family) : null
+
+  // Inject font override into <head> — body <style> tags have rendering-order
+  // issues on mobile (processed after Tailwind's stylesheet).
+  useEffect(() => {
+    const STYLE_ID = 'gym-font-override'
+    let el = document.getElementById(STYLE_ID)
+    if (!fontStack || !gym?.font_family || gym.font_family === 'default') {
+      el?.remove()
+      return
+    }
+    if (!el) {
+      el = document.createElement('style')
+      el.id = STYLE_ID
+      document.head.appendChild(el)
+    }
+    el.textContent = `.font-display { font-family: ${fontStack} !important; }`
+    return () => { document.getElementById(STYLE_ID)?.remove() }
+  }, [fontStack, gym?.font_family])
 
   if (loading) {
     return (
@@ -46,19 +68,13 @@ function GymLayoutInner() {
 
   const themeVars = getFullThemeCSSVars(gym)
   const base = `/${gym.slug}`
-  const fontStack = getFontStack(gym.font_family)
 
   return (
     <div
       data-gym-theme={gym.theme_mode || 'dark'}
-      style={{ ...themeVars, background: 'var(--gym-bg)', color: 'var(--gym-text)', '--font-display': fontStack }}
+      style={{ ...themeVars, background: 'var(--gym-bg)', color: 'var(--gym-text)', overflowX: 'hidden' }}
       className="min-h-screen"
     >
-      {/* Scoped font override — guarantees the custom font applies on all devices
-          even when Tailwind v4 @theme CSS variable registration interferes */}
-      {gym.font_family && gym.font_family !== 'default' && (
-        <style>{`[data-gym-theme] .font-display { font-family: ${fontStack} !important; }`}</style>
-      )}
       <GymNavbar />
       <main>
         <Outlet />
@@ -67,9 +83,10 @@ function GymLayoutInner() {
       {/* Theme-aware footer */}
       <footer style={{ background: 'var(--gym-surface)', borderTop: '1px solid var(--gym-border)' }}>
         <div className="max-w-6xl mx-auto px-6 py-16">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
-            {/* Brand col */}
-            <div className="md:col-span-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-10 mb-12">
+
+            {/* Brand + social */}
+            <div className="sm:col-span-2 md:col-span-5">
               <div className="flex items-center gap-3 mb-5">
                 {gym.logo_url ? (
                   <img src={gym.logo_url} alt={gym.name} className="w-10 h-10 rounded-xl object-cover" />
@@ -85,9 +102,29 @@ function GymLayoutInner() {
               <p className="text-sm leading-relaxed max-w-xs" style={{ color: 'var(--gym-text-muted)' }}>
                 {gym.description || `Premium fitness facility${gym.city ? ` in ${gym.city}` : ''}. Built for those who refuse to settle.`}
               </p>
+              {/* Social icons */}
+              {(gym.social_links?.length > 0) && (
+                <div className="flex flex-wrap gap-2 mt-5">
+                  {gym.social_links.map(link => (
+                    <a
+                      key={link.platform}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={link.platform}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 hover:scale-110"
+                      style={{ background: 'var(--gym-border)', color: 'var(--gym-text-secondary)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--gym-primary)'; e.currentTarget.style.color = '#fff' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--gym-border)'; e.currentTarget.style.color = 'var(--gym-text-secondary)' }}
+                    >
+                      <SocialIcon platform={link.platform} className="w-4 h-4" />
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Links */}
+            {/* Navigate */}
             <div className="md:col-span-3 md:col-start-7">
               <h4 className="text-xs tracking-[0.2em] uppercase mb-5 font-sans font-bold" style={{ color: 'var(--gym-text-muted)' }}>Navigate</h4>
               <ul className="space-y-3">
@@ -113,18 +150,14 @@ function GymLayoutInner() {
               </ul>
             </div>
 
-            {/* Contact info */}
+            {/* Contact */}
             <div className="md:col-span-3">
               <h4 className="text-xs tracking-[0.2em] uppercase mb-5 font-sans font-bold" style={{ color: 'var(--gym-text-muted)' }}>Contact</h4>
               <div className="space-y-3">
                 {gym.phone && (
-                  <a
-                    href={`tel:${gym.phone}`}
-                    className="flex items-start gap-2 text-sm transition-colors"
-                    style={{ color: 'var(--gym-text-secondary)' }}
+                  <a href={`tel:${gym.phone}`} className="flex items-start gap-2 text-sm transition-colors" style={{ color: 'var(--gym-text-secondary)' }}
                     onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
-                  >
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}>
                     <svg className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--gym-primary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
                     </svg>
@@ -132,13 +165,9 @@ function GymLayoutInner() {
                   </a>
                 )}
                 {gym.email && (
-                  <a
-                    href={`mailto:${gym.email}`}
-                    className="flex items-start gap-2 text-sm transition-colors"
-                    style={{ color: 'var(--gym-text-secondary)' }}
+                  <a href={`mailto:${gym.email}`} className="flex items-start gap-2 text-sm transition-colors" style={{ color: 'var(--gym-text-secondary)' }}
                     onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
-                  >
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}>
                     <svg className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--gym-primary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                     </svg>
@@ -158,9 +187,9 @@ function GymLayoutInner() {
                   <p className="text-sm italic" style={{ color: 'var(--gym-text-muted)' }}>No contact details set</p>
                 )}
               </div>
-              {/* Gradient line accent */}
               <div className="mt-8 h-px w-16" style={{ background: 'var(--gym-gradient)' }} />
             </div>
+
           </div>
 
           {/* Bottom bar */}

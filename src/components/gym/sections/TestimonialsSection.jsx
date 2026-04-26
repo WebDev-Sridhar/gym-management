@@ -1,53 +1,87 @@
 import { motion } from 'framer-motion'
 import { staggerContainer, scrollViewport, fadeUp } from '../../../lib/animations'
+import TestimonialCard from '../TestimonialCard'
+import { useState, useEffect, useRef } from 'react'
 
-function TestimonialCard({ t }) {
-  return (
-    <motion.div
-      variants={fadeUp}
-      className="rounded-2xl p-7 flex flex-col h-full"
-      style={{ background: 'var(--gym-card)', border: '1px solid var(--gym-border)' }}
-      whileHover={{ y: -4, borderColor: 'var(--gym-border-strong)' }}
-      transition={{ duration: 0.3 }}
-    >
-      {/* Quote mark */}
-      <svg className="w-10 h-10 mb-4 opacity-20" style={{ color: 'var(--gym-primary)' }} fill="currentColor" viewBox="0 0 24 24">
-        <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H14.017zM0 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151C7.546 6.068 5.983 8.789 5.983 11H10v10H0z" />
-      </svg>
+export default function TestimonialsSection({ testimonials, defaults, content }) {
+  const displayTestimonials =
+    testimonials.length > 0
+      ? testimonials
+      : defaults.testimonials.fallbackTestimonials
 
-      {/* Stars */}
-      <div className="flex gap-1 mb-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <svg key={i} className="w-4 h-4" style={{ color: i < t.rating ? 'var(--gym-primary)' : 'var(--gym-border-strong)' }} fill="currentColor" viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-          </svg>
-        ))}
-      </div>
+  const rawHeading =
+    content?.testimonials_heading || defaults.testimonials.heading
 
-      <p className="text-white/65 text-sm font-sans leading-relaxed flex-1 mb-6">
-        "{t.message}"
-      </p>
+  const titleLines = rawHeading.split('\n')
 
-      {/* Author */}
-      <div className="flex items-center gap-3 pt-5" style={{ borderTop: '1px solid var(--gym-border)' }}>
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-          style={{ background: 'var(--gym-gradient)' }}
-        >
-          {t.name.charAt(0).toUpperCase()}
-        </div>
-        <div>
-          <p className="text-white text-sm font-semibold font-sans">{t.name}</p>
-          {t.role && <p className="text-white/35 text-xs font-sans mt-0.5">{t.role}</p>}
-        </div>
-      </div>
-    </motion.div>
-  )
-}
+  const [index, setIndex] = useState(0)
+  const [isDesktop, setIsDesktop] = useState(false)
+  const [containerW, setContainerW] = useState(0)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const wrapperRef = useRef(null)
+  const touchStartX = useRef(null)
 
-export default function TestimonialsSection({ testimonials, defaults }) {
-  const displayTestimonials = testimonials.length > 0 ? testimonials : defaults.testimonials.fallbackTestimonials
-  const titleLines = defaults.testimonials.heading.split('\n')
+  // Track breakpoint
+  useEffect(() => {
+    const update = () => setIsDesktop(window.innerWidth >= 768)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  // Measure container width via ResizeObserver for pixel-perfect math
+  useEffect(() => {
+    if (!wrapperRef.current) return
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerW(entry.contentRect.width)
+    })
+    ro.observe(wrapperRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  // Reset to 0 whenever layout changes
+  useEffect(() => {
+    setIndex(0)
+  }, [isDesktop])
+
+  const itemsPerView = isDesktop ? 3 : 1
+  const gap = 16 // px
+  const total = displayTestimonials.length
+  const maxIndex = Math.max(0, total - itemsPerView)
+
+  // cardWidth = (containerW - gap * (N-1)) / N
+  // shiftPx per step = cardWidth + gap
+  const cardWidth = containerW > 0
+    ? (containerW - gap * (itemsPerView - 1)) / itemsPerView
+    : 0
+  const shiftPx = index * (cardWidth + gap)
+
+  const next = () => setIndex((p) => Math.min(p + 1, maxIndex))
+  const prev = () => setIndex((p) => Math.max(p - 1, 0))
+
+  // ── Touch / swipe handlers (mobile only) ──────────────────────────────
+  const SWIPE_THRESHOLD = 50 // px needed to commit a slide
+
+  const onTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX
+    setIsDragging(true)
+    setDragOffset(0)
+  }
+
+  const onTouchMove = (e) => {
+    if (touchStartX.current === null) return
+    const delta = e.touches[0].clientX - touchStartX.current
+    setDragOffset(delta)
+  }
+
+  const onTouchEnd = () => {
+    setIsDragging(false)
+    if (dragOffset < -SWIPE_THRESHOLD) next()
+    else if (dragOffset > SWIPE_THRESHOLD) prev()
+    setDragOffset(0)
+    touchStartX.current = null
+  }
 
   return (
     <motion.section
@@ -55,27 +89,186 @@ export default function TestimonialsSection({ testimonials, defaults }) {
       initial="hidden"
       whileInView="visible"
       viewport={scrollViewport}
-      style={{ background: 'var(--gym-bg)', borderTop: '1px solid var(--gym-border)' }}
+      style={{
+        background: 'var(--gym-bg)',
+        borderTop: '1px solid var(--gym-border)',
+      }}
     >
-      <div className="max-w-6xl mx-auto px-6 py-24">
+      <div
+        className="max-w-7xl mx-auto"
+        style={{ paddingBlock: 'var(--gym-section-py)', paddingInline: '1.5rem' }}
+      >
         {/* Header */}
         <motion.div variants={fadeUp} className="mb-14 text-center">
-          <p className="text-xs font-bold tracking-[0.25em] uppercase mb-4 font-sans" style={{ color: 'var(--gym-primary)' }}>
-            Testimonials
+          <p
+            className="text-xs font-bold tracking-[0.25em] uppercase mb-4 font-sans"
+            style={{ color: 'var(--gym-primary)' }}
+          >
+            {content?.testimonials_label || 'Testimonials'}
           </p>
-          <h2 className="font-display text-white tracking-wide leading-none" style={{ fontSize: 'clamp(2.8rem, 6vw, 5.5rem)' }}>
+
+          <h2
+            className="font-display text-white tracking-wide leading-none"
+            style={{ fontSize: 'var(--gym-h2-size)' }}
+          >
             {titleLines.map((line, i) => (
-              <span key={i} className="block">{line}</span>
+              <span key={i} className="block">
+                {line}
+              </span>
             ))}
           </h2>
-          <p className="text-white/40 text-sm font-sans mt-4">{defaults.testimonials.subtitle}</p>
+
+          <p className="text-white/40 text-sm font-sans mt-4">
+            {content?.testimonials_subtitle ||
+              defaults.testimonials.subtitle}
+          </p>
         </motion.div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {displayTestimonials.map(t => (
-            <TestimonialCard key={t.id} t={t} />
-          ))}
+        {/* Slider */}
+        <div
+          style={{
+            position: 'relative',
+            borderRadius: '18px',
+            padding: isDesktop ? '24px 32px' : '16px',
+          }}
+        >
+          {/* Overflow clip — paddingTop gives room for the card hover lift */}
+          <div
+            ref={wrapperRef}
+            style={{ overflow: 'hidden', backgroundColor: 'var(--gym-bg)' }}
+            className='px-4 rounded-lg py-8'
+            onTouchStart={!isDesktop ? onTouchStart : undefined}
+            onTouchMove={!isDesktop ? onTouchMove : undefined}
+            onTouchEnd={!isDesktop ? onTouchEnd : undefined}
+          >
+
+            <div
+              style={{
+                display: 'flex',
+                gap: `${gap}px`,
+                transform: `translateX(${-shiftPx + dragOffset}px)`,
+                transition: isDragging ? 'none' : 'transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                willChange: 'transform',
+                touchAction: 'pan-y', // allow vertical scroll, capture horizontal
+              }}
+            >
+              {displayTestimonials.map((t) => (
+                <div
+                  key={t.id}
+                  style={{
+                    flex: `0 0 ${cardWidth}px`,
+                    minWidth: 0,
+                  }}
+                >
+                  <TestimonialCard testimonial={t} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Left Arrow */}
+          {index > 0 && (
+            <button
+              onClick={prev}
+              aria-label="Previous testimonials"
+              style={{
+                position: 'absolute',
+                left: '-16px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 10,
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.13)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.2s, transform 0.2s',
+                boxShadow: 'var(--gym-shadow)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(-50%) scale(1)'
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="var(--gym-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
+
+          {/* Right Arrow */}
+          {index < maxIndex && (
+            <button
+              onClick={next}
+              aria-label="Next testimonials"
+              style={{
+                position: 'absolute',
+                right: '-16px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 10,
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.13)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.2s, transform 0.2s',
+                boxShadow: 'var(--gym-shadow)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(-50%) scale(1)'
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="var(--gym-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+
+          {/* Dot indicators */}
+          {maxIndex > 0 && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '8px',
+              marginTop: '32px',
+            }}>
+              {Array.from({ length: maxIndex + 1 }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setIndex(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                  style={{
+                    width: i === index ? '24px' : '8px',
+                    height: '8px',
+                    borderRadius: '999px',
+                    background: i === index
+                      ? 'var(--gym-primary)'
+                      : 'var(--gym-text-muted)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    transition: 'width 0.3s ease, background 0.3s ease',
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </motion.section>

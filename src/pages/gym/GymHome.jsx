@@ -54,17 +54,18 @@ export default function GymHome() {
   }
 
   const defaults = getDefaultContent(gym?.name, gym?.city)
+  const hidden   = Array.isArray(content?.hidden_sections) ? content.hidden_sections : []
 
   return (
     <>
-      <HeroSection gym={gym} content={content} defaults={defaults} />
-      <StatsSection defaults={defaults} />
-      <ProgramsGridSection content={content} defaults={defaults} />
-      <AboutSection content={content} defaults={defaults} />
-      <TrainersSection gym={gym} trainers={trainers} defaults={defaults} themeColor={theme.primary} />
-      <TestimonialsSection testimonials={testimonials} defaults={defaults} />
-      <GallerySection defaults={defaults} />
-      <CTABanner gym={gym} content={content} defaults={defaults} />
+      {!hidden.includes('hero')         && <HeroSection gym={gym} content={content} defaults={defaults} />}
+      {!hidden.includes('stats_home')    && <StatsSection defaults={defaults} content={content} />}
+      {!hidden.includes('programs')     && <ProgramsGridSection content={content} defaults={defaults} />}
+      {!hidden.includes('about')        && <AboutSection content={content} defaults={defaults} />}
+      {!hidden.includes('trainers')     && <TrainersSection gym={gym} trainers={trainers} defaults={defaults} themeColor={theme.primary} content={content} />}
+      {!hidden.includes('testimonials') && <TestimonialsSection testimonials={testimonials} defaults={defaults} content={content} />}
+      {!hidden.includes('gallery')       && <GallerySection defaults={defaults} content={content} />}
+      {!hidden.includes('cta_home')     && <CTABanner gym={gym} content={content} defaults={defaults} />}
     </>
   )
 }
