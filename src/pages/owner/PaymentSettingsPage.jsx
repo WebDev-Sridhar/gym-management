@@ -78,8 +78,9 @@ export default function PaymentSettingsPage() {
     }
 
     setSaving(true)
+    setLastTestOrderId('')
     try {
-      await saveRazorpayKeys({
+      const result = await saveRazorpayKeys({
         keyId: keyId.trim(),
         keySecret: keySecret.trim(),
         webhookSecret: webhookSecret.trim(),
@@ -89,8 +90,9 @@ export default function PaymentSettingsPage() {
       setGym(g); setSettings(s)
       setKeySecret(''); setWebhookSecret('')
       setPaymentMode(g?.payment_mode || 'razorpay')
+      if (result?.testOrderId) setLastTestOrderId(result.testOrderId)
       setSuccess('Razorpay keys validated and saved')
-      setTimeout(() => setSuccess(''), 4000)
+      setTimeout(() => setSuccess(''), 6000)
     } catch (err) {
       setError(err.message || 'Failed to save keys')
     } finally {
@@ -249,6 +251,22 @@ export default function PaymentSettingsPage() {
 
           {error && <p className="text-red-500 text-xs">{error}</p>}
           {success && <p className="text-green-600 text-xs font-medium">{success}</p>}
+
+          {lastTestOrderId && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3.5 text-xs text-green-900 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-semibold">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Razorpay validated us with a real ₹1 test order
+              </div>
+              <p>Order ID: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-green-200">{lastTestOrderId}</span></p>
+              <p className="text-green-700">
+                Find it at <span className="font-medium">Razorpay Dashboard {'→'} Test Mode {'→'} Transactions {'→'} Orders</span>{' '}
+                (status: <span className="font-mono">created</span>, never charged).
+              </p>
+            </div>
+          )}
 
           <button
             type="submit"
