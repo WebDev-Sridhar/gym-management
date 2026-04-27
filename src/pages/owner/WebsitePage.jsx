@@ -26,6 +26,7 @@ import PreviewPanel from './cms/components/PreviewPanel'
 import HeroForm from './cms/sections/HeroForm'
 import AboutForm from './cms/sections/AboutForm'
 import TrainersForm from './cms/sections/TrainersForm'
+import { useDialog } from '../../components/ui/Dialog'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 const PRESET_COLORS = [
@@ -173,6 +174,7 @@ function canAccessPage(minPlan, planName) {
 
 // ─── Section Visibility Toggle ──────────────────────────────────────────────────
 function SectionVisibilityToggle({ sectionId, gymId, content, onSave, label }) {
+  const dialog = useDialog()
   const hidden = Array.isArray(content?.hidden_sections) ? content.hidden_sections : []
   const isHidden = hidden.includes(sectionId)
   const [saving, setSaving] = useState(false)
@@ -185,7 +187,7 @@ function SectionVisibilityToggle({ sectionId, gymId, content, onSave, label }) {
     try {
       const result = await upsertCmsContent(gymId, { hidden_sections: updated })
       onSave(prev => ({ ...prev, ...result }))
-    } catch (err) { alert(err.message) }
+    } catch (err) { dialog.alert(err.message) }
     finally { setSaving(false) }
   }
 
@@ -340,6 +342,7 @@ function InlineForm({ title, children, onCancel, onSave, saving }) {
 
 // ─── Theme Panel ────────────────────────────────────────────────────────────────
 function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const [name, setName] = useState(gym?.name || '')
   const [city, setCity] = useState(gym?.city || '')
   const [description, setDescription] = useState(gym?.description || '')
@@ -369,7 +372,7 @@ function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
       onSave(updated)
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -450,6 +453,7 @@ function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
 
 // ─── Design Panel ───────────────────────────────────────────────────────────────
 function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const [fontFamily, setFontFamily] = useState(gym?.font_family || 'default')
   const [headingSize, setHeadingSize] = useState(gym?.heading_size || 'md')
   const [cardStyle, setCardStyle] = useState(gym?.card_style || 'rounded')
@@ -477,8 +481,8 @@ function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
   function handleShadowIntensity(val) { setShadowIntensity(val); pushOverride({ shadow_intensity: val }) }
   function handleSpacing(val)         { setSpacing(val);         pushOverride({ spacing:          val }) }
 
-  function resetToDefaults() {
-    if (!window.confirm('Reset all design settings to defaults?')) return
+  async function resetToDefaults() {
+    if (!await dialog.confirm('Reset all design settings to defaults?')) return
     const d = DESIGN_DEFAULTS
     setFontFamily(d.fontFamily); setHeadingSize(d.headingSize)
     setCardStyle(d.cardStyle);   setBorderRadius(d.borderRadius)
@@ -497,7 +501,7 @@ function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
       onSave(updated)
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -607,6 +611,7 @@ function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
 
 // ─── Gallery Panel ──────────────────────────────────────────────────────────────
 function GalleryPanel({ content, gymId, planName, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
 
@@ -643,7 +648,7 @@ function GalleryPanel({ content, gymId, planName, onSave, setPreviewData }) {
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -659,6 +664,7 @@ function GalleryPanel({ content, gymId, planName, onSave, setPreviewData }) {
         onListChange={handleListChange}
         onFileSelected={galleryImgs.handleFile}
         isPending={galleryImgs.isPending}
+        pendingUrls={galleryImgs.pendingUrls}
         selectMode={false}
         planName={planName}
         label="Gallery Images"
@@ -682,6 +688,7 @@ const STAT_PLACEHOLDERS = [
 ]
 
 function StatsPanel({ content, gymId, planName, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const [stats, setStats] = useState(() =>
     content?.stats?.length >= 4
       ? content.stats.slice(0, 4).map(s => ({ value: s.value || '', label: s.label || '' }))
@@ -709,7 +716,7 @@ function StatsPanel({ content, gymId, planName, onSave, setPreviewData }) {
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -749,6 +756,7 @@ function StatsPanel({ content, gymId, planName, onSave, setPreviewData }) {
 
 // ─── Page Hero Form ─────────────────────────────────────────────────────────────
 function PageHeroForm({ pageKey, content, gymId, planName, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const defs = PAGE_HERO_DEFAULTS[pageKey]
   const lk = `${pageKey}_page_label`
   const tk = `${pageKey}_page_title`
@@ -800,7 +808,7 @@ function PageHeroForm({ pageKey, content, gymId, planName, onSave, setPreviewDat
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -886,6 +894,7 @@ function PageHeroForm({ pageKey, content, gymId, planName, onSave, setPreviewDat
 
 // ─── Single CTA Panel ───────────────────────────────────────────────────────────
 function SingleCTAPanel({ fieldKey, pageLabel, content, gymId, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const [value, setValue] = useState(content?.[fieldKey] || '')
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
@@ -903,7 +912,7 @@ function SingleCTAPanel({ fieldKey, pageLabel, content, gymId, onSave, setPrevie
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -931,6 +940,7 @@ const WHY_US_PLACEHOLDERS = [
 ]
 
 function WhyUsForm({ content, gymId, planName, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const [whyLabel,   setWhyLabel]   = useState(content?.why_us_label   || '')
   const [whyHeading, setWhyHeading] = useState(content?.why_us_heading || '')
   const [items, setItems] = useState(() =>
@@ -973,7 +983,7 @@ function WhyUsForm({ content, gymId, planName, onSave, setPreviewData }) {
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -1015,6 +1025,7 @@ function WhyUsForm({ content, gymId, planName, onSave, setPreviewData }) {
 
 // ─── Vision & Mission Form ───────────────────────────────────────────────────────
 function VisionMissionForm({ content, gymId, planName, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const [visionLabel,   setVisionLabel]   = useState(content?.vision_section_label   || '')
   const [visionHeading, setVisionHeading] = useState(content?.vision_section_heading || '')
   const [vision,  setVision]  = useState(content?.vision  || '')
@@ -1043,7 +1054,7 @@ function VisionMissionForm({ content, gymId, planName, onSave, setPreviewData })
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -1082,6 +1093,7 @@ function VisionMissionForm({ content, gymId, planName, onSave, setPreviewData })
 
 // ─── Pricing Panel ──────────────────────────────────────────────────────────────
 function IncludedFeaturesSubPanel({ content, gymId, onSave, planName, setPreviewData }) {
+  const dialog = useDialog()
   const [pricingLabel,   setPricingLabel]   = useState(content?.pricing_section_label   || '')
   const [pricingHeading, setPricingHeading] = useState(content?.pricing_section_heading || '')
   const [text, setText] = useState(content?.included_features?.length ? content.included_features.join('\n') : '')
@@ -1115,7 +1127,7 @@ function IncludedFeaturesSubPanel({ content, gymId, onSave, planName, setPreview
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -1148,6 +1160,7 @@ function IncludedFeaturesSubPanel({ content, gymId, onSave, planName, setPreview
 const EMPTY_PLAN = { name: '', price: '', duration_label: '', features_text: '', is_popular: false }
 
 function PricingPanel({ plans: initPlans, gymId, onUpdate, content, onSaveCms, planName, setPreviewData }) {
+  const dialog = useDialog()
   const [plansLabel,    setPlansLabel]    = useState(content?.plans_section_label    || '')
   const [plansHeading,  setPlansHeading]  = useState(content?.plans_section_heading  || '')
   const [plansSubtitle, setPlansSubtitle] = useState(content?.plans_section_subtitle || '')
@@ -1170,7 +1183,7 @@ function PricingPanel({ plans: initPlans, gymId, onUpdate, content, onSaveCms, p
       onSaveCms(prev => ({ ...prev, ...updated }))
       setHeaderSuccess('Saved!')
       setTimeout(() => setHeaderSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setHeaderSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setHeaderSaving(false) }
   }
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -1190,18 +1203,18 @@ function PricingPanel({ plans: initPlans, gymId, onUpdate, content, onSaveCms, p
       if (form.mode === 'add') { const created = await createCmsPlan(gymId, { ...payload, sort_order: plans.length }); updated = [...plans, created] }
       else { const saved = await updateCmsPlan(form.data.id, payload); updated = plans.map(p => p.id === saved.id ? saved : p) }
       setPlans(updated); onUpdate(updated); setForm(null)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Delete this plan?')) return
+    if (!await dialog.confirm('Delete this plan?')) return
     setDeleting(id)
     try {
       await deleteCmsPlan(id)
       const updated = plans.filter(p => p.id !== id)
       setPlans(updated); onUpdate(updated)
       if (form?.data?.id === id) setForm(null)
-    } catch (err) { alert(err.message) } finally { setDeleting(null) }
+    } catch (err) { dialog.alert(err.message) } finally { setDeleting(null) }
   }
 
   return (
@@ -1260,6 +1273,7 @@ const EMPTY_PROG = { title: '', category: '', description: '', image: '' }
 const PROG_CATEGORIES = ['STRENGTH', 'HIIT', 'YOGA', 'CARDIO', 'BOXING', 'CROSSFIT']
 
 function ProgramInlineForm({ mode, data, gymId, planName, imageCount, onSave, onCancel }) {
+  const dialog = useDialog()
   const [title,       setTitle]       = useState(data.title)
   const [category,    setCategory]    = useState(data.category)
   const [description, setDescription] = useState(data.description)
@@ -1289,7 +1303,7 @@ function ProgramInlineForm({ mode, data, gymId, planName, imageCount, onSave, on
         description: description.trim(),
         image: finalImage || '',
       })
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -1339,6 +1353,7 @@ function ProgramInlineForm({ mode, data, gymId, planName, imageCount, onSave, on
 }
 
 function ProgramsPanel({ content, gymId, onSave, planName, setPreviewData }) {
+  const dialog = useDialog()
   const [progLabel,   setProgLabel]   = useState(content?.programs_label   || '')
   const [progHeading, setProgHeading] = useState(content?.programs_heading || '')
   const [progDesc,    setProgDesc]    = useState(content?.programs_desc    || '')
@@ -1363,7 +1378,7 @@ function ProgramsPanel({ content, gymId, onSave, planName, setPreviewData }) {
       onSave(prev => ({ ...prev, ...updated }))
       setHeaderSuccess('Saved!')
       setTimeout(() => setHeaderSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setHeaderSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setHeaderSaving(false) }
   }
 
   async function persist(newItems) {
@@ -1384,14 +1399,14 @@ function ProgramsPanel({ content, gymId, onSave, planName, setPreviewData }) {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Delete this program?')) return
+    if (!await dialog.confirm('Delete this program?')) return
     setDeleting(id)
     try {
       const item = items.find(it => it.id === id)
       if (item?.image) await deleteFile(item.image)
       await persist(items.filter(it => it.id !== id))
       if (form?.data?.id === id) setForm(null)
-    } catch (err) { alert(err.message) } finally { setDeleting(null) }
+    } catch (err) { dialog.alert(err.message) } finally { setDeleting(null) }
   }
 
   const imageCount = items.filter(it => it.image).length
@@ -1447,6 +1462,7 @@ function ProgramsPanel({ content, gymId, onSave, planName, setPreviewData }) {
 const EMPTY_TESTIMONIAL = { name: '', message: '', rating: 5 }
 
 function TestimonialsPanel({ testimonials: initList, gymId, onUpdate, content, onSaveCms, setPreviewData, planName }) {
+  const dialog = useDialog()
   const [testiLabel,    setTestiLabel]    = useState(content?.testimonials_label    || '')
   const [testiHeading,  setTestiHeading]  = useState(content?.testimonials_heading  || '')
   const [testiSubtitle, setTestiSubtitle] = useState(content?.testimonials_subtitle || '')
@@ -1472,7 +1488,7 @@ function TestimonialsPanel({ testimonials: initList, gymId, onUpdate, content, o
       onSaveCms?.(prev => ({ ...prev, ...updated }))
       setHeaderSuccess('Saved!')
       setTimeout(() => setHeaderSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setHeaderSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setHeaderSaving(false) }
   }
 
   function openAdd() { setForm({ mode: 'add', data: { ...EMPTY_TESTIMONIAL } }) }
@@ -1489,18 +1505,18 @@ function TestimonialsPanel({ testimonials: initList, gymId, onUpdate, content, o
       if (form.mode === 'add') { const created = await createCmsTestimonial(gymId, payload); updated = [created, ...list] }
       else { const saved = await updateCmsTestimonial(form.data.id, payload); updated = list.map(t => t.id === saved.id ? saved : t) }
       setList(updated); onUpdate(updated); setPreviewData?.(p => ({ ...p, _testimonials: updated, _ts: Date.now() })); setForm(null)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Delete this review?')) return
+    if (!await dialog.confirm('Delete this review?')) return
     setDeleting(id)
     try {
       await deleteCmsTestimonial(id)
       const updated = list.filter(t => t.id !== id)
       setList(updated); onUpdate(updated); setPreviewData?.(p => ({ ...p, _testimonials: updated, _ts: Date.now() }))
       if (form?.data?.id === id) setForm(null)
-    } catch (err) { alert(err.message) } finally { setDeleting(null) }
+    } catch (err) { dialog.alert(err.message) } finally { setDeleting(null) }
   }
 
   return (
@@ -1565,6 +1581,7 @@ const DEFAULT_FAQ_ITEMS = [
 ]
 
 function FAQPanel({ content, gymId, planName, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const [faqLabel,   setFaqLabel]   = useState(content?.faq_label   || '')
   const [faqHeading, setFaqHeading] = useState(content?.faq_heading || '')
   const [items, setItems] = useState(content?.faq_items || [])
@@ -1584,7 +1601,7 @@ function FAQPanel({ content, gymId, planName, onSave, setPreviewData }) {
       onSave(prev => ({ ...prev, ...updated }))
       setHeaderSuccess('Saved!')
       setTimeout(() => setHeaderSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setHeaderSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setHeaderSaving(false) }
   }
 
   async function persist(newItems) {
@@ -1594,7 +1611,7 @@ function FAQPanel({ content, gymId, planName, onSave, setPreviewData }) {
   }
 
   async function loadDefaults() {
-    if (items.length > 0 && !window.confirm('This will replace your current FAQ items with defaults. Continue?')) return
+    if (items.length > 0 && !await dialog.confirm('This will replace your current FAQ items with defaults. Continue?')) return
     await persist(DEFAULT_FAQ_ITEMS)
   }
 
@@ -1620,14 +1637,14 @@ function FAQPanel({ content, gymId, planName, onSave, setPreviewData }) {
       const entry = { q: form.data.q.trim(), a: form.data.a.trim() }
       const newItems = form.mode === 'add' ? [...items, entry] : items.map((it, i) => i === form.data.idx ? entry : it)
       await persist(newItems); setForm(null)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   async function handleDelete(idx) {
-    if (!window.confirm('Delete this FAQ item?')) return
+    if (!await dialog.confirm('Delete this FAQ item?')) return
     setDeleting(idx)
     try { await persist(items.filter((_, i) => i !== idx)); if (form?.data?.idx === idx) setForm(null) }
-    catch (err) { alert(err.message) } finally { setDeleting(null) }
+    catch (err) { dialog.alert(err.message) } finally { setDeleting(null) }
   }
 
   return (
@@ -1705,6 +1722,7 @@ const CONTACT_DEFAULT_HOURS = [
 ]
 
 function ContactPanel({ gym, gymId, onSave }) {
+  const dialog = useDialog()
   const [phone, setPhone] = useState(gym?.phone || '')
   const [email, setEmail] = useState(gym?.email || '')
   const [address, setAddress] = useState(gym?.address || '')
@@ -1743,7 +1761,7 @@ function ContactPanel({ gym, gymId, onSave }) {
     const url = addUrl.trim()
     if (!addPlatform || !url) return
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      alert('Please enter a valid URL starting with https://')
+      dialog.alert('Please enter a valid URL starting with https://')
       return
     }
     setSocialLinks(prev => [...prev, { platform: addPlatform, url }])
@@ -1767,7 +1785,7 @@ function ContactPanel({ gym, gymId, onSave }) {
       onSave(updated)
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (

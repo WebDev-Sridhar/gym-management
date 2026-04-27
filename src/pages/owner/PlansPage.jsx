@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchPlans, createPlan, deletePlan, fetchMembers } from '../../services/membershipService'
+import { useDialog } from '../../components/ui/Dialog'
 
 export default function PlansPage() {
+  const dialog = useDialog()
   const { gymId } = useAuth()
   const [plans, setPlans] = useState([])
   const [members, setMembers] = useState([])
@@ -73,13 +75,13 @@ export default function PlansPage() {
       ? `${assignedCount} member${assignedCount !== 1 ? 's are' : ' is'} currently on "${plan.name}". Deleting will unassign them and set their status to inactive. Continue?`
       : `Delete plan "${plan.name}"?`
 
-    if (!confirm(warning)) return
+    if (!await dialog.confirm(warning)) return
 
     try {
       await deletePlan(plan.id)
       setPlans((prev) => prev.filter((p) => p.id !== plan.id))
     } catch (err) {
-      alert(err.message || 'Failed to delete plan')
+      dialog.alert(err.message || 'Failed to delete plan')
     }
   }
 

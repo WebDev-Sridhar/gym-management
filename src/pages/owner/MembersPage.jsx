@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchMembers, createMember, assignPlan, deleteMember, updateMember, fetchPlans } from '../../services/membershipService'
+import { useDialog } from '../../components/ui/Dialog'
 
 export default function MembersPage() {
+  const dialog = useDialog()
   const { gymId } = useAuth()
   const [members, setMembers] = useState([])
   const [plans, setPlans] = useState([])
@@ -116,19 +118,19 @@ export default function MembersPage() {
       setAssigningId(null)
       setSelectedPlanId('')
     } catch (err) {
-      alert(err.message || 'Failed to assign plan')
+      dialog.alert(err.message || 'Failed to assign plan')
     } finally {
       setSubmitting(false)
     }
   }
 
   async function handleDelete(memberId) {
-    if (!confirm('Remove this member?')) return
+    if (!await dialog.confirm('Remove this member?')) return
     try {
       await deleteMember(memberId)
       setMembers((prev) => prev.filter((m) => m.id !== memberId))
     } catch (err) {
-      alert(err.message || 'Failed to delete member')
+      dialog.alert(err.message || 'Failed to delete member')
     }
   }
 

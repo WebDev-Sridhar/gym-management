@@ -6,6 +6,7 @@ import { deleteFile } from '../../../../services/storageService'
 import { useCMSImage } from '../../../../hooks/useCMSImage'
 import ImageUploader from '../components/ImageUploader'
 import FeatureGate from '../components/FeatureGate'
+import { useDialog } from '../../../../components/ui/Dialog'
 
 const inputCls =
   'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors'
@@ -44,6 +45,7 @@ function ItemRow({ title, subtitle, onEdit, onDelete, deleting }) {
 // ─── Inline form extracted as sub-component ────────────────────────────────
 // This ensures useCMSImage lifecycle (draft cleanup) ties to the form's mount/unmount.
 function TrainerInlineForm({ mode, data, gymId, planName, imageCount, onSave, onCancel }) {
+  const dialog = useDialog()
   const [name,           setName]           = useState(data.name)
   const [specialization, setSpecialization] = useState(data.specialization)
   const [bio,            setBio]            = useState(data.bio)
@@ -72,7 +74,7 @@ function TrainerInlineForm({ mode, data, gymId, planName, imageCount, onSave, on
         image_url: finalImageUrl || null,
         bio: bio.trim() || null,
       })
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -129,6 +131,7 @@ function TrainerInlineForm({ mode, data, gymId, planName, imageCount, onSave, on
 const EMPTY_TRAINER = { name: '', specialization: '', image_url: '', bio: '' }
 
 export default function TrainersForm({ trainers: initTrainers, gymId, planName, onUpdate, content, setPreviewData }) {
+  const dialog = useDialog()
   const [sectionLabel,    setSectionLabel]    = useState(content?.trainers_section_label    || '')
   const [sectionHeading,  setSectionHeading]  = useState(content?.trainers_section_heading  || '')
   const [sectionSubtitle, setSectionSubtitle] = useState(content?.trainers_section_subtitle || '')
@@ -152,7 +155,7 @@ export default function TrainersForm({ trainers: initTrainers, gymId, planName, 
       })
       setHeaderSuccess('Saved!')
       setTimeout(() => setHeaderSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setHeaderSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setHeaderSaving(false) }
   }
 
   function openAdd() { setForm({ mode: 'add', data: { ...EMPTY_TRAINER } }) }
@@ -175,7 +178,7 @@ export default function TrainersForm({ trainers: initTrainers, gymId, planName, 
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Delete this trainer?')) return
+    if (!await dialog.confirm('Delete this trainer?')) return
     setDeleting(id)
     try {
       const trainer = trainers.find(t => t.id === id)
@@ -185,7 +188,7 @@ export default function TrainersForm({ trainers: initTrainers, gymId, planName, 
       setTrainers(updated); onUpdate(updated)
       setPreviewData?.(p => ({ ...p, _trainers: updated, _ts: Date.now() }))
       if (form?.data?.id === id) setForm(null)
-    } catch (err) { alert(err.message) } finally { setDeleting(null) }
+    } catch (err) { dialog.alert(err.message) } finally { setDeleting(null) }
   }
 
   const imageCount = trainers.filter(t => t.image_url).length

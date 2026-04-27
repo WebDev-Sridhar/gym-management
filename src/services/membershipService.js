@@ -336,7 +336,7 @@ export async function fetchGymDetails(gymId) {
   return data
 }
 
-export async function updateGymDetails({ gymId, name, city, description, logo_url, theme_color, phone, email, address, lat, lng, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, hero_style, social_links, working_hours }) {
+export async function updateGymDetails({ gymId, name, city, description, logo_url, theme_color, phone, email, address, lat, lng, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, hero_style, social_links, working_hours, payment_mode, upi_id }) {
   const updates = {}
   if (name !== undefined) updates.name = name
   if (city !== undefined) updates.city = city
@@ -359,6 +359,8 @@ export async function updateGymDetails({ gymId, name, city, description, logo_ur
   if (hero_style !== undefined) updates.hero_style = hero_style
   if (social_links !== undefined) updates.social_links = social_links
   if (working_hours !== undefined) updates.working_hours = working_hours
+  if (payment_mode !== undefined) updates.payment_mode = payment_mode
+  if (upi_id !== undefined) updates.upi_id = upi_id
 
   const { data, error } = await supabase
     .from('gyms')

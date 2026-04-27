@@ -3,6 +3,7 @@ import { upsertCmsContent } from '../../../../services/gymCmsService'
 import { useCMSImageList } from '../../../../hooks/useCMSImage'
 import ImageUploader from '../components/ImageUploader'
 import FeatureGate from '../components/FeatureGate'
+import { useDialog } from '../../../../components/ui/Dialog'
 
 const inputCls =
   'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors'
@@ -64,6 +65,7 @@ const FEATURE_PLACEHOLDERS = [
  * Why Us cards (with descriptions) and Vision & Mission are in the About Page CMS.
  */
 export default function AboutForm({ content, gymId, planName, onSave, setPreviewData }) {
+  const dialog = useDialog()
   const [sectionLabel,   setSectionLabel]   = useState(content?.about_section_label   || '')
   const [sectionHeading, setSectionHeading] = useState(content?.about_section_heading || '')
   const [aboutText, setAboutText] = useState(content?.about_text || '')
@@ -148,7 +150,7 @@ export default function AboutForm({ content, gymId, planName, onSave, setPreview
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -216,6 +218,7 @@ export default function AboutForm({ content, gymId, planName, onSave, setPreview
           onListChange={handleListChange}
           onFileSelected={aboutImgs.handleFile}
           isPending={aboutImgs.isPending}
+          pendingUrls={aboutImgs.pendingUrls}
           planName={planName}
           label="About Section Images"
           hint="Upload multiple images and select one as the active photo for the About section."

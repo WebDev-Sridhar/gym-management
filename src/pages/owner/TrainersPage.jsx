@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchTrainerInvites, createTrainerInvite, deleteTrainerInvite } from '../../services/membershipService'
+import { useDialog } from '../../components/ui/Dialog'
 
 export default function TrainersPage() {
+  const dialog = useDialog()
   const { gymId } = useAuth()
   const [invites, setInvites] = useState([])
   const [loading, setLoading] = useState(true)
@@ -46,12 +48,12 @@ export default function TrainersPage() {
   }
 
   async function handleDelete(inviteId) {
-    if (!confirm('Remove this trainer invite?')) return
+    if (!await dialog.confirm('Remove this trainer invite?')) return
     try {
       await deleteTrainerInvite(inviteId)
       setInvites((prev) => prev.filter((i) => i.id !== inviteId))
     } catch (err) {
-      alert(err.message || 'Failed to remove trainer')
+      dialog.alert(err.message || 'Failed to remove trainer')
     }
   }
 

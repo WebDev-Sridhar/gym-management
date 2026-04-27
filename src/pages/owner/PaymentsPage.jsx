@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
-import { fetchPayments, createPaymentLink, markPaymentPaid } from '../../services/paymentService'
-import { fetchMembers, fetchPlans } from '../../services/membershipService'
+import { fetchPayments, createPaymentLink, markPaymentPaid, createOrder, openCheckout } from '../../services/paymentService'
+import { fetchMembers, fetchPlans, fetchGymDetails } from '../../services/membershipService'
+import { useDialog } from '../../components/ui/Dialog'
 
 export default function PaymentsPage() {
+  const dialog = useDialog()
   const { gymId } = useAuth()
   const [payments, setPayments] = useState([])
   const [members, setMembers] = useState([])
   const [plans, setPlans] = useState([])
+  const [gym, setGym] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const [showCollect, setShowCollect] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [selectedPlanId, setSelectedPlanId] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [error, setError] = useState('')
   const [generatedLink, setGeneratedLink] = useState(null)
 
@@ -25,15 +29,59 @@ export default function PaymentsPage() {
     if (!gymId) { setLoading(false); return }
     setLoading(true)
     let cancelled = false
-    Promise.all([fetchPayments(gymId), fetchMembers(gymId), fetchPlans(gymId)])
-      .then(([pay, mem, pln]) => {
+    Promise.all([fetchPayments(gymId), fetchMembers(gymId), fetchPlans(gymId), fetchGymDetails(gymId)])
+      .then(([pay, mem, pln, g]) => {
         if (cancelled) return
-        setPayments(pay); setMembers(mem); setPlans(pln)
+        setPayments(pay); setMembers(mem); setPlans(pln); setGym(g)
       })
       .catch((err) => console.error('Failed to load payments data:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [gymId])
+
+  async function handleCollectCheckout() {
+    setError(''); setGeneratedLink(null)
+    if (!selectedMemberId) return setError('Select a member')
+    if (!selectedPlanId) return setError('Select a plan')
+    const member = members.find((m) => m.id === selectedMemberId)
+    const plan = plans.find((p) => p.id === selectedPlanId)
+    if (!member || !plan) return setError('Invalid selection')
+
+    setCheckoutLoading(true)
+    try {
+      const order = await createOrder({
+        memberId: member.id,
+        planId: plan.id,
+        amount: Number(plan.price),
+      })
+
+      await openCheckout({
+        orderId: order.orderId,
+        amount: order.amount,
+        currency: order.currency,
+        razorpayKeyId: order.razorpayKeyId,
+        prefill: order.prefill,
+        gymName: gym?.name,
+        themeColor: gym?.theme_color,
+      })
+
+      // Payment succeeded — refresh list
+      const updated = await fetchPayments(gymId)
+      setPayments(updated)
+      setShowCollect(false); setSelectedMemberId(''); setSelectedPlanId('')
+      dialog.alert('Payment received successfully!')
+    } catch (err) {
+      if (err?.message === 'checkout_dismissed') {
+        // User closed the modal — no error toast, just refresh in case
+        const updated = await fetchPayments(gymId)
+        setPayments(updated)
+      } else {
+        setError(err.message || 'Checkout failed')
+      }
+    } finally {
+      setCheckoutLoading(false)
+    }
+  }
 
   async function handleCreateLink(e) {
     e.preventDefault()
@@ -68,7 +116,7 @@ export default function PaymentsPage() {
       setMarkingId(null)
       setPaymentMethod('cash')
     } catch (err) {
-      alert(err.message || 'Failed to mark as paid')
+      dialog.alert(err.message || 'Failed to mark as paid')
     }
   }
 
@@ -150,9 +198,34 @@ export default function PaymentsPage() {
             )}
 
             {!generatedLink && (
-              <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50">
-                {submitting ? 'Generating...' : 'Generate Payment Link'}
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                {gym?.razorpay_enabled && (
+                  <button
+                    type="button"
+                    onClick={handleCollectCheckout}
+                    disabled={checkoutLoading || submitting}
+                    className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {checkoutLoading ? 'Opening Checkout...' : 'Collect via Checkout'}
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={submitting || checkoutLoading}
+                  className={`px-6 py-2.5 font-medium rounded-lg transition-colors text-sm cursor-pointer disabled:opacity-50 ${
+                    gym?.razorpay_enabled
+                      ? 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                      : 'bg-violet-600 text-white hover:bg-violet-700'
+                  }`}
+                >
+                  {submitting ? 'Generating...' : (gym?.razorpay_enabled ? 'Generate Link instead' : 'Generate Payment Link')}
+                </button>
+                {!gym?.razorpay_enabled && (
+                  <a href="/owner-dashboard/payment-settings" className="text-xs text-violet-600 hover:text-violet-800 font-medium">
+                    Set up Razorpay Checkout {'→'}
+                  </a>
+                )}
+              </div>
             )}
           </form>
         </div>

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import imageCompression from 'browser-image-compression'
 import { supabaseData } from '../../../../services/supabaseClient'
 import { getImageLimit } from '../../../../lib/featureGates'
+import { useDialog } from '../../../../components/ui/Dialog'
 
 /**
  * ImageUploader — upload, list, select and delete images for a CMS section.
@@ -25,10 +26,12 @@ export default function ImageUploader({
   onListChange,        // fn(newList) — called when list changes
   selectMode = true,   // set false to hide "Use" button (e.g. gallery)
   onFileSelected,      // optional: when provided, bypasses internal upload (useCMSImage hook drives it)
-  isPending = false,   // shows amber "Unsaved" badge on preview
+  isPending = false,   // shows amber "Unsaved" badge on preview (basic mode)
+  pendingUrls = [],    // URLs in temp storage — shows "Unsaved" badge on individual grid items (list mode)
   label,
   hint,
 }) {
+  const dialog = useDialog()
   const [uploading, setUploading] = useState(false)
   const [removing, setRemoving]   = useState(false)
   const [error, setError]         = useState('')
@@ -100,7 +103,7 @@ export default function ImageUploader({
 
   // ── Delete (list mode) ───────────────────────────────────────────────────────
   async function handleDelete(url) {
-    if (!window.confirm('Remove this image?')) return
+    if (!await dialog.confirm('Remove this image?')) return
     // Attempt storage delete for images uploaded to our bucket
     const marker = '/gym-images/'
     if (url.includes(marker)) {
@@ -161,27 +164,43 @@ export default function ImageUploader({
           {imageList.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {imageList.map((url, i) => (
-                <div key={i} className={`relative group rounded-xl overflow-hidden border-2 transition-all ${url === currentUrl ? 'border-violet-500' : 'border-transparent'}`}
+                <div key={i} className={`relative rounded-xl overflow-hidden border-2 transition-all ${url === currentUrl ? 'border-violet-500' : 'border-transparent'}`}
                   style={{ aspectRatio: '4/3' }}>
                   <img src={url} alt="" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none' }} />
-                  {/* Overlay actions */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                    {selectMode && url !== currentUrl && (
-                      <button type="button" onClick={() => onChange(url)}
-                        className="px-2 py-1 text-xs font-semibold bg-white text-gray-800 rounded-lg hover:bg-violet-600 hover:text-white transition-colors cursor-pointer">
-                        Use
-                      </button>
-                    )}
-                    <button type="button" onClick={() => handleDelete(url)}
-                      className="px-2 py-1 text-xs font-semibold bg-white text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-colors cursor-pointer">
-                      Del
-                    </button>
-                  </div>
-                  {url === currentUrl && (
-                    <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center">
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+
+                  {/* Delete — always visible, top-right */}
+                  <button type="button" onClick={() => handleDelete(url)}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-black/50 hover:bg-red-500 flex items-center justify-center transition-colors cursor-pointer">
+                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  {/* Use — always visible, top-left, only when not selected */}
+                  {selectMode && url !== currentUrl && (
+                    <button type="button" onClick={() => onChange(url)}
+                      className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-black/50 hover:bg-violet-500 flex items-center justify-center transition-colors cursor-pointer">
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
+                    </button>
+                  )}
+
+                  {/* Active badge — click to deselect */}
+                  {url === currentUrl && (
+                    <button type="button" onClick={() => onChange('')}
+                      className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-violet-500 hover:bg-violet-600 flex items-center justify-center transition-colors cursor-pointer"
+                      title="Deselect">
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                  )}
+
+                  {/* Unsaved badge — shown on temp uploads not yet committed */}
+                  {pendingUrls.includes(url) && (
+                    <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-md tracking-wide pointer-events-none">
+                      Unsaved
                     </div>
                   )}
                 </div>
@@ -200,14 +219,7 @@ export default function ImageUploader({
                 <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Upload Image</>
               )}
             </button>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <div className="flex gap-0.5">
-                {Array.from({ length: limit }).map((_, i) => (
-                  <div key={i} className={`w-2 h-2 rounded-full ${i < count ? 'bg-violet-500' : 'bg-gray-200'}`} />
-                ))}
-              </div>
-              <span>{count} / {limit} used</span>
-            </div>
+            <span className="text-xs text-gray-400">{count} / {limit} used</span>
           </div>
 
           {/* URL add */}
@@ -238,7 +250,7 @@ export default function ImageUploader({
                 onClick={handleRemove}
                 disabled={removing}
                 title="Delete image"
-                className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg bg-red-500 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-all disabled:opacity-60"
+                className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg bg-red-500 hover:bg-red-600 text-white opacity-100 md:opacity-0 group-hover:opacity-100 transition-all disabled:opacity-60"
               >
                 {removing
                   ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -261,14 +273,7 @@ export default function ImageUploader({
                 <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>{currentUrl ? 'Replace Image' : 'Upload Image'}</>
               )}
             </button>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <div className="flex gap-0.5">
-                {Array.from({ length: limit }).map((_, i) => (
-                  <div key={i} className={`w-2 h-2 rounded-full ${i < count ? 'bg-violet-500' : 'bg-gray-200'}`} />
-                ))}
-              </div>
-              <span>{count} / {limit} used</span>
-            </div>
+            <span className="text-xs text-gray-400">{count} / {limit} used</span>
           </div>
 
           <div>

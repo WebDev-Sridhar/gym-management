@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchAttendance, fetchAttendanceSummary, manualCheckin, fetchMembers } from '../../services/membershipService'
+import { useDialog } from '../../components/ui/Dialog'
 
 export default function AttendancePage() {
+  const dialog = useDialog()
   const { gymId } = useAuth()
   const [checkins, setCheckins] = useState([])
   const [members, setMembers] = useState([])
@@ -47,7 +49,7 @@ export default function AttendancePage() {
       setSelectedMemberId('')
       setShowCheckin(false)
     } catch (err) {
-      alert(err.message || 'Failed to mark check-in')
+      dialog.alert(err.message || 'Failed to mark check-in')
     } finally {
       setSubmitting(false)
     }

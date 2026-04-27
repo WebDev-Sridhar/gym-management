@@ -4,6 +4,7 @@ import { updateGymDetails } from '../../../../services/membershipService'
 import { canAccess } from '../../../../lib/featureGates'
 import { useCMSImageList } from '../../../../hooks/useCMSImage'
 import ImageUploader from '../components/ImageUploader'
+import { useDialog } from '../../../../components/ui/Dialog'
 
 const inputCls =
   'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors'
@@ -94,6 +95,7 @@ const HERO_STYLES = [
 ]
 
 export default function HeroForm({ content, gym, gymId, planName, onSave, onSaveGym, setPreviewData }) {
+  const dialog = useDialog()
   const [title, setTitle] = useState(content?.hero_title || '')
   const [subtitle, setSubtitle] = useState(content?.hero_subtitle || '')
   const [selectedImage, setSelectedImage] = useState(content?.hero_image || '')
@@ -168,7 +170,7 @@ export default function HeroForm({ content, gym, gymId, planName, onSave, onSave
       onSaveGym?.(updatedGym)
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   const canUseC = canAccess('live_preview', planName)
@@ -252,6 +254,7 @@ export default function HeroForm({ content, gym, gymId, planName, onSave, onSave
         onListChange={handleListChange}
         onFileSelected={heroImgs.handleFile}
         isPending={heroImgs.isPending}
+        pendingUrls={heroImgs.pendingUrls}
         planName={planName}
         label="Hero Background Images"
         hint="Upload multiple images and select one as the active background. Landscape works best."

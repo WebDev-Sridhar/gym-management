@@ -159,6 +159,7 @@ export function useCMSImageList({ gymId, fieldKey, section, initialList = [] }) 
 
   return {
     list, isPending, uploading, error,
+    pendingUrls: Object.keys(tempPaths),
     handleFile, handleDelete, handleUrlAdd,
     commitList, discardList,
     setList,

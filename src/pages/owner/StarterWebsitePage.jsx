@@ -7,6 +7,7 @@ const PRESET_COLORS = [
 ]
 
 function ThemePanel({ gym, gymId, onSave }) {
+  const dialog = useDialog()
   const [name, setName] = useState(gym?.name || '')
   const [city, setCity] = useState(gym?.city || '')
   const [description, setDescription] = useState(gym?.description || '')
@@ -24,7 +25,7 @@ function ThemePanel({ gym, gymId, onSave }) {
       const updated = await updateGymDetails({ gymId, name: name.trim(), city: city.trim(), description: description.trim(), theme_color: themeColor, secondary_color: secondaryColor, theme_mode: themeMode })
       onSave(updated)
       setSuccess('Saved!'); setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -112,6 +113,7 @@ import HeroForm from './cms/sections/HeroForm'
 import { useCMSImage, useCMSImageList } from '../../hooks/useCMSImage'
 import { deleteFile } from '../../services/storageService'
 import { sweepStaleDraftEntries } from '../../lib/cmsDraft'
+import { useDialog } from '../../components/ui/Dialog'
 
 // ─── Shared UI primitives ───────────────────────────────────────────────────────
 
@@ -249,6 +251,7 @@ const FEATURE_PLACEHOLDERS = [
 ]
 
 function AboutPanel({ content, gymId, onSave, planName }) {
+  const dialog = useDialog()
   const [aboutText, setAboutText] = useState(content?.about_text || '')
   const [aboutImage, setAboutImage] = useState(content?.about_image || '')
   const [aboutImages, setAboutImages] = useState(content?.about_images || [])
@@ -284,7 +287,7 @@ function AboutPanel({ content, gymId, onSave, planName }) {
       })
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!'); setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -352,6 +355,7 @@ const PROG_CATEGORIES = ['STRENGTH', 'HIIT', 'YOGA', 'CARDIO', 'BOXING', 'CROSSF
 const EMPTY_PROG = { title: '', category: '', description: '', image: '' }
 
 function StarterProgramInlineForm({ mode, data, gymId, planName, imageCount, onSave, onCancel }) {
+  const dialog = useDialog()
   const [title,       setTitle]       = useState(data.title)
   const [category,    setCategory]    = useState(data.category)
   const [description, setDescription] = useState(data.description)
@@ -372,7 +376,7 @@ function StarterProgramInlineForm({ mode, data, gymId, planName, imageCount, onS
     try {
       const finalImage = await img.commit()
       await onSave({ title: title.trim(), category, description: description.trim() || null, image: finalImage || null })
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -401,6 +405,7 @@ function StarterProgramInlineForm({ mode, data, gymId, planName, imageCount, onS
 }
 
 function ProgramsPanel({ content, gymId, onSave, planName }) {
+  const dialog = useDialog()
   const [items, setItems] = useState(content?.training_programs || [])
   const [form, setForm] = useState(null)
   const [deleting, setDeleting] = useState(null)
@@ -424,7 +429,7 @@ function ProgramsPanel({ content, gymId, onSave, planName }) {
         {items.map((it, i) => (
           <ItemRow key={i} title={it.title} subtitle={it.category || 'No category'}
             onEdit={() => setForm({ mode: 'edit', data: { idx: i, title: it.title, category: it.category || '', description: it.description || '', image: it.image || '' } })}
-            onDelete={async () => { if (!window.confirm('Delete this program?')) return; setDeleting(i); try { if (it.image) await deleteFile(it.image); await persist(items.filter((_, j) => j !== i)) } catch (err) { alert(err.message) } finally { setDeleting(null) } }}
+            onDelete={async () => { if (!await dialog.confirm('Delete this program?')) return; setDeleting(i); try { if (it.image) await deleteFile(it.image); await persist(items.filter((_, j) => j !== i)) } catch (err) { dialog.alert(err.message) } finally { setDeleting(null) } }}
             deleting={deleting === i} />
         ))}
       </div>
@@ -445,6 +450,7 @@ function ProgramsPanel({ content, gymId, onSave, planName }) {
 }
 
 function ReviewsPanel({ testimonials: init, gymId, onUpdate, planName }) {
+  const dialog = useDialog()
   const [items, setItems] = useState(init)
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -461,14 +467,14 @@ function ReviewsPanel({ testimonials: init, gymId, onUpdate, planName }) {
       if (form.mode === 'add') { const created = await createCmsTestimonial(gymId, payload); updated = [...items, created] }
       else { const saved = await updateCmsTestimonial(form.data.id, payload); updated = items.map(t => t.id === saved.id ? saved : t) }
       setItems(updated); onUpdate(updated); setForm(null)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Delete this review?')) return
+    if (!await dialog.confirm('Delete this review?')) return
     setDeleting(id)
     try { await deleteCmsTestimonial(id); const updated = items.filter(t => t.id !== id); setItems(updated); onUpdate(updated) }
-    catch (err) { alert(err.message) } finally { setDeleting(null) }
+    catch (err) { dialog.alert(err.message) } finally { setDeleting(null) }
   }
 
   return (
@@ -509,6 +515,7 @@ const WHY_US_PLACEHOLDERS = [
 ]
 
 function WhyUsPanel({ content, gymId, onSave }) {
+  const dialog = useDialog()
   const [items, setItems] = useState(() =>
     Array.from({ length: 4 }, (_, i) => ({
       title:       content?.why_us?.[i]?.title       || '',
@@ -532,7 +539,7 @@ function WhyUsPanel({ content, gymId, onSave }) {
       })
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!'); setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -563,6 +570,7 @@ function WhyUsPanel({ content, gymId, onSave }) {
 }
 
 function VisionPanel({ content, gymId, onSave }) {
+  const dialog = useDialog()
   const [vision, setVision] = useState(content?.vision_text || '')
   const [mission, setMission] = useState(content?.mission_text || '')
   const [saving, setSaving] = useState(false)
@@ -578,7 +586,7 @@ function VisionPanel({ content, gymId, onSave }) {
       })
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!'); setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -607,6 +615,7 @@ function VisionPanel({ content, gymId, onSave }) {
 const EMPTY_PLAN = { name: '', price: '', duration_label: '', features_text: '', is_popular: false }
 
 function PlansPanel({ plans: initPlans, content, gymId, onUpdate, onSaveCms }) {
+  const dialog = useDialog()
   const [plans, setPlans] = useState(initPlans)
   const [includedText, setIncludedText] = useState(content?.included_features?.length ? content.included_features.join('\n') : '')
   const [form, setForm] = useState(null)
@@ -632,14 +641,14 @@ function PlansPanel({ plans: initPlans, content, gymId, onUpdate, onSaveCms }) {
       if (form.mode === 'add') { const created = await createCmsPlan(gymId, { ...payload, sort_order: plans.length }); updated = [...plans, created] }
       else { const saved = await updateCmsPlan(form.data.id, payload); updated = plans.map(p => p.id === saved.id ? saved : p) }
       setPlans(updated); onUpdate(updated); setForm(null)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Delete this plan?')) return
+    if (!await dialog.confirm('Delete this plan?')) return
     setDeleting(id)
     try { await deleteCmsPlan(id); const updated = plans.filter(p => p.id !== id); setPlans(updated); onUpdate(updated); if (form?.data?.id === id) setForm(null) }
-    catch (err) { alert(err.message) } finally { setDeleting(null) }
+    catch (err) { dialog.alert(err.message) } finally { setDeleting(null) }
   }
 
   async function saveIncluded(e) {
@@ -650,7 +659,7 @@ function PlansPanel({ plans: initPlans, content, gymId, onUpdate, onSaveCms }) {
       const updated = await upsertCmsContent(gymId, { included_features: features.length ? features : null })
       onSaveCms(prev => ({ ...prev, ...updated }))
       setFeatSuccess('Saved!'); setTimeout(() => setFeatSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setFeatSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setFeatSaving(false) }
   }
 
   return (
@@ -708,6 +717,7 @@ function PlansPanel({ plans: initPlans, content, gymId, onUpdate, onSaveCms }) {
 const EMPTY_FAQ = { q: '', a: '' }
 
 function FAQPanel({ content, gymId, onSave }) {
+  const dialog = useDialog()
   const [items, setItems] = useState(content?.faq_items || [])
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -732,7 +742,7 @@ function FAQPanel({ content, gymId, onSave }) {
       const entry = { q: form.data.q.trim(), a: form.data.a.trim() }
       const newItems = form.mode === 'add' ? [...items, entry] : items.map((it, i) => i === form.data.idx ? entry : it)
       await persist(newItems); setForm(null)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   const DEFAULT_FAQS = [
@@ -749,7 +759,7 @@ function FAQPanel({ content, gymId, onSave }) {
         action={
           <div className="flex items-center gap-2">
             {items.length === 0 && (
-              <button type="button" onClick={async () => { if (!window.confirm('Load default FAQ items?')) return; await persist(DEFAULT_FAQS) }}
+              <button type="button" onClick={async () => { if (!await dialog.confirm('Load default FAQ items?')) return; await persist(DEFAULT_FAQS) }}
                 className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
                 Load Defaults
               </button>
@@ -764,7 +774,7 @@ function FAQPanel({ content, gymId, onSave }) {
           <div key={i}>
             <ItemRow title={item.q} subtitle={item.a?.slice(0, 70) + (item.a?.length > 70 ? '…' : '')}
               onEdit={() => setForm({ mode: 'edit', data: { idx: i, q: item.q, a: item.a } })}
-              onDelete={async () => { if (!window.confirm('Delete this question?')) return; setDeleting(i); try { await persist(items.filter((_, j) => j !== i)); if (form?.data?.idx === i) setForm(null) } finally { setDeleting(null) } }}
+              onDelete={async () => { if (!await dialog.confirm('Delete this question?')) return; setDeleting(i); try { await persist(items.filter((_, j) => j !== i)); if (form?.data?.idx === i) setForm(null) } finally { setDeleting(null) } }}
               deleting={deleting === i} />
             {form?.mode === 'edit' && form.data.idx === i && (
               <div className="mt-1">
@@ -791,6 +801,7 @@ const EMPTY_TRAINER = { name: '', specialization: '', image_url: '', bio: '' }
 
 // ─── Gallery Panel ──────────────────────────────────────────────────────────────
 function GalleryPanel({ content, gymId, onSave }) {
+  const dialog = useDialog()
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
 
@@ -822,7 +833,7 @@ function GalleryPanel({ content, gymId, onSave }) {
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -837,6 +848,7 @@ function GalleryPanel({ content, gymId, onSave }) {
         onListChange={handleListChange}
         onFileSelected={galleryImgs.handleFile}
         isPending={galleryImgs.isPending}
+        pendingUrls={galleryImgs.pendingUrls}
         selectMode={false}
         planName="Starter"
         label="Gallery Images"
@@ -852,6 +864,7 @@ function GalleryPanel({ content, gymId, onSave }) {
 }
 
 function StarterCoachInlineForm({ mode, data, gymId, planName, imageCount, onSave, onCancel }) {
+  const dialog = useDialog()
   const [name,           setName]           = useState(data.name)
   const [specialization, setSpecialization] = useState(data.specialization)
   const [bio,            setBio]            = useState(data.bio)
@@ -872,7 +885,7 @@ function StarterCoachInlineForm({ mode, data, gymId, planName, imageCount, onSav
     try {
       const finalImage = await img.commit()
       await onSave({ name: name.trim(), specialization: specialization.trim() || null, image_url: finalImage || null, bio: bio.trim() || null })
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (
@@ -892,6 +905,7 @@ function StarterCoachInlineForm({ mode, data, gymId, planName, imageCount, onSav
 }
 
 function CoachesPanel({ trainers: initTrainers, gymId, onUpdate, planName }) {
+  const dialog = useDialog()
   const [trainers, setTrainers] = useState(initTrainers)
   const [form, setForm] = useState(null)
   const [deleting, setDeleting] = useState(null)
@@ -904,7 +918,7 @@ function CoachesPanel({ trainers: initTrainers, gymId, onUpdate, planName }) {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Delete this coach?')) return
+    if (!await dialog.confirm('Delete this coach?')) return
     setDeleting(id)
     try {
       const trainer = trainers.find(t => t.id === id)
@@ -913,7 +927,7 @@ function CoachesPanel({ trainers: initTrainers, gymId, onUpdate, planName }) {
       const updated = trainers.filter(t => t.id !== id)
       setTrainers(updated); onUpdate(updated)
       if (form?.data?.id === id) setForm(null)
-    } catch (err) { alert(err.message) } finally { setDeleting(null) }
+    } catch (err) { dialog.alert(err.message) } finally { setDeleting(null) }
   }
 
   return (
@@ -951,6 +965,7 @@ const CONTACT_DEFAULT_HOURS = [
 ]
 
 function ContactPanel({ gym, gymId, onSave }) {
+  const dialog = useDialog()
   const [phone, setPhone] = useState(gym?.phone || '')
   const [email, setEmail] = useState(gym?.email || '')
   const [address, setAddress] = useState(gym?.address || '')
@@ -999,7 +1014,7 @@ function ContactPanel({ gym, gymId, onSave }) {
       })
       onSave(updated)
       setSuccess('Saved!'); setTimeout(() => setSuccess(''), 3000)
-    } catch (err) { alert(err.message) } finally { setSaving(false) }
+    } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
 
   return (

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './store/AuthContext'
+import { DialogProvider } from './components/ui/Dialog'
 import DashboardLayout from './components/layout/DashboardLayout'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import PublicRoute from './components/layout/PublicRoute'
@@ -19,6 +20,7 @@ import AnalyticsPage from './pages/owner/AnalyticsPage'
 import TrainersPage from './pages/owner/TrainersPage'
 import SettingsPage from './pages/owner/SettingsPage'
 import WebsitePage from './pages/owner/WebsitePage'
+import PaymentSettingsPage from './pages/owner/PaymentSettingsPage'
 import StarterWebsitePage from './pages/owner/StarterWebsitePage'
 import TrainerDashboard from './pages/trainer/TrainerDashboard'
 import MemberApp from './pages/member/MemberApp'
@@ -54,6 +56,7 @@ const ownerLinks = [
   { to: '/owner-dashboard/members', icon: 'members', label: 'Members' },
   { to: '/owner-dashboard/plans', icon: 'plans', label: 'Plans' },
   { to: '/owner-dashboard/payments', icon: 'payments', label: 'Payments' },
+  { to: '/owner-dashboard/payment-settings', icon: 'settings', label: 'Payment Setup' },
   { to: '/owner-dashboard/trainers', icon: 'trainers', label: 'Trainers' },
   { to: '/owner-dashboard/analytics', icon: 'analytics', label: 'Analytics' },
   { to: '/owner-dashboard/checkin', icon: 'checkin', label: 'Check-in' },
@@ -76,6 +79,7 @@ const memberLinks = [
 export default function App() {
   return (
     <BrowserRouter>
+      <DialogProvider>
       <AuthProvider>
         <Routes>
           {/* Public routes */}
@@ -123,6 +127,7 @@ export default function App() {
             <Route path="checkin" element={<AttendancePage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="website" element={<WebsitePageRouter />} />
+            <Route path="payment-settings" element={<PaymentSettingsPage />} />
           </Route>
 
           {/* Trainer dashboard — protected, trainer only */}
@@ -152,6 +157,7 @@ export default function App() {
           </Route>
         </Routes>
       </AuthProvider>
+      </DialogProvider>
     </BrowserRouter>
   )
 }
