@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
-import { createSubscriptionLink } from '../../services/subscriptionService'
+import { createSubscriptionOrder, openSubscriptionCheckout } from '../../services/subscriptionService'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
 
 const PLANS = [
@@ -57,7 +57,7 @@ const PLANS = [
 ]
 
 export default function BillingPage() {
-  const { profile, subscription, hasActiveSubscription, isAuthenticated, isOnboarded, loading, gymId, refreshProfile } = useAuth()
+  const { profile, subscription, hasActiveSubscription, isAuthenticated, isOnboarded, loading, refreshProfile } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -66,12 +66,12 @@ export default function BillingPage() {
   const [error, setError] = useState('')
   const [paymentSuccess, setPaymentSuccess] = useState(false)
 
-  // Handle Razorpay callback redirect
+  // Backward compat: handle Razorpay Payment Link callback redirect from the
+  // old (legacy) flow. New Checkout flow doesn't redirect — it stays in-page.
   useEffect(() => {
     const status = searchParams.get('razorpay_payment_link_status')
     if (status === 'paid') {
       setPaymentSuccess(true)
-      // Give webhook a moment to process, then refresh profile
       const timer = setTimeout(async () => {
         await refreshProfile()
         navigate('/owner-dashboard', { replace: true })
@@ -97,18 +97,38 @@ export default function BillingPage() {
     try {
       const plan = PLANS[selectedPlan]
 
-      const result = await createSubscriptionLink({
-        gymId,
+      const order = await createSubscriptionOrder({
         planName: plan.name,
         price: plan.price,
         durationDays: plan.durationDays,
-        callbackUrl: `${window.location.origin}/billing`,
       })
 
-      // Redirect to Razorpay payment page
-      window.location.href = result.paymentLinkUrl
+      await openSubscriptionCheckout({
+        orderId: order.orderId,
+        amount: order.amount,
+        currency: order.currency,
+        razorpayKeyId: order.razorpayKeyId,
+        planName: order.planName,
+        prefill: {
+          name: profile?.name || '',
+          contact: profile?.phone || '',
+          email: profile?.email || '',
+        },
+      })
+
+      // Payment + verification succeeded — show success screen, then redirect
+      setPaymentSuccess(true)
+      setTimeout(async () => {
+        await refreshProfile()
+        navigate('/owner-dashboard', { replace: true })
+      }, 1500)
     } catch (err) {
-      setError(err.message || 'Failed to generate payment link')
+      if (err?.message === 'checkout_dismissed') {
+        // User closed the modal — silent, just refresh state in case
+        await refreshProfile()
+      } else {
+        setError(err.message || 'Failed to start payment')
+      }
     } finally {
       setProcessing(false)
     }
@@ -257,7 +277,7 @@ export default function BillingPage() {
               Activate now to start tracking members today
             </p>
             <p className="text-xs text-amber-600 mt-1">
-              14-day free trial included — no charge until trial ends
+              30-day subscription. Cancel anytime, no commitment.
             </p>
           </div>
         )}
@@ -335,10 +355,10 @@ export default function BillingPage() {
             className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-blue-500 text-white font-bold rounded-xl hover:opacity-90 transition-opacity cursor-pointer text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-200"
           >
             {processing
-              ? 'Generating payment link...'
+              ? 'Opening Checkout...'
               : isExpired
                 ? `Renew with ${PLANS[selectedPlan].name} Plan — ${'\u20B9'}${PLANS[selectedPlan].price.toLocaleString('en-IN')}/month`
-                : `Activate ${PLANS[selectedPlan].name} Plan — Start Free Trial`
+                : `Activate ${PLANS[selectedPlan].name} Plan — ₹${PLANS[selectedPlan].price.toLocaleString('en-IN')}/month`
             }
           </button>
 

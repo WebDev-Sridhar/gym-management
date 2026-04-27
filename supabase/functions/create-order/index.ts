@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
         currency: 'INR',
         receipt: paymentId,
         notes: {
+          type: 'membership',
           gym_id: gymId,
           payment_id: paymentId,
           member_id: body.memberId,
