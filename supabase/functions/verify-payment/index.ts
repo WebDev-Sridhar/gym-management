@@ -52,14 +52,17 @@ Deno.serve(async (req) => {
     // Load gym keys for signature verification
     const { data: settings, error: setErr } = await supabase
       .from('gym_payment_settings')
-      .select('razorpay_key_secret_enc')
+      .select('razorpay_key_secret_enc, encryption_version')
       .eq('gym_id', gymId)
       .single()
     if (setErr || !settings?.razorpay_key_secret_enc) {
       throw new HttpError(500, 'gym keys not available for verification')
     }
 
-    const keySecret = await decryptSecret(byteaToBytes(settings.razorpay_key_secret_enc))
+    const keySecret = await decryptSecret(
+      settings.encryption_version ?? 1,
+      byteaToBytes(settings.razorpay_key_secret_enc),
+    )
 
     // Razorpay Checkout signature: HMAC-SHA256(order_id + '|' + payment_id, key_secret)
     const expected = await hmacSha256Hex(

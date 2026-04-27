@@ -52,7 +52,6 @@ export default function PaymentsPage() {
       const order = await createOrder({
         memberId: member.id,
         planId: plan.id,
-        amount: Number(plan.price),
       })
 
       await openCheckout({

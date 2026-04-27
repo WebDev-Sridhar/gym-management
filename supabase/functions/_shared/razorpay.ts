@@ -53,18 +53,46 @@ export async function createOrder(
   return res.json()
 }
 
-// Validate keys by making a cheap authenticated call.
-// Returns true if the keys are accepted, false on 401, throws on other errors.
-export async function validateKeys(creds: RazorpayCreds): Promise<boolean> {
-  const res = await fetch(`${BASE}/payments?count=1`, {
-    headers: { 'Authorization': authHeader(creds.keyId, creds.keySecret) },
+// Validate keys by attempting to create a real ₹1 order. This proves:
+//   1. The key_id + key_secret are valid (would 401 otherwise)
+//   2. The keys have orders:write permission (some restricted keys don't)
+//   3. The mode (test vs live) is consistent — live keys reject test-mode requests
+//
+// Returns the test order so the caller can record it for audit. Razorpay does
+// NOT charge for unpaid orders, so leaving this in their dashboard is harmless.
+export async function validateKeysWithTestOrder(
+  creds: RazorpayCreds,
+): Promise<{ ok: boolean; reason?: string; testOrderId?: string }> {
+  const res = await fetch(`${BASE}/orders`, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader(creds.keyId, creds.keySecret),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      amount: 100,                                  // ₹1 in paise
+      currency: 'INR',
+      receipt: `keytest_${Date.now()}`,
+      notes: { purpose: 'gymos_key_validation' },
+    }),
   })
-  if (res.status === 401) return false
+
+  if (res.status === 401) {
+    return { ok: false, reason: 'Invalid key ID or secret (401 from Razorpay)' }
+  }
+
+  if (res.status === 400) {
+    const txt = await res.text()
+    return { ok: false, reason: `Razorpay rejected the test order: ${txt}` }
+  }
+
   if (!res.ok) {
     const txt = await res.text()
-    throw new Error(`razorpay validateKeys unexpected status ${res.status}: ${txt}`)
+    return { ok: false, reason: `Razorpay returned ${res.status}: ${txt}` }
   }
-  return true
+
+  const order = await res.json()
+  return { ok: true, testOrderId: order.id }
 }
 
 // HMAC-SHA256(message, secret) → hex string. Used for both checkout signature

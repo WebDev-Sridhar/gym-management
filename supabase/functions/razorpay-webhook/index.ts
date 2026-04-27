@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
   // Load this gym's webhook secret
   const { data: settings, error: setErr } = await supabase
     .from('gym_payment_settings')
-    .select('razorpay_webhook_secret_enc')
+    .select('razorpay_webhook_secret_enc, encryption_version')
     .eq('gym_id', gymId)
     .single()
 
@@ -79,7 +79,10 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: true, ignored: 'no settings' })
   }
 
-  const webhookSecret = await decryptSecret(byteaToBytes(settings.razorpay_webhook_secret_enc))
+  const webhookSecret = await decryptSecret(
+    settings.encryption_version ?? 1,
+    byteaToBytes(settings.razorpay_webhook_secret_enc),
+  )
 
   // Validate signature
   const expected = await hmacSha256Hex(rawBody, webhookSecret)

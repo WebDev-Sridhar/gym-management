@@ -17,6 +17,7 @@ export default function PaymentSettingsPage() {
   const [savingMode, setSavingMode] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [lastTestOrderId, setLastTestOrderId] = useState('')
 
   // Form fields
   const [paymentMode, setPaymentMode] = useState('upi')

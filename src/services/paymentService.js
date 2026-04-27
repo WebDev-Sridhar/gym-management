@@ -68,12 +68,13 @@ export async function markPaymentPaid({ paymentId, paymentMethod }) {
 // ─── Razorpay Checkout (Orders API) ─────────────────────────────────────────
 
 /**
- * Server-side: creates a Razorpay Order using THIS gym's keys, inserts a
+ * Server-side: creates a Razorpay Order using THIS gym's keys + the plan's
+ * server-side price (frontend cannot tamper with the amount), inserts a
  * pending payments row. Returns everything the frontend needs to open Checkout.
  */
-export async function createOrder({ memberId, planId, amount, dueDate }) {
+export async function createOrder({ memberId, planId, dueDate }) {
   const { data, error } = await supabase.functions.invoke('create-order', {
-    body: { memberId, planId, amount, dueDate },
+    body: { memberId, planId, dueDate },
   })
   if (error) throw error
   if (data?.error) throw new Error(data.error)
