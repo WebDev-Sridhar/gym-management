@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Moon, Sun } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 import { supabaseData } from '../../services/supabaseClient'
@@ -6,7 +6,7 @@ import { fetchGymDetails, updateGymDetails } from '../../services/membershipServ
 import { Link } from 'react-router-dom'
 import {
   fetchCmsContent, upsertCmsContent,
-  fetchCmsPlans, createCmsPlan, updateCmsPlan, deleteCmsPlan,
+  fetchCmsPlans, createCmsPlan, updateCmsPlan, deleteCmsPlan, fetchBillablePlans,
   fetchCmsTestimonials, createCmsTestimonial, updateCmsTestimonial, deleteCmsTestimonial,
   fetchCmsTrainers,
 } from '../../services/gymCmsService'
@@ -28,6 +28,8 @@ import HeroForm from './cms/sections/HeroForm'
 import AboutForm from './cms/sections/AboutForm'
 import TrainersForm from './cms/sections/TrainersForm'
 import { useDialog } from '../../components/ui/Dialog'
+import CustomSelect from '../../components/ui/CustomSelect'
+import FormModal from '../../components/ui/FormModal'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 const PRESET_COLORS = [
@@ -330,14 +332,13 @@ function AddBtn({ onClick, label }) {
 
 function InlineForm({ title, children, onCancel, onSave, saving }) {
   return (
-    <div className="mt-3 p-5 bg-gray-50 border border-gray-200 rounded-xl space-y-4">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
+    <FormModal title={title} onClose={onCancel}>
       {children}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">Cancel</button>
         <SaveBtn saving={saving} onClick={onSave} label="Save" type="button" />
       </div>
-    </div>
+    </FormModal>
   )
 }
 
@@ -1158,7 +1159,17 @@ function IncludedFeaturesSubPanel({ content, gymId, onSave, planName, setPreview
   )
 }
 
-const EMPTY_PLAN = { name: '', price: '', duration_label: '', features_text: '', is_popular: false }
+const EMPTY_PLAN = { plan_id: '', features_text: '', is_popular: false }
+
+function formatDurationDays(days) {
+  if (!days) return ''
+  if (days === 1) return '1 day'
+  if (days < 30) return `${days} days`
+  const months = Math.round(days / 30)
+  if (months === 1) return '1 month'
+  if (months === 12) return '1 year'
+  return `${months} months`
+}
 
 function PricingPanel({ plans: initPlans, gymId, onUpdate, content, onSaveCms, planName, setPreviewData }) {
   const dialog = useDialog()
@@ -1189,20 +1200,61 @@ function PricingPanel({ plans: initPlans, gymId, onUpdate, content, onSaveCms, p
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(null)
+  const [billablePlans, setBillablePlans] = useState([])
+
+  // Load gym's billable plans for the dropdown
+  useEffect(() => {
+    if (!gymId) return
+    fetchBillablePlans(gymId).then(setBillablePlans).catch(() => setBillablePlans([]))
+  }, [gymId])
+
+  // IDs already linked, so we don't show duplicates in the dropdown for new rows
+  const linkedPlanIds = new Set(plans.map(p => p.plan_id).filter(Boolean))
 
   function openAdd() { setForm({ mode: 'add', data: { ...EMPTY_PLAN } }) }
-  function openEdit(p) { setForm({ mode: 'edit', data: { id: p.id, name: p.name || '', price: p.price ?? '', duration_label: p.duration_label || '', features_text: (p.features || []).join('\n'), is_popular: p.is_popular || false } }) }
+  function openEdit(p) {
+    setForm({
+      mode: 'edit',
+      data: {
+        id: p.id,
+        plan_id: p.plan_id || '',
+        features_text: (p.features || []).join('\n'),
+        is_popular: p.is_popular || false,
+      },
+    })
+  }
   function closeForm() { setForm(null) }
   function patch(key, val) { setForm(f => ({ ...f, data: { ...f.data, [key]: val } })) }
 
   async function handleSave() {
-    if (!form.data.name.trim()) return
+    if (!form.data.plan_id) {
+      dialog.alert('Please select a gym plan to link.')
+      return
+    }
     setSaving(true)
     try {
-      const payload = { name: form.data.name.trim(), price: Number(form.data.price) || 0, duration_label: form.data.duration_label.trim() || null, features: form.data.features_text.split('\n').map(f => f.trim()).filter(Boolean), is_popular: form.data.is_popular }
+      const linked = billablePlans.find(p => p.id === form.data.plan_id)
+      // Mirror name on gym_plans for display fallback (denormalized — we still
+      // read price/duration from the linked plans row at render time)
+      const payload = {
+        plan_id: form.data.plan_id,
+        name: linked?.name ?? '',
+        price: Number(linked?.price ?? 0),
+        duration_label: formatDurationDays(linked?.duration_days),
+        features: form.data.features_text.split('\n').map(f => f.trim()).filter(Boolean),
+        is_popular: form.data.is_popular,
+      }
       let updated
-      if (form.mode === 'add') { const created = await createCmsPlan(gymId, { ...payload, sort_order: plans.length }); updated = [...plans, created] }
-      else { const saved = await updateCmsPlan(form.data.id, payload); updated = plans.map(p => p.id === saved.id ? saved : p) }
+      if (form.mode === 'add') {
+        const created = await createCmsPlan(gymId, { ...payload, sort_order: plans.length })
+        // Re-attach hydrated plan info so the row renders correctly without a refetch
+        created.plan = linked
+        updated = [...plans, created]
+      } else {
+        const saved = await updateCmsPlan(form.data.id, payload)
+        saved.plan = linked
+        updated = plans.map(p => p.id === saved.id ? saved : p)
+      }
       setPlans(updated); onUpdate(updated); setForm(null)
     } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
@@ -1242,28 +1294,90 @@ function PricingPanel({ plans: initPlans, gymId, onUpdate, content, onSaveCms, p
         </div>
       </FeatureGate>
       {plans.length === 0 && !form && <EmptyState label="No plans yet. Add your first pricing plan." />}
-      <div className="space-y-2">
-        {plans.map(p => (
-          <ItemRow key={p.id} title={p.name}
-            subtitle={`₹${Number(p.price).toLocaleString('en-IN')} · ${p.duration_label || 'month'} · ${(p.features || []).length} feature${(p.features || []).length !== 1 ? 's' : ''}`}
-            badge={p.is_popular ? 'Popular' : null}
-            onEdit={() => openEdit(p)} onDelete={() => handleDelete(p.id)} deleting={deleting === p.id} />
-        ))}
-      </div>
-      {form && (
-        <InlineForm title={form.mode === 'add' ? 'New Plan' : 'Edit Plan'} onCancel={closeForm} onSave={handleSave} saving={saving}>
-          <Field label="Plan Name" required><input type="text" value={form.data.name} onChange={e => patch('name', e.target.value)} placeholder="e.g. Basic" className={inputCls} /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Price (₹)"><input type="number" min="0" value={form.data.price} onChange={e => patch('price', e.target.value)} placeholder="999" className={inputCls} /></Field>
-            <Field label="Duration" hint='e.g. "1 month"'><input type="text" value={form.data.duration_label} onChange={e => patch('duration_label', e.target.value)} placeholder="1 month" className={inputCls} /></Field>
-          </div>
-          <Field label="Features" hint="One per line."><textarea value={form.data.features_text} onChange={e => patch('features_text', e.target.value)} rows={4} placeholder={'Gym floor access\nLocker room\nFree parking'} className={inputCls + ' resize-none'} /></Field>
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input type="checkbox" checked={form.data.is_popular} onChange={e => patch('is_popular', e.target.checked)} className="w-4 h-4 rounded accent-violet-600" />
-            <span className="text-gray-700 font-medium">Mark as popular plan</span>
-          </label>
-        </InlineForm>
+
+      {billablePlans.length === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+          You don't have any billable plans yet. <a href="/owner-dashboard/plans" className="font-semibold underline">Create one first</a> — these are what members actually pay for.
+        </div>
       )}
+
+      <div className="space-y-2">
+        {plans.map(p => {
+          const linked = p.plan
+          const unlinked = !linked
+          const subtitle = unlinked
+            ? '⚠ Not linked to a billable plan — checkout disabled'
+            : `${linked.name} · ₹${Number(linked.price).toLocaleString('en-IN')} · ${formatDurationDays(linked.duration_days)} · ${(p.features || []).length} feature${(p.features || []).length !== 1 ? 's' : ''}`
+          return (
+            <ItemRow
+              key={p.id}
+              title={linked?.name || p.name || '(unlinked)'}
+              subtitle={subtitle}
+              badge={p.is_popular ? 'Popular' : null}
+              onEdit={() => openEdit(p)}
+              onDelete={() => handleDelete(p.id)}
+              deleting={deleting === p.id}
+            />
+          )
+        })}
+      </div>
+
+      {form && (() => {
+        const selectedPlan = billablePlans.find(p => p.id === form.data.plan_id)
+        const stillLinkedButMissing = form.mode === 'edit' && form.data.plan_id && !selectedPlan
+        return (
+          <InlineForm title={form.mode === 'add' ? 'New Plan' : 'Edit Plan'} onCancel={closeForm} onSave={handleSave} saving={saving}>
+            <Field label="Linked Gym Plan" required hint="This plan will be automatically assigned after successful payment.">
+              <CustomSelect
+                value={form.data.plan_id}
+                onChange={v => patch('plan_id', v)}
+                placeholder="— Select a plan —"
+                options={[
+                  ...billablePlans.map(bp => {
+                    const isLinkedElsewhere = linkedPlanIds.has(bp.id) && bp.id !== form.data.plan_id
+                    return {
+                      value: bp.id,
+                      label: `${bp.name} — ₹${Number(bp.price).toLocaleString('en-IN')} / ${formatDurationDays(bp.duration_days)}`,
+                      disabled: isLinkedElsewhere,
+                      hint: isLinkedElsewhere ? 'already linked' : undefined,
+                    }
+                  }),
+                  ...(stillLinkedButMissing ? [{ value: form.data.plan_id, label: '⚠ Linked plan no longer exists' }] : []),
+                ]}
+              />
+            </Field>
+
+            {selectedPlan && (
+              <div className="rounded-lg bg-violet-50 border border-violet-100 p-3 text-xs text-violet-900">
+                <div className="font-semibold">{selectedPlan.name}</div>
+                <div className="mt-0.5 text-violet-700">
+                  ₹{Number(selectedPlan.price).toLocaleString('en-IN')} · {formatDurationDays(selectedPlan.duration_days)}
+                </div>
+              </div>
+            )}
+
+            <Field label="Features" hint="One per line. Shown on the public pricing card.">
+              <textarea
+                value={form.data.features_text}
+                onChange={e => patch('features_text', e.target.value)}
+                rows={4}
+                placeholder={'Gym floor access\nLocker room\nFree parking'}
+                className={inputCls + ' resize-none'}
+              />
+            </Field>
+
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.data.is_popular}
+                onChange={e => patch('is_popular', e.target.checked)}
+                className="w-4 h-4 rounded accent-violet-600"
+              />
+              <span className="text-gray-700 font-medium">Mark as popular plan</span>
+            </label>
+          </InlineForm>
+        )
+      })()}
       <IncludedFeaturesSubPanel content={content} gymId={gymId} onSave={onSaveCms} planName={planName} setPreviewData={setPreviewData} />
     </div>
   )
@@ -1308,10 +1422,7 @@ function ProgramInlineForm({ mode, data, gymId, planName, imageCount, onSave, on
   }
 
   return (
-    <div className="mt-3 p-5 bg-gray-50 border border-gray-200 rounded-xl space-y-4">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-        {mode === 'add' ? 'New Program' : 'Edit Program'}
-      </p>
+    <div className="space-y-4">
       <Field label="Program Title" required>
         <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Iron Weight Training" className={inputCls} />
       </Field>
@@ -1444,16 +1555,18 @@ function ProgramsPanel({ content, gymId, onSave, planName, setPreviewData }) {
         ))}
       </div>
       {form && (
-        <ProgramInlineForm
-          key={form.data.id || 'new'}
-          mode={form.mode}
-          data={form.data}
-          gymId={gymId}
-          planName={planName}
-          imageCount={imageCount}
-          onSave={handleInlineSave}
-          onCancel={() => setForm(null)}
-        />
+        <FormModal title={form.mode === 'add' ? 'New Program' : 'Edit Program'} onClose={() => setForm(null)}>
+          <ProgramInlineForm
+            key={form.data.id || 'new'}
+            mode={form.mode}
+            data={form.data}
+            gymId={gymId}
+            planName={planName}
+            imageCount={imageCount}
+            onSave={handleInlineSave}
+            onCancel={() => setForm(null)}
+          />
+        </FormModal>
       )}
     </div>
   )
@@ -1861,11 +1974,13 @@ function ContactPanel({ gym, gymId, onSave }) {
           })}
           {availablePlatforms.length > 0 && (
             <div className="flex gap-2">
-              <select value={addPlatform} onChange={e => setAddPlatform(e.target.value)}
-                className="px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors">
-                <option value="">Platform…</option>
-                {availablePlatforms.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-              </select>
+              <CustomSelect
+                value={addPlatform}
+                onChange={setAddPlatform}
+                placeholder="Platform…"
+                className="w-36"
+                options={availablePlatforms.map(p => ({ value: p.id, label: p.label }))}
+              />
               <input type="url" value={addUrl} onChange={e => setAddUrl(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addLink())}
                 placeholder="https://…" className={inputCls + ' flex-1 min-w-0'} />
@@ -1983,6 +2098,7 @@ export default function WebsitePage() {
   const [expandedPages, setExpandedPages] = useState(new Set(['settings', 'home']))
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const pageItemRefs = useRef({})
 
   const [previewData, setPreviewData] = useState(null)
   const [trainersList, setTrainersList] = useState([])
@@ -2033,12 +2149,15 @@ export default function WebsitePage() {
       const next = new Set(prev)
       if (next.has(pageId)) {
         next.delete(pageId)
-        // If the active section belongs to this page being collapsed, reset to theme
         if (SECTION_PAGE_MAP[activeSection] === pageId) {
           setActiveSection('theme')
         }
       } else {
         next.add(pageId)
+        // After DOM updates, scroll the expanded item into view within the sidebar
+        requestAnimationFrame(() => {
+          pageItemRefs.current[pageId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        })
       }
       return next
     })
@@ -2053,14 +2172,20 @@ export default function WebsitePage() {
   // ── Sidebar renderer ──
   function renderSidebar(mobile = false) {
     return (
-      <ul className={mobile ? 'py-1' : 'space-y-1'}>
-        {PAGES.map(page => {
+      <ul className={mobile ? 'py-2 space-y-1' : 'space-y-2'}>
+        {PAGES.map((page, pageIdx) => {
           const accessible = canAccessPage(page.minPlan, planName)
           const isExpanded = expandedPages.has(page.id)
           const isCurrentPage = SECTION_PAGE_MAP[activeSection] === page.id
+          const isActive = accessible && (isCurrentPage || isExpanded)
 
           return (
-            <li key={page.id}>
+            <li key={page.id} ref={el => { if (!mobile) pageItemRefs.current[page.id] = el }}>
+              {/* Separator above every item except the first */}
+              {pageIdx > 0 && (
+                <div className="h-px bg-gray-100 mb-2" />
+              )}
+
               {/* Page group header */}
               <button
                 type="button"
@@ -2069,12 +2194,17 @@ export default function WebsitePage() {
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
                   !accessible
                     ? 'text-gray-300 cursor-not-allowed'
-                    : isCurrentPage || isExpanded
+                    : isActive
                       ? 'text-violet-700 bg-violet-50'
                       : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 cursor-pointer'
                 }`}
               >
-                <span>{page.label}</span>
+                <div className="flex items-center gap-2">
+                  {isActive && (
+                    <span className="w-1 h-3.5 rounded-full bg-violet-500 shrink-0" />
+                  )}
+                  <span>{page.label}</span>
+                </div>
                 {!accessible ? (
                   <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded font-bold border border-amber-100">Pro</span>
                 ) : (
@@ -2089,7 +2219,7 @@ export default function WebsitePage() {
 
               {/* Section items */}
               {accessible && isExpanded && (
-                <ul className="mt-0.5 ml-2 pl-2 border-l border-gray-100 space-y-0.5">
+                <ul className="mt-1 mb-1 ml-2 pl-2 border-l-2 border-violet-100 space-y-0.5">
                   {page.sections.map(sec => {
                     const secLocked = sec.minPlan && !canAccessPage(sec.minPlan, planName)
                     return (
@@ -2109,7 +2239,6 @@ export default function WebsitePage() {
                           <div className="flex items-center justify-between gap-1">
                             <span className={`block text-sm font-medium ${activeSection === sec.id ? 'text-violet-700' : ''}`}>{sec.label}</span>
                             <div className="flex items-center gap-1 shrink-0">
-                              {/* Hidden indicator dot — Enterprise only */}
                               {canAccess('section_visibility', planName) && (
                                 (TOGGLEABLE_SECTIONS.has(sec.id) && (content?.hidden_sections || []).includes(sec.id)) ||
                                 (sec.id === 'stats' && (
@@ -2203,15 +2332,15 @@ export default function WebsitePage() {
       <div className={`flex gap-5 items-start ${showPreview ? 'flex-col md:flex-row' : ''}`}>
         {/* Desktop sidebar */}
         <nav
-          className="cms-sidebar hidden lg:block shrink-0 sticky top-6 overflow-hidden"
+          className="cms-sidebar hidden lg:block shrink-0 sticky top-6"
           style={{
             width: sidebarCollapsed ? 0 : '12rem',
             minWidth: 0,
-            maxHeight: 'calc(100vh - 3rem)',
+            height: 'calc(100vh - 8.5rem)',
             transition: 'width 0.25s ease',
           }}
         >
-          <div className="cms-sidebar-inner w-48 overflow-y-auto overscroll-contain max-h-[calc(100vh-3rem)]">
+          <div className="cms-sidebar-inner w-48 h-full overflow-y-auto overscroll-contain">
             {renderSidebar()}
           </div>
         </nav>
@@ -2258,9 +2387,12 @@ export default function WebsitePage() {
           {activeSection === 'cta_contact'        && <SingleCTAPanel fieldKey="cta_contact" pageLabel="Contact Page" content={content} gymId={gymId} onSave={handleContentSave} setPreviewData={setPreviewData} />}
         </div>
 
-        {/* Live preview panel — Pro+ only */}
+        {/* Live preview panel — Pro+ only, sticky */}
         {showPreview && (
-          <div className="flex-1 min-w-0">
+          <div
+            className="flex-1 min-w-0 sticky top-6 overflow-y-auto overscroll-contain"
+            style={{ height: 'calc(100vh - 8.5rem)' }}
+          >
             <PreviewPanel
               section={activeSection}
               previewData={previewData}

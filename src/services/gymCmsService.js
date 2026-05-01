@@ -28,15 +28,28 @@ export async function upsertCmsContent(gymId, fields) {
 }
 
 // ─── Plans (gym_plans table) ──────────────────────────────────────
-// Public pricing plans displayed on the gym website.
-// Columns: id, gym_id, name, price, duration_label, features (text[]), is_popular, sort_order
+// Public pricing plans (CMS marketing layer). Each row maps to a billable
+// `plans` row via plan_id. Owners only edit features + is_popular here; the
+// linked plan controls name/price/duration.
 
 export async function fetchCmsPlans(gymId) {
   const { data, error } = await supabase
     .from('gym_plans')
-    .select('*')
+    .select('*, plan:plans(id, name, price, duration_days, is_active)')
     .eq('gym_id', gymId)
     .order('sort_order')
+  if (error) throw error
+  return data || []
+}
+
+// All active billable plans for a gym — used by the CMS dropdown.
+export async function fetchBillablePlans(gymId) {
+  const { data, error } = await supabase
+    .from('plans')
+    .select('id, name, price, duration_days, is_active')
+    .eq('gym_id', gymId)
+    .eq('is_active', true)
+    .order('price')
   if (error) throw error
   return data || []
 }

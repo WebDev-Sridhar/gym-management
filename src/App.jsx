@@ -25,6 +25,7 @@ import StarterWebsitePage from './pages/owner/StarterWebsitePage'
 import TrainerDashboard from './pages/trainer/TrainerDashboard'
 import MemberApp from './pages/member/MemberApp'
 import CheckinPage from './pages/checkin/CheckinPage'
+import PayLandingPage from './pages/pay/PayLandingPage'
 import GymLayout from './components/gym/GymLayout'
 import GymHome from './pages/gym/GymHome'
 import GymAbout from './pages/gym/GymAbout'
@@ -85,6 +86,7 @@ export default function App() {
           {/* Public routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/checkin" element={<CheckinPage />} />
+          <Route path="/pay/:token" element={<PayLandingPage />} />
           <Route path="/features" element={<FeaturesPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/demo" element={<DemoPage />} />

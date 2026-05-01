@@ -102,7 +102,7 @@ import { useAuth } from '../../store/AuthContext'
 import { fetchGymDetails, updateGymDetails } from '../../services/membershipService'
 import {
   fetchCmsContent, upsertCmsContent,
-  fetchCmsPlans, createCmsPlan, updateCmsPlan, deleteCmsPlan,
+  fetchCmsPlans, createCmsPlan, updateCmsPlan, deleteCmsPlan, fetchBillablePlans,
   fetchCmsTrainers, createCmsTrainer, updateCmsTrainer, deleteCmsTrainer,
   fetchCmsTestimonials, createCmsTestimonial, updateCmsTestimonial, deleteCmsTestimonial,
 } from '../../services/gymCmsService'
@@ -114,6 +114,8 @@ import { useCMSImage, useCMSImageList } from '../../hooks/useCMSImage'
 import { deleteFile } from '../../services/storageService'
 import { sweepStaleDraftEntries } from '../../lib/cmsDraft'
 import { useDialog } from '../../components/ui/Dialog'
+import CustomSelect from '../../components/ui/CustomSelect'
+import FormModal from '../../components/ui/FormModal'
 
 // ─── Shared UI primitives ───────────────────────────────────────────────────────
 
@@ -208,10 +210,9 @@ function ItemRow({ title, subtitle, onEdit, onDelete, deleting, badge }) {
 
 function InlineForm({ title, onCancel, onSave, saving, children }) {
   return (
-    <div className="p-4 sm:p-5 bg-gray-50 border border-gray-200 rounded-xl space-y-4">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
+    <FormModal title={title} onClose={onCancel}>
       {children}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
         <button type="button" onClick={onCancel}
           className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
           Cancel
@@ -222,7 +223,7 @@ function InlineForm({ title, onCancel, onSave, saving, children }) {
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
-    </div>
+    </FormModal>
   )
 }
 
@@ -380,8 +381,7 @@ function StarterProgramInlineForm({ mode, data, gymId, planName, imageCount, onS
   }
 
   return (
-    <div className="mt-3 p-5 bg-gray-50 border border-gray-200 rounded-xl space-y-4">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{mode === 'add' ? 'New Program' : 'Edit Program'}</p>
+    <div className="space-y-4">
       <Field label="Title" required><input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Strength Training" className={inputCls} /></Field>
       <Field label="Category">
         <div className="flex flex-wrap gap-2 mt-1">
@@ -434,16 +434,18 @@ function ProgramsPanel({ content, gymId, onSave, planName }) {
         ))}
       </div>
       {form && (
-        <StarterProgramInlineForm
-          key={form.mode === 'add' ? 'new' : form.data.idx}
-          mode={form.mode}
-          data={form.data}
-          gymId={gymId}
-          planName={planName}
-          imageCount={items.filter(it => it.image).length}
-          onSave={handleInlineSave}
-          onCancel={() => setForm(null)}
-        />
+        <FormModal title={form.mode === 'add' ? 'New Program' : 'Edit Program'} onClose={() => setForm(null)}>
+          <StarterProgramInlineForm
+            key={form.mode === 'add' ? 'new' : form.data.idx}
+            mode={form.mode}
+            data={form.data}
+            gymId={gymId}
+            planName={planName}
+            imageCount={items.filter(it => it.image).length}
+            onSave={handleInlineSave}
+            onCancel={() => setForm(null)}
+          />
+        </FormModal>
       )}
     </div>
   )
@@ -612,7 +614,17 @@ function VisionPanel({ content, gymId, onSave }) {
   )
 }
 
-const EMPTY_PLAN = { name: '', price: '', duration_label: '', features_text: '', is_popular: false }
+const EMPTY_PLAN = { plan_id: '', features_text: '', is_popular: false }
+
+function formatDurationDays(days) {
+  if (!days) return ''
+  if (days === 1) return '1 day'
+  if (days < 30) return `${days} days`
+  const months = Math.round(days / 30)
+  if (months === 1) return '1 month'
+  if (months === 12) return '1 year'
+  return `${months} months`
+}
 
 function PlansPanel({ plans: initPlans, content, gymId, onUpdate, onSaveCms }) {
   const dialog = useDialog()
@@ -623,23 +635,43 @@ function PlansPanel({ plans: initPlans, content, gymId, onUpdate, onSaveCms }) {
   const [deleting, setDeleting] = useState(null)
   const [featSaving, setFeatSaving] = useState(false)
   const [featSuccess, setFeatSuccess] = useState('')
+  const [billablePlans, setBillablePlans] = useState([])
+
+  useEffect(() => {
+    if (!gymId) return
+    fetchBillablePlans(gymId).then(setBillablePlans).catch(() => setBillablePlans([]))
+  }, [gymId])
+
+  const linkedPlanIds = new Set(plans.map(p => p.plan_id).filter(Boolean))
 
   function patch(key, val) { setForm(f => ({ ...f, data: { ...f.data, [key]: val } })) }
 
   async function handleSave() {
-    if (!form.data.name.trim()) return
+    if (!form.data.plan_id) {
+      dialog.alert('Please select a gym plan to link.')
+      return
+    }
     setSaving(true)
     try {
+      const linked = billablePlans.find(p => p.id === form.data.plan_id)
       const payload = {
-        name: form.data.name.trim(),
-        price: Number(form.data.price) || 0,
-        duration_label: form.data.duration_label.trim() || null,
+        plan_id: form.data.plan_id,
+        name: linked?.name ?? '',
+        price: Number(linked?.price ?? 0),
+        duration_label: formatDurationDays(linked?.duration_days),
         features: form.data.features_text.split('\n').map(f => f.trim()).filter(Boolean),
         is_popular: form.data.is_popular,
       }
       let updated
-      if (form.mode === 'add') { const created = await createCmsPlan(gymId, { ...payload, sort_order: plans.length }); updated = [...plans, created] }
-      else { const saved = await updateCmsPlan(form.data.id, payload); updated = plans.map(p => p.id === saved.id ? saved : p) }
+      if (form.mode === 'add') {
+        const created = await createCmsPlan(gymId, { ...payload, sort_order: plans.length })
+        created.plan = linked
+        updated = [...plans, created]
+      } else {
+        const saved = await updateCmsPlan(form.data.id, payload)
+        saved.plan = linked
+        updated = plans.map(p => p.id === saved.id ? saved : p)
+      }
       setPlans(updated); onUpdate(updated); setForm(null)
     } catch (err) { dialog.alert(err.message) } finally { setSaving(false) }
   }
@@ -668,30 +700,98 @@ function PlansPanel({ plans: initPlans, content, gymId, onUpdate, onSaveCms }) {
         action={<AddBtn onClick={() => setForm({ mode: 'add', data: { ...EMPTY_PLAN } })} label="Add Plan" />} />
 
       {plans.length === 0 && !form && <EmptyState label="No plans yet. Add your first pricing plan." />}
+
+      {billablePlans.length === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+          You don't have any billable plans yet. <a href="/owner-dashboard/plans" className="font-semibold underline">Create one first</a> — these are what members actually pay for.
+        </div>
+      )}
+
       <div className="space-y-2">
-        {plans.map(p => (
-          <ItemRow key={p.id} title={p.name}
-            subtitle={`₹${Number(p.price).toLocaleString('en-IN')} · ${p.duration_label || 'month'} · ${(p.features || []).length} features`}
-            badge={p.is_popular ? 'Popular' : null}
-            onEdit={() => setForm({ mode: 'edit', data: { id: p.id, name: p.name || '', price: p.price ?? '', duration_label: p.duration_label || '', features_text: (p.features || []).join('\n'), is_popular: p.is_popular || false } })}
-            onDelete={() => handleDelete(p.id)} deleting={deleting === p.id} />
-        ))}
+        {plans.map(p => {
+          const linked = p.plan
+          const unlinked = !linked
+          const subtitle = unlinked
+            ? '⚠ Not linked to a billable plan — checkout disabled'
+            : `${linked.name} · ₹${Number(linked.price).toLocaleString('en-IN')} · ${formatDurationDays(linked.duration_days)} · ${(p.features || []).length} feature${(p.features || []).length !== 1 ? 's' : ''}`
+          return (
+            <ItemRow
+              key={p.id}
+              title={linked?.name || p.name || '(unlinked)'}
+              subtitle={subtitle}
+              badge={p.is_popular ? 'Popular' : null}
+              onEdit={() => setForm({
+                mode: 'edit',
+                data: {
+                  id: p.id,
+                  plan_id: p.plan_id || '',
+                  features_text: (p.features || []).join('\n'),
+                  is_popular: p.is_popular || false,
+                },
+              })}
+              onDelete={() => handleDelete(p.id)}
+              deleting={deleting === p.id}
+            />
+          )
+        })}
       </div>
 
-      {form && (
-        <InlineForm title={form.mode === 'add' ? 'New Plan' : 'Edit Plan'} onCancel={() => setForm(null)} onSave={handleSave} saving={saving}>
-          <Field label="Plan Name" required><input type="text" value={form.data.name} onChange={e => patch('name', e.target.value)} placeholder="e.g. Basic" className={inputCls} /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Price (₹)"><input type="number" min="0" value={form.data.price} onChange={e => patch('price', e.target.value)} placeholder="999" className={inputCls} /></Field>
-            <Field label="Duration" hint='e.g. "1 month"'><input type="text" value={form.data.duration_label} onChange={e => patch('duration_label', e.target.value)} placeholder="1 month" className={inputCls} /></Field>
-          </div>
-          <Field label="Features" hint="One per line."><textarea value={form.data.features_text} onChange={e => patch('features_text', e.target.value)} rows={4} placeholder={'Gym floor access\nLocker room\nFree parking'} className={inputCls + ' resize-none'} /></Field>
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input type="checkbox" checked={form.data.is_popular} onChange={e => patch('is_popular', e.target.checked)} className="w-4 h-4 rounded accent-violet-600" />
-            <span className="text-gray-700 font-medium">Mark as popular plan</span>
-          </label>
-        </InlineForm>
-      )}
+      {form && (() => {
+        const selectedPlan = billablePlans.find(p => p.id === form.data.plan_id)
+        const stillLinkedButMissing = form.mode === 'edit' && form.data.plan_id && !selectedPlan
+        return (
+          <InlineForm title={form.mode === 'add' ? 'New Plan' : 'Edit Plan'} onCancel={() => setForm(null)} onSave={handleSave} saving={saving}>
+            <Field label="Linked Gym Plan" required hint="This plan will be automatically assigned after successful payment.">
+              <CustomSelect
+                value={form.data.plan_id}
+                onChange={v => patch('plan_id', v)}
+                placeholder="— Select a plan —"
+                options={[
+                  ...billablePlans.map(bp => {
+                    const isLinkedElsewhere = linkedPlanIds.has(bp.id) && bp.id !== form.data.plan_id
+                    return {
+                      value: bp.id,
+                      label: `${bp.name} — ₹${Number(bp.price).toLocaleString('en-IN')} / ${formatDurationDays(bp.duration_days)}`,
+                      disabled: isLinkedElsewhere,
+                      hint: isLinkedElsewhere ? 'already linked' : undefined,
+                    }
+                  }),
+                  ...(stillLinkedButMissing ? [{ value: form.data.plan_id, label: '⚠ Linked plan no longer exists' }] : []),
+                ]}
+              />
+            </Field>
+
+            {selectedPlan && (
+              <div className="rounded-lg bg-violet-50 border border-violet-100 p-3 text-xs text-violet-900">
+                <div className="font-semibold">{selectedPlan.name}</div>
+                <div className="mt-0.5 text-violet-700">
+                  ₹{Number(selectedPlan.price).toLocaleString('en-IN')} · {formatDurationDays(selectedPlan.duration_days)}
+                </div>
+              </div>
+            )}
+
+            <Field label="Features" hint="One per line. Shown on the public pricing card.">
+              <textarea
+                value={form.data.features_text}
+                onChange={e => patch('features_text', e.target.value)}
+                rows={4}
+                placeholder={'Gym floor access\nLocker room\nFree parking'}
+                className={inputCls + ' resize-none'}
+              />
+            </Field>
+
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.data.is_popular}
+                onChange={e => patch('is_popular', e.target.checked)}
+                className="w-4 h-4 rounded accent-violet-600"
+              />
+              <span className="text-gray-700 font-medium">Mark as popular plan</span>
+            </label>
+          </InlineForm>
+        )
+      })()}
 
       <form onSubmit={saveIncluded} className="space-y-4 pt-4 border-t border-gray-100">
         <div className="pt-2 mt-2">
@@ -889,8 +989,7 @@ function StarterCoachInlineForm({ mode, data, gymId, planName, imageCount, onSav
   }
 
   return (
-    <div className="mt-3 p-5 bg-gray-50 border border-gray-200 rounded-xl space-y-4">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{mode === 'add' ? 'New Coach' : 'Edit Coach'}</p>
+    <div className="space-y-4">
       <Field label="Full Name" required><input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Ravi Kumar" className={inputCls} /></Field>
       <Field label="Specialization" hint="e.g. Strength & Conditioning, Yoga, Boxing"><input type="text" value={specialization} onChange={e => setSpecialization(e.target.value)} placeholder="Strength & Conditioning" className={inputCls} /></Field>
       <ImageUploader gymId={gymId} section="trainers" currentUrl={img.url} onChange={img.handleUrl} onFileSelected={img.handleFile} isPending={img.isPending} planName={planName} usageCount={imageCount} label="Coach Photo" hint="Square or portrait photo works best." />
@@ -943,16 +1042,18 @@ function CoachesPanel({ trainers: initTrainers, gymId, onUpdate, planName }) {
         ))}
       </div>
       {form && (
-        <StarterCoachInlineForm
-          key={form.data.id || 'new'}
-          mode={form.mode}
-          data={form.data}
-          gymId={gymId}
-          planName={planName}
-          imageCount={trainers.filter(t => t.image_url).length}
-          onSave={handleInlineSave}
-          onCancel={() => setForm(null)}
-        />
+        <FormModal title={form.mode === 'add' ? 'New Coach' : 'Edit Coach'} onClose={() => setForm(null)}>
+          <StarterCoachInlineForm
+            key={form.data.id || 'new'}
+            mode={form.mode}
+            data={form.data}
+            gymId={gymId}
+            planName={planName}
+            imageCount={trainers.filter(t => t.image_url).length}
+            onSave={handleInlineSave}
+            onCancel={() => setForm(null)}
+          />
+        </FormModal>
       )}
     </div>
   )
@@ -1087,11 +1188,13 @@ function ContactPanel({ gym, gymId, onSave }) {
             })}
             {availablePlatforms.length > 0 && (
               <div className="flex gap-2">
-                <select value={addPlatform} onChange={e => setAddPlatform(e.target.value)}
-                  className="px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors">
-                  <option value="">Platform…</option>
-                  {availablePlatforms.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-                </select>
+                <CustomSelect
+                  value={addPlatform}
+                  onChange={setAddPlatform}
+                  placeholder="Platform…"
+                  className="w-36"
+                  options={availablePlatforms.map(p => ({ value: p.id, label: p.label }))}
+                />
                 <input type="url" value={addUrl} onChange={e => setAddUrl(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addLink())}
                   placeholder="https://…" className={inputCls + ' flex-1 min-w-0'} />
@@ -1243,7 +1346,7 @@ export default function StarterWebsitePage() {
       <div className="flex gap-5 items-start">
 
         {/* Sidebar — desktop only */}
-        <nav className="cms-sidebar hidden lg:flex flex-col w-44 shrink-0 sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto overscroll-contain">
+        <nav className="cms-sidebar hidden lg:flex flex-col w-44 shrink-0 sticky top-6 overflow-y-auto overscroll-contain" style={{ height: 'calc(100vh - 8.5rem)' }}>
           <ul className="space-y-0.5">
             {SECTIONS.map(sec => (
               <li key={sec.id}>

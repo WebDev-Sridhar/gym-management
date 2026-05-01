@@ -49,6 +49,18 @@ export async function deletePlan(planId) {
   if (error) throw error
 }
 
+export async function updatePlan(planId, { name, price, durationDays }) {
+  const { data, error } = await supabase
+    .from('plans')
+    .update({ name, price, duration_days: durationDays })
+    .eq('id', planId)
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 // ─── Members ───
 
 export async function fetchMembers(gymId) {

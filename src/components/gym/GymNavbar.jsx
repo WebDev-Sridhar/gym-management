@@ -149,32 +149,45 @@ export default function GymNavbar() {
               borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)'}`,
             }}
           >
-            <div className="py-3 space-y-1">
+            <div className="py-3 flex flex-col gap-1">
               {links.map(link => (
                 <NavLink
                   key={link.to}
                   to={link.to}
                   end={link.end}
                   onClick={() => setMobileOpen(false)}
-                  className="block px-4 py-3 text-sm font-sans rounded-lg transition-colors"
+                  className="flex items-center gap-3 px-4 py-3.5 text-sm font-sans rounded-xl transition-colors"
                   style={({ isActive }) => ({
                     color: isActive
                       ? isDark ? 'white' : 'var(--gym-text)'
-                      : isDark ? 'rgba(255,255,255,0.55)' : 'var(--gym-text-secondary)',
+                      : isDark ? 'rgba(255,255,255,0.5)' : 'var(--gym-text-secondary)',
                     background: isActive
-                      ? isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)'
+                      ? isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'
                       : 'transparent',
+                    border: isActive
+                      ? `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`
+                      : '1px solid transparent',
                   })}
                 >
-                  {link.label}
+                  {({ isActive }) => (
+                    <>
+                      <span
+                        className="w-1 h-5 rounded-full shrink-0 transition-all"
+                        style={{
+                          background: isActive ? 'var(--gym-gradient)' : 'transparent',
+                        }}
+                      />
+                      <span>{link.label}</span>
+                    </>
+                  )}
                 </NavLink>
               ))}
-              <div className="pt-2">
+              <div className="pt-2 mt-1 border-t" style={{ borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}>
                 <Link
                   to={`${base}/pricing`}
                   onClick={() => setMobileOpen(false)}
-                  className="block text-center px-4 py-3 text-sm font-semibold text-white"
-                  style={{ background: 'var(--gym-gradient)', borderRadius: 'var(--gym-card-radius)' }}
+                  className="block text-center px-4 py-3.5 text-sm font-semibold text-white rounded-xl mt-2"
+                  style={{ background: 'var(--gym-gradient)' }}
                 >
                   Join Now
                 </Link>

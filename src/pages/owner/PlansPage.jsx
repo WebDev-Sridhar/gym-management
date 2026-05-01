@@ -1,7 +1,97 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
-import { fetchPlans, createPlan, deletePlan, fetchMembers } from '../../services/membershipService'
+import { fetchPlans, createPlan, updatePlan, deletePlan, fetchMembers } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
+import FormModal from '../../components/ui/FormModal'
+
+const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500'
+
+function PlanForm({ initial, onSave, onCancel }) {
+  const [name, setName] = useState(initial?.name ?? '')
+  const [price, setPrice] = useState(initial?.price != null ? String(initial.price) : '')
+  const [durationDays, setDurationDays] = useState(initial?.duration_days != null ? String(initial.duration_days) : '')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    if (!name.trim()) return setError('Plan name is required')
+    if (!price || Number(price) <= 0) return setError('Enter a valid price')
+    if (!durationDays || Number(durationDays) <= 0) return setError('Enter duration in days')
+
+    setSubmitting(true)
+    try {
+      await onSave({ name: name.trim(), price: Number(price), durationDays: Number(durationDays) })
+    } catch (err) {
+      setError(err.message || 'Failed to save plan')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Plan Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Monthly Basic"
+            className={inputCls}
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Price (₹)</label>
+          <input
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="e.g. 1500"
+            min="1"
+            className={inputCls}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Duration (days)</label>
+          <input
+            type="number"
+            value={durationDays}
+            onChange={(e) => setDurationDays(e.target.value)}
+            placeholder="e.g. 30"
+            min="1"
+            className={inputCls}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-red-500 text-xs">{error}</p>
+      )}
+
+      <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+        >
+          {submitting && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+          {submitting ? 'Saving...' : (initial ? 'Save Changes' : 'Create Plan')}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
 
 export default function PlansPage() {
   const dialog = useDialog()
@@ -9,74 +99,38 @@ export default function PlansPage() {
   const [plans, setPlans] = useState([])
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-
-  // Form fields
-  const [name, setName] = useState('')
-  const [price, setPrice] = useState('')
-  const [durationDays, setDurationDays] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
+  const [editingPlan, setEditingPlan] = useState(null)
 
   useEffect(() => {
-    if (!gymId) {
-      setLoading(false)
-      return
-    }
-
+    if (!gymId) { setLoading(false); return }
     setLoading(true)
     let cancelled = false
-
     Promise.all([fetchPlans(gymId), fetchMembers(gymId)])
-      .then(([p, m]) => {
-        if (cancelled) return
-        setPlans(p)
-        setMembers(m)
-      })
+      .then(([p, m]) => { if (cancelled) return; setPlans(p); setMembers(m) })
       .catch((err) => console.error('Failed to load plans:', err))
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [gymId])
 
-  async function handleCreate(e) {
-    e.preventDefault()
-    setError('')
+  async function handleCreate({ name, price, durationDays }) {
+    const newPlan = await createPlan({ gymId, name, price, durationDays })
+    setPlans((prev) => [...prev, newPlan])
+    setShowCreate(false)
+  }
 
-    if (!name.trim()) return setError('Plan name is required')
-    if (!price || Number(price) <= 0) return setError('Enter a valid price')
-    if (!durationDays || Number(durationDays) <= 0) return setError('Enter duration in days')
-
-    setSubmitting(true)
-    try {
-      const newPlan = await createPlan({
-        gymId,
-        name: name.trim(),
-        price: Number(price),
-        durationDays: Number(durationDays),
-      })
-      setPlans((prev) => [...prev, newPlan])
-      setName('')
-      setPrice('')
-      setDurationDays('')
-      setShowForm(false)
-    } catch (err) {
-      setError(err.message || 'Failed to create plan')
-    } finally {
-      setSubmitting(false)
-    }
+  async function handleUpdate({ name, price, durationDays }) {
+    const updated = await updatePlan(editingPlan.id, { name, price, durationDays })
+    setPlans((prev) => prev.map((p) => p.id === updated.id ? updated : p))
+    setEditingPlan(null)
   }
 
   async function handleDelete(plan) {
     const assignedCount = members.filter((m) => m.plan_id === plan.id).length
     const warning = assignedCount > 0
-      ? `${assignedCount} member${assignedCount !== 1 ? 's are' : ' is'} currently on "${plan.name}". Deleting will unassign them and set their status to inactive. Continue?`
+      ? `${assignedCount} member${assignedCount !== 1 ? 's are' : ' is'} currently on "${plan.name}". Deleting will unassign them. Continue?`
       : `Delete plan "${plan.name}"?`
-
     if (!await dialog.confirm(warning)) return
-
     try {
       await deletePlan(plan.id)
       setPlans((prev) => prev.filter((p) => p.id !== plan.id))
@@ -89,7 +143,7 @@ export default function PlansPage() {
     if (days === 1) return '1 day'
     if (days < 30) return `${days} days`
     const months = Math.round(days / 30)
-    return months === 1 ? '1 month' : `${months} months`
+    return months === 1 ? '1 month' : months === 12 ? '1 year' : `${months} months`
   }
 
   if (loading) {
@@ -109,68 +163,28 @@ export default function PlansPage() {
           <p className="text-sm text-gray-500 mt-1">{plans.length} plan{plans.length !== 1 ? 's' : ''} created</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => setShowCreate(true)}
           className="px-4 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer"
         >
-          {showForm ? 'Cancel' : '+ New Plan'}
+          + New Plan
         </button>
       </div>
 
-      {/* Create form */}
-      {showForm && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Create New Plan</h2>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Plan Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Monthly Basic"
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Price ({'\u20B9'})</label>
-                <input
-                  type="number"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="e.g. 1500"
-                  min="1"
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Duration (days)</label>
-                <input
-                  type="number"
-                  value={durationDays}
-                  onChange={(e) => setDurationDays(e.target.value)}
-                  placeholder="e.g. 30"
-                  min="1"
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-                />
-              </div>
-            </div>
-
-            {error && <p className="text-red-500 text-xs">{error}</p>}
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
-            >
-              {submitting ? 'Creating...' : 'Create Plan'}
-            </button>
-          </form>
-        </div>
+      {/* Create modal */}
+      {showCreate && (
+        <FormModal title="New Plan" onClose={() => setShowCreate(false)}>
+          <PlanForm onSave={handleCreate} onCancel={() => setShowCreate(false)} />
+        </FormModal>
       )}
 
-      {/* Plans list */}
+      {/* Edit modal */}
+      {editingPlan && (
+        <FormModal title="Edit Plan" onClose={() => setEditingPlan(null)}>
+          <PlanForm initial={editingPlan} onSave={handleUpdate} onCancel={() => setEditingPlan(null)} />
+        </FormModal>
+      )}
+
+      {/* Plans grid */}
       {plans.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
@@ -183,23 +197,39 @@ export default function PlansPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {plans.map((plan) => (
-            <div key={plan.id} className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col">
-              <h3 className="font-semibold text-gray-900">{plan.name}</h3>
-              <p className="text-sm text-gray-500 mt-1">{formatDuration(plan.duration_days)}</p>
-              <p className="text-2xl font-bold text-gray-900 mt-3">
-                {'\u20B9'}{Number(plan.price).toLocaleString('en-IN')}
-              </p>
-              <div className="mt-auto pt-4">
-                <button
-                  onClick={() => handleDelete(plan)}
-                  className="text-xs text-red-500 hover:text-red-700 transition-colors cursor-pointer"
-                >
-                  Delete plan
-                </button>
+          {plans.map((plan) => {
+            const memberCount = members.filter((m) => m.plan_id === plan.id).length
+            return (
+              <div key={plan.id} className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold text-gray-900 leading-tight">{plan.name}</h3>
+                  {memberCount > 0 && (
+                    <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 font-medium">
+                      {memberCount} member{memberCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mt-1">{formatDuration(plan.duration_days)}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-3">
+                  ₹{Number(plan.price).toLocaleString('en-IN')}
+                </p>
+                <div className="mt-auto pt-4 flex items-center gap-4">
+                  <button
+                    onClick={() => setEditingPlan(plan)}
+                    className="text-xs text-violet-600 hover:text-violet-800 font-medium cursor-pointer transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(plan)}
+                    className="text-xs text-red-500 hover:text-red-700 transition-colors cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { fadeUp } from '../../lib/animations'
 
-export default function PricingCard({ plan }) {
+export default function PricingCard({ plan, onSelect }) {
   const isPopular = plan.is_popular
 
   return (
@@ -63,7 +63,9 @@ export default function PricingCard({ plan }) {
       <motion.button
         whileHover={{ scale: 1.03 }}
         whileTap={{ scale: 0.98 }}
-        className="w-full py-4 font-bold text-sm font-sans transition-all duration-300 cursor-pointer"
+        disabled={!onSelect}
+        onClick={onSelect ? () => onSelect(plan) : undefined}
+        className="w-full py-4 font-bold text-sm font-sans transition-all duration-300 cursor-pointer disabled:cursor-not-allowed"
         style={
           isPopular
             ? { background: 'var(--gym-gradient)', color: '#fff', boxShadow: '0 6px 20px var(--gym-glow)', borderRadius: 'var(--gym-card-radius)' }

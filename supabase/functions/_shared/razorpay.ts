@@ -53,6 +53,57 @@ export async function createOrder(
   return res.json()
 }
 
+// ─── Payment Links (used for WhatsApp reminders) ────────────────────────────
+
+export interface CreatePaymentLinkParams {
+  amount: number              // in paise
+  currency?: string
+  description?: string
+  customer?: { name?: string; contact?: string; email?: string }
+  notify?: { sms?: boolean; email?: boolean }
+  notes?: Record<string, string>
+  callback_url?: string
+  reference_id?: string
+  expire_by?: number          // unix seconds
+}
+
+export interface RazorpayPaymentLink {
+  id: string                  // plink_xxx
+  short_url: string           // user-shareable URL
+  status: string
+  amount: number
+  reference_id?: string
+}
+
+export async function createPaymentLink(
+  creds: RazorpayCreds,
+  params: CreatePaymentLinkParams,
+): Promise<RazorpayPaymentLink> {
+  const res = await fetch(`${BASE}/payment_links`, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader(creds.keyId, creds.keySecret),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      amount: params.amount,
+      currency: params.currency ?? 'INR',
+      description: params.description,
+      customer: params.customer,
+      notify: params.notify ?? { sms: false, email: false },
+      notes: params.notes ?? {},
+      callback_url: params.callback_url,
+      reference_id: params.reference_id,
+      expire_by: params.expire_by,
+    }),
+  })
+  if (!res.ok) {
+    const txt = await res.text()
+    throw new Error(`razorpay createPaymentLink failed (${res.status}): ${txt}`)
+  }
+  return res.json()
+}
+
 // Validate keys by attempting to create a real ₹1 order. This proves:
 //   1. The key_id + key_secret are valid (would 401 otherwise)
 //   2. The keys have orders:write permission (some restricted keys don't)

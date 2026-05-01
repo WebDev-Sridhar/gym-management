@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchMembers, createMember, assignPlan, deleteMember, updateMember, fetchPlans } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
+import CustomSelect from '../../components/ui/CustomSelect'
 
 export default function MembersPage() {
   const dialog = useDialog()
@@ -21,6 +22,7 @@ export default function MembersPage() {
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [newPlanId, setNewPlanId] = useState('')
 
   // Edit member form
   const [editName, setEditName] = useState('')
@@ -55,16 +57,22 @@ export default function MembersPage() {
 
     setSubmitting(true)
     try {
-      const member = await createMember({
+      let member = await createMember({
         gymId,
         name: newName.trim(),
         phone: newPhone.trim(),
         email: newEmail.trim(),
       })
+
+      if (newPlanId) {
+        const plan = plans.find((p) => p.id === newPlanId)
+        if (plan) {
+          member = await assignPlan({ memberId: member.id, planId: plan.id, durationDays: plan.duration_days })
+        }
+      }
+
       setMembers((prev) => [member, ...prev])
-      setNewName('')
-      setNewPhone('')
-      setNewEmail('')
+      setNewName(''); setNewPhone(''); setNewEmail(''); setNewPlanId('')
       setShowAddForm(false)
     } catch (err) {
       setError(err.message || 'Failed to add member')
@@ -180,7 +188,7 @@ export default function MembersPage() {
           <p className="text-sm text-gray-500 mt-1">{members.length} total member{members.length !== 1 ? 's' : ''}</p>
         </div>
         <button
-          onClick={() => { setShowAddForm(!showAddForm); setError('') }}
+          onClick={() => { setShowAddForm(!showAddForm); setError(''); setNewPlanId('') }}
           className="px-4 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer"
         >
           {showAddForm ? 'Cancel' : '+ Add Member'}
@@ -192,22 +200,37 @@ export default function MembersPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-base font-semibold text-gray-900 mb-4">Add New Member</h2>
           <form onSubmit={handleAddMember} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Name <span className="text-red-500">*</span></label>
                 <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" autoFocus />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
-                <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, ''))} placeholder="Phone number" maxLength={10} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, ''))} placeholder="10-digit mobile" maxLength={10} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
                 <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email address" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Plan <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <CustomSelect
+                  value={newPlanId}
+                  onChange={setNewPlanId}
+                  placeholder="Assign a plan..."
+                  options={plans.map((p) => ({
+                    value: p.id,
+                    label: `${p.name} — ₹${Number(p.price).toLocaleString('en-IN')} / ${p.duration_days}d`,
+                  }))}
+                />
+              </div>
             </div>
             {error && !editingId && <p className="text-red-500 text-xs">{error}</p>}
-            <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2">
+              {submitting && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               {submitting ? 'Adding...' : 'Add Member'}
             </button>
           </form>
@@ -309,12 +332,17 @@ export default function MembersPage() {
                         <div className="flex items-center justify-end gap-2">
                           {assigningId === member.id ? (
                             <div className="flex items-center gap-2">
-                              <select value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-gray-50 outline-none focus:border-violet-500">
-                                <option value="">Select plan...</option>
-                                {plans.map((p) => (
-                                  <option key={p.id} value={p.id}>{p.name} {'\u2014'} {'\u20B9'}{Number(p.price).toLocaleString('en-IN')}</option>
-                                ))}
-                              </select>
+                              <CustomSelect
+                                value={selectedPlanId}
+                                onChange={setSelectedPlanId}
+                                placeholder="Select plan..."
+                                compact
+                                className="w-48"
+                                options={plans.map((p) => ({
+                                  value: p.id,
+                                  label: `${p.name} \u2014 \u20B9${Number(p.price).toLocaleString('en-IN')}`,
+                                }))}
+                              />
                               <button onClick={() => handleAssignPlan(member.id)} disabled={!selectedPlanId || submitting} className="px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 cursor-pointer">{submitting ? '...' : 'Assign'}</button>
                               <button onClick={() => { setAssigningId(null); setSelectedPlanId('') }} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
                             </div>

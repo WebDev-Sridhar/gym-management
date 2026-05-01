@@ -7,6 +7,7 @@ import { useCMSImage } from '../../../../hooks/useCMSImage'
 import ImageUploader from '../components/ImageUploader'
 import FeatureGate from '../components/FeatureGate'
 import { useDialog } from '../../../../components/ui/Dialog'
+import FormModal from '../../../../components/ui/FormModal'
 
 const inputCls =
   'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors'
@@ -44,7 +45,7 @@ function ItemRow({ title, subtitle, onEdit, onDelete, deleting }) {
 
 // ─── Inline form extracted as sub-component ────────────────────────────────
 // This ensures useCMSImage lifecycle (draft cleanup) ties to the form's mount/unmount.
-function TrainerInlineForm({ mode, data, gymId, planName, imageCount, onSave, onCancel }) {
+function TrainerInlineForm({ data, gymId, planName, imageCount, onSave, onCancel }) {
   const dialog = useDialog()
   const [name,           setName]           = useState(data.name)
   const [specialization, setSpecialization] = useState(data.specialization)
@@ -78,11 +79,7 @@ function TrainerInlineForm({ mode, data, gymId, planName, imageCount, onSave, on
   }
 
   return (
-    <div className="mt-3 p-5 bg-gray-50 border border-gray-200 rounded-xl space-y-4">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-        {mode === 'add' ? 'New Trainer' : 'Edit Trainer'}
-      </p>
-
+    <div className="space-y-4">
       <Field label="Full Name">
         <input type="text" value={name} onChange={e => setName(e.target.value)}
           placeholder="e.g. Ravi Kumar" className={inputCls} />
@@ -262,18 +259,18 @@ export default function TrainersForm({ trainers: initTrainers, gymId, planName, 
         ))}
       </div>
 
-      {/* Inline form — extracted as sub-component so useCMSImage unmounts on cancel */}
       {form && (
-        <TrainerInlineForm
-          key={form.data.id || 'new'}
-          mode={form.mode}
-          data={form.data}
-          gymId={gymId}
-          planName={planName}
-          imageCount={imageCount}
-          onSave={handleInlineSave}
-          onCancel={() => setForm(null)}
-        />
+        <FormModal title={form.mode === 'add' ? 'New Trainer' : 'Edit Trainer'} onClose={() => setForm(null)}>
+          <TrainerInlineForm
+            key={form.data.id || 'new'}
+            data={form.data}
+            gymId={gymId}
+            planName={planName}
+            imageCount={imageCount}
+            onSave={handleInlineSave}
+            onCancel={() => setForm(null)}
+          />
+        </FormModal>
       )}
     </div>
   )

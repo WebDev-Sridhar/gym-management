@@ -6,7 +6,7 @@ import { supabaseAnon } from './supabaseClient'
 export async function fetchGymBySlug(slug) {
   const { data, error } = await supabaseAnon
     .from('gyms')
-.select('id, name, slug, logo_url, theme_color, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, description, city, phone, email, address, lat, lng, hero_style, social_links, working_hours')
+.select('id, name, slug, logo_url, theme_color, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, description, city, phone, email, address, lat, lng, hero_style, social_links, working_hours, payment_mode, razorpay_enabled, upi_id')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -35,32 +35,57 @@ export async function fetchGymContent(gymId) {
  * manage plans in two places — dashboard plans auto-show on the website.
  */
 export async function fetchGymPlans(gymId) {
+  // Source of truth: gym_plans (CMS row) joined with plans (price + duration).
+  // The shape we return uses the BILLABLE plans.id as `id` so checkout can
+  // pass it straight to create-public-order. Marketing fields (features,
+  // is_popular, name) come from gym_plans.
   const { data, error } = await supabaseAnon
     .from('gym_plans')
-    .select('id, name, price, duration_label, features, is_popular, sort_order')
+    .select(`
+      id, name, duration_label, features, is_popular, sort_order, plan_id, is_active,
+      plan:plans(id, name, price, duration_days, is_active)
+    `)
     .eq('gym_id', gymId)
+    .eq('is_active', true)
     .order('sort_order')
 
   if (error) throw error
-  if (data && data.length > 0) return data
 
-  // Fallback: read from the internal plans table
+  // Keep only rows that are properly mapped to an active billable plan
+  const mapped = (data || [])
+    .filter((row) => row.plan && row.plan.is_active !== false)
+    .map((row) => ({
+      id: row.plan.id,                                                // billable plans.id (used by checkout)
+      gym_plan_id: row.id,                                            // marketing row id
+      name: row.name || row.plan.name,
+      price: Number(row.plan.price),
+      duration_days: row.plan.duration_days,
+      duration_label: row.duration_label || formatDuration(row.plan.duration_days),
+      features: row.features || [],
+      is_popular: !!row.is_popular,
+      sort_order: row.sort_order,
+    }))
+
+  if (mapped.length > 0) return mapped
+
+  // Fallback: no CMS rows configured → list raw billable plans directly
   const { data: internal, error: intErr } = await supabaseAnon
     .from('plans')
-    .select('id, name, price, duration_days')
+    .select('id, name, price, duration_days, is_active')
     .eq('gym_id', gymId)
+    .eq('is_active', true)
     .order('price')
 
   if (intErr) throw intErr
 
-  // Map to the shape PricingCard expects
   return (internal || []).map((p, i) => ({
-    id: p.id,
+    id: p.id,                                                         // billable plans.id
     name: p.name,
     price: Number(p.price),
+    duration_days: p.duration_days,
     duration_label: formatDuration(p.duration_days),
     features: [],
-    is_popular: i === Math.floor((internal.length - 1) / 2), // middle plan is "popular"
+    is_popular: i === Math.floor((internal.length - 1) / 2),
     sort_order: i,
   }))
 }

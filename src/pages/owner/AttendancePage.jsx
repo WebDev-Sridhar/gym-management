@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchAttendance, fetchAttendanceSummary, manualCheckin, fetchMembers } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
+import CustomSelect from '../../components/ui/CustomSelect'
 
 export default function AttendancePage() {
   const dialog = useDialog()
@@ -122,16 +123,16 @@ export default function AttendancePage() {
           <form onSubmit={handleManualCheckin} className="flex items-end gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Member</label>
-              <select
+              <CustomSelect
                 value={selectedMemberId}
-                onChange={(e) => setSelectedMemberId(e.target.value)}
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-              >
-                <option value="">Choose a member...</option>
-                {availableMembers.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name} {m.phone ? `(${m.phone})` : ''}</option>
-                ))}
-              </select>
+                onChange={setSelectedMemberId}
+                placeholder="Choose a member..."
+                options={availableMembers.map((m) => ({
+                  value: m.id,
+                  label: m.name,
+                  hint: m.phone || undefined,
+                }))}
+              />
             </div>
             <button
               type="submit"

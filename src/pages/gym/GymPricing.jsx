@@ -6,6 +6,7 @@ import { fetchGymPlans, fetchGymContent } from '../../services/gymPublicService'
 import { getDefaultContent } from '../../lib/gymDefaultContent'
 import { staggerContainer, scrollViewport, fadeUp } from '../../lib/animations'
 import PricingCard from '../../components/gym/PricingCard'
+import PublicCheckoutModal from '../../components/gym/PublicCheckoutModal'
 
 const faqs = [
   { q: 'Can I cancel anytime?', a: 'Yes. Monthly plans can be cancelled at any time with no hidden fees.' },
@@ -22,6 +23,7 @@ export default function GymPricing() {
   const [content, setContent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [openFaq, setOpenFaq] = useState(null)
+  const [checkoutPlan, setCheckoutPlan] = useState(null)
 
   useEffect(() => {
     if (!gym?.id) return
@@ -104,7 +106,11 @@ export default function GymPricing() {
               'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
             }`}>
               {displayPlans.map(plan => (
-                <PricingCard key={plan.id} plan={plan} />
+                <PricingCard
+                  key={plan.id}
+                  plan={plan}
+                  onSelect={gym?.razorpay_enabled ? setCheckoutPlan : undefined}
+                />
               ))}
             </div>
           </div>
@@ -190,6 +196,16 @@ export default function GymPricing() {
           </div>
         </motion.section>
       )}
+
+      {/* ── Public checkout modal ── */}
+      <PublicCheckoutModal
+        open={!!checkoutPlan}
+        onClose={() => setCheckoutPlan(null)}
+        gymSlug={gym?.slug}
+        gymName={gym?.name}
+        plan={checkoutPlan}
+        themeColor={gym?.theme_color}
+      />
 
       {/* ── CTA ── */}
       {!hidden.includes('cta_pricing') && (
