@@ -247,20 +247,43 @@ Deno.serve(async (req) => {
       sendErr = err instanceof Error ? err.message : String(err)
     }
 
-    // Always log the attempt (success or failure)
-    await supabase.from('payment_reminders').insert({
-      gym_id: gymId,
-      payment_id: payment.id,
-      member_id: payment.member.id,
-      channel: 'whatsapp',
-      provider: 'interakt',
-      template_name: templateName,
-      status: sendErr ? 'failed' : 'sent',
-      provider_message_id: interaktId ?? null,
-      link_sent: payLink,
-      error: sendErr ?? null,
-      triggered_by: 'manual',
-    })
+    // Always log the attempt (success or failure) to both the legacy reminders
+    // table (for existing UIs) and the unified notifications table.
+    await Promise.all([
+      supabase.from('payment_reminders').insert({
+        gym_id: gymId,
+        payment_id: payment.id,
+        member_id: payment.member.id,
+        channel: 'whatsapp',
+        provider: 'interakt',
+        template_name: templateName,
+        status: sendErr ? 'failed' : 'sent',
+        provider_message_id: interaktId ?? null,
+        link_sent: payLink,
+        error: sendErr ?? null,
+        triggered_by: 'manual',
+      }),
+      supabase.from('notifications').insert({
+        gym_id: gymId,
+        member_id: payment.member.id,
+        type: 'payment_reminder',
+        channels: ['whatsapp'],
+        status: sendErr ? 'failed' : 'sent',
+        triggered_by: 'manual',
+        metadata: {
+          payment_id: payment.id,
+          planName,
+          amount: amountRupees,
+          payLink,
+        },
+        channel_results: {
+          whatsapp: sendErr
+            ? { status: 'failed', error: sendErr }
+            : { status: 'sent', id: interaktId ?? null },
+        },
+        sent_at: new Date().toISOString(),
+      }),
+    ])
 
     if (sendErr) throw new HttpError(502, `Interakt send failed: ${sendErr}`)
 

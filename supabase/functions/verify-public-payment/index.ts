@@ -9,6 +9,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { decryptSecret, byteaToBytes } from '../_shared/crypto.ts'
 import { hmacSha256Hex, timingSafeEqual } from '../_shared/razorpay.ts'
+import { sendNotification } from '../_shared/notifications.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -99,6 +100,30 @@ Deno.serve(async (req) => {
     }
 
     const memberInfo = await fetchMemberInfo(supabase, payment.member_id, payment.plan_id)
+
+    // Fire-and-forget payment confirmation notification (email primary).
+    // Don't fail the whole request if notification dispatch fails.
+    if (payment.member_id) {
+      try {
+        const { data: pay } = await supabase
+          .from('payments').select('amount').eq('id', payment.id).single()
+        await sendNotification({
+          supabase,
+          gymId: payment.gym_id,
+          memberId: payment.member_id,
+          type: 'payment_confirmation',
+          triggeredBy: 'webhook',
+          metadata: {
+            amount: pay?.amount ?? 0,
+            planName: memberInfo.planName ?? 'Membership',
+            expiresAt: memberInfo.expiresAt ?? null,
+          },
+        })
+      } catch (notifErr) {
+        console.error('payment_confirmation notification failed (non-fatal):', notifErr)
+      }
+    }
+
     return jsonResponse({ ok: true, paymentId: payment.id, ...memberInfo })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'internal error'

@@ -21,6 +21,7 @@ import TrainersPage from './pages/owner/TrainersPage'
 import SettingsPage from './pages/owner/SettingsPage'
 import WebsitePage from './pages/owner/WebsitePage'
 import PaymentSettingsPage from './pages/owner/PaymentSettingsPage'
+import CommunicationPage from './pages/owner/CommunicationPage'
 import StarterWebsitePage from './pages/owner/StarterWebsitePage'
 import TrainerDashboard from './pages/trainer/TrainerDashboard'
 import MemberApp from './pages/member/MemberApp'
@@ -58,6 +59,7 @@ const ownerLinks = [
   { to: '/owner-dashboard/plans', icon: 'plans', label: 'Plans' },
   { to: '/owner-dashboard/payments', icon: 'payments', label: 'Payments' },
   { to: '/owner-dashboard/payment-settings', icon: 'settings', label: 'Payment Setup' },
+  { to: '/owner-dashboard/communication', icon: 'message', label: 'Communication' },
   { to: '/owner-dashboard/trainers', icon: 'trainers', label: 'Trainers' },
   { to: '/owner-dashboard/analytics', icon: 'analytics', label: 'Analytics' },
   { to: '/owner-dashboard/checkin', icon: 'checkin', label: 'Check-in' },
@@ -130,6 +132,7 @@ export default function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="website" element={<WebsitePageRouter />} />
             <Route path="payment-settings" element={<PaymentSettingsPage />} />
+            <Route path="communication" element={<CommunicationPage />} />
           </Route>
 
           {/* Trainer dashboard — protected, trainer only */}
