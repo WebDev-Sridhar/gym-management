@@ -1,18 +1,8 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 
-/**
- * ProtectedRoute guards dashboard routes.
- *
- * Flow:
- * 1. Not authenticated → /signup
- * 2. Authenticated but not onboarded → /create-gym
- * 3. Owner without active subscription → /billing
- * 4. Wrong role → redirect to correct dashboard
- * 5. All good → render children
- */
 export default function ProtectedRoute({ allowedRoles, children }) {
-  const { isAuthenticated, isOnboarded, role, hasActiveSubscription, loading } = useAuth()
+  const { isAuthenticated, profile, role, gymId, hasActiveSubscription, loading } = useAuth()
 
   if (loading) {
     return (
@@ -25,29 +15,37 @@ export default function ProtectedRoute({ allowedRoles, children }) {
     )
   }
 
-  // Not logged in
   if (!isAuthenticated) {
-    return <Navigate to="/signup" replace />
+    return <Navigate to="/login" replace />
   }
 
-  // Logged in but hasn't completed onboarding
-  if (!isOnboarded) {
+  // No profile yet — brand new user who hasn't created a gym
+  if (!profile) {
     return <Navigate to="/create-gym" replace />
   }
 
-  // Owner without active subscription → paywall
-  if (role === 'owner' && !hasActiveSubscription) {
-    return <Navigate to="/billing" replace />
+  // Owner-specific onboarding gate
+  if (role === 'owner') {
+    const step = profile.onboarding_step
+    if (!gymId || !step || step === 'started') {
+      return <Navigate to="/create-gym" replace />
+    }
+    if (step === 'gym_created' || step === 'setup_done') {
+      return <Navigate to="/billing" replace />
+    }
+    if (!hasActiveSubscription) {
+      return <Navigate to="/billing" replace />
+    }
   }
 
-  // Role mismatch — redirect to correct dashboard
+  // Role mismatch — send to the correct dashboard
   if (allowedRoles && !allowedRoles.includes(role)) {
     const roleRoutes = {
       owner: '/owner-dashboard',
       trainer: '/trainer-dashboard',
       member: '/member-app',
     }
-    return <Navigate to={roleRoutes[role] || '/signup'} replace />
+    return <Navigate to={roleRoutes[role] || '/login'} replace />
   }
 
   return children

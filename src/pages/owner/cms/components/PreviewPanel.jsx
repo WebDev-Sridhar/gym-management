@@ -136,7 +136,7 @@ function VisionMissionPreview({ previewData }) {
   const heading = (previewData?.vision_section_heading || 'VISION & MISSION').toUpperCase()
 
   return (
-    <section style={{ background: 'var(--gym-bg)', paddingBlock: 'var(--gym-section-py)' }}>
+    <section style={{ background: 'var(--gym-bg)', paddingBlock: 'var(--gym-section-py)' }} >
       <div style={{ maxWidth: '72rem', margin: '0 auto', paddingInline: '1.5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <p className="font-sans font-bold uppercase mb-3" style={{ fontSize: '0.75rem', letterSpacing: '0.25em', color: 'var(--gym-primary)' }}>{label}</p>
@@ -283,7 +283,7 @@ export default function PreviewPanel({ section, previewData, gym, plans = [], tr
 
   if (section === 'theme' || section === 'design') {
     previewContent = (
-      <>
+      <div className="overflow-hidden">
         <HeroSection        {...buildSectionProps('hero',         { previewData, gym, plans, trainers, testimonials, defaults })} />
         <StatsSection       {...buildSectionProps('stats',        { previewData, gym, plans, trainers, testimonials, defaults })} />
         <AboutSection       {...buildSectionProps('about',        { previewData, gym, plans, trainers, testimonials, defaults })} />
@@ -291,7 +291,7 @@ export default function PreviewPanel({ section, previewData, gym, plans = [], tr
         <TrainersSection    {...buildSectionProps('trainers',     { previewData, gym, plans, trainers: previewData?._trainers     ?? trainers,     testimonials, defaults })} />
         <TestimonialsSection {...buildSectionProps('testimonials',{ previewData, gym, plans, trainers, testimonials: previewData?._testimonials ?? testimonials, defaults })} />
         <GallerySection     {...buildSectionProps('gallery',     { previewData, gym, plans, trainers, testimonials, defaults })} />
-      </>
+      </div>
     )
   } else if (SectionComponent) {
     const sectionProps = buildSectionProps(section, { previewData, gym, plans, trainers, testimonials, defaults })
@@ -329,7 +329,7 @@ export default function PreviewPanel({ section, previewData, gym, plans = [], tr
       <div className="w-full rounded-xl border border-gray-200 overflow-hidden bg-gray-900">
         <div
           data-gym-theme={gym?.theme_mode || 'dark'}
-          style={{ ...themeVars, background: 'var(--gym-bg)', height: 'calc(100vh - 180px)', overflowY: 'auto' }}
+          style={{ ...themeVars, background: 'var(--gym-bg)', height: 'calc(100vh - 190px)', overflowY: 'auto' }}
           className="md:w-full w-[calc(100vw-50px)]"
         >
           {fontStack && (

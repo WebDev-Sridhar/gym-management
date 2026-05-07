@@ -76,7 +76,7 @@ export async function openSubscriptionCheckout({ orderId, amount, currency = 'IN
       order_id: orderId,
       amount,
       currency,
-      name: 'GymOS',
+      name: 'Gymmobius',
       description: `${planName} Plan Subscription`,
       prefill: prefill || {},
       theme: { color: '#8B5CF6' },

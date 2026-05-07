@@ -104,6 +104,13 @@ export default function GymNavbar() {
           {/* CTA + hamburger */}
           <div className="flex items-center gap-3">
             <Link
+              to={`${base}/login`}
+              className="hidden md:inline-flex items-center justify-center px-4 py-2 text-sm font-semibold transition-all duration-300 hover:opacity-80 rounded-lg"
+              style={{ color: textMutedColor, border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}` }}
+            >
+              Member Login
+            </Link>
+            <Link
               to={`${base}/pricing`}
               className="hidden md:inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:opacity-90 hover:-translate-y-0.5"
               style={{ background: 'var(--gym-gradient)', borderRadius: 'var(--gym-card-radius)' }}
@@ -182,11 +189,22 @@ export default function GymNavbar() {
                   )}
                 </NavLink>
               ))}
-              <div className="pt-2 mt-1 border-t" style={{ borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}>
+              <div className="pt-2 mt-1 border-t flex flex-col gap-2" style={{ borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}>
+                <Link
+                  to={`${base}/login`}
+                  onClick={() => setMobileOpen(false)}
+                  className="block text-center px-4 py-3 text-sm font-semibold rounded-xl mt-1"
+                  style={{
+                    color: isDark ? 'rgba(255,255,255,0.7)' : 'var(--gym-text)',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
+                  }}
+                >
+                  Member Login
+                </Link>
                 <Link
                   to={`${base}/pricing`}
                   onClick={() => setMobileOpen(false)}
-                  className="block text-center px-4 py-3.5 text-sm font-semibold text-white rounded-xl mt-2"
+                  className="block text-center px-4 py-3.5 text-sm font-semibold text-white rounded-xl"
                   style={{ background: 'var(--gym-gradient)' }}
                 >
                   Join Now

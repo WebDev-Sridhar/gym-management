@@ -1,9 +1,7 @@
 import SectionWrapper from '../../components/layout/SectionWrapper'
-import MarketingLayout from '../../components/layout/MarketingLayout'
 
 export default function SecurityPage() {
   return (
-    <MarketingLayout>
       <SectionWrapper>
 
         <div className="max-w-3xl mx-auto">
@@ -53,6 +51,5 @@ export default function SecurityPage() {
         </div>
 
       </SectionWrapper>
-    </MarketingLayout>
   )
 }

@@ -257,10 +257,10 @@ export async function fetchTrainerInvites(gymId) {
   return data || []
 }
 
-export async function createTrainerInvite({ gymId, name, phone }) {
+export async function createTrainerInvite({ gymId, name, phone, email }) {
   const { data, error } = await supabase
     .from('trainer_invites')
-    .insert({ gym_id: gymId, name, phone: phone || null })
+    .insert({ gym_id: gymId, name, phone: phone || null, email: email || null })
     .select('*')
     .single()
 

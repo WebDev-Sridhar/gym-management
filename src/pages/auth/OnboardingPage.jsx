@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { createPlan, addTrainerInvite, updateGymOnboardingStep } from '../../services/userService'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
@@ -12,7 +12,7 @@ const PRESET_PLANS = [
 ]
 
 export default function OnboardingPage() {
-  const { user, profile, isAuthenticated, isOnboarded, loading, gymId } = useAuth()
+  const { profile, isAuthenticated, loading, gymId } = useAuth()
   const navigate = useNavigate()
 
   const [setupStep, setSetupStep] = useState('plan') // 'plan' | 'trainer'
@@ -26,20 +26,24 @@ export default function OnboardingPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Not authenticated → signup
   if (!loading && !isAuthenticated) {
-    return <Navigate to="/signup" replace />
+    return <Navigate to="/login" replace />
   }
 
-  // Not onboarded (no profile) → create gym first
-  if (!loading && !isOnboarded) {
+  // No gym yet → must create gym first
+  if (!loading && !gymId) {
     return <Navigate to="/create-gym" replace />
   }
 
+  // Already subscribed with active onboarding → dashboard
+  if (!loading && profile?.onboarding_step === 'subscribed') {
+    return <Navigate to="/owner-dashboard" replace />
+  }
+
   // Non-owner roles shouldn't be here
-  if (!loading && profile?.role !== 'owner') {
+  if (!loading && profile?.role && profile.role !== 'owner') {
     const routes = { trainer: '/trainer-dashboard', member: '/member-app' }
-    return <Navigate to={routes[profile?.role] || '/'} replace />
+    return <Navigate to={routes[profile.role] || '/'} replace />
   }
 
   const handleSavePlan = async () => {
@@ -111,8 +115,46 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
+        <div className="min-h-screen flex font-sans">
+      
+      {/* ───────── LEFT (65%) ───────── */}
+      <div className="hidden lg:flex w-[65%] relative overflow-hidden bg-black text-white">
+        <div className="absolute inset-0 bg-gradient-to-br from-black via-violet-950/40 to-violet-900/60" />
+        
+        <div className="relative z-10 flex flex-col justify-between p-16 w-full">
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" className="w-10 h-10 object-contain" alt="Logo" />
+            <span className="text-xl font-bold tracking-tight">Gymmobius</span>
+          </div>
+
+          <div>
+            <h1 className="text-7xl font-bold leading-tight mb-6">
+              Build your gym's<br />future today.
+            </h1>
+            <p className="text-white/70 max-w-md text-xl leading-relaxed">
+              Join 500+ gym owners who have automated their business and reclaimed their time.
+            </p>
+          </div>
+
+          <div className="flex gap-8 text-white/60 text-sm font-medium">
+            <p className="flex items-center gap-2"><span className="text-violet-400">✔</span> Free 14-day trial</p>
+            <p className="flex items-center gap-2"><span className="text-violet-400">✔</span> No credit card</p>
+            <p className="flex items-center gap-2"><span className="text-violet-400">✔</span> Setup in 2 mins</p>
+          </div>
+
+          <p className="text-white/30 text-xs uppercase tracking-widest">
+            © {new Date().getFullYear()} Gymmobius Core
+          </p>
+        </div>
+      </div>
+
+      {/* ───────── RIGHT (35%) ───────── */}
+      <div className="w-full lg:w-[35%] flex flex-col items-center justify-center px-8 bg-white">
+        <div className="w-full max-w-sm">
+          
+          <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-8 transition-colors">
+            ← Back
+          </Link>
         <OnboardingProgress currentStep={3} />
 
         {/* Header */}
@@ -275,7 +317,9 @@ export default function OnboardingPage() {
           <div className={`w-2 h-2 rounded-full transition-colors ${setupStep === 'plan' ? 'bg-violet-500' : 'bg-gray-300'}`} />
           <div className={`w-2 h-2 rounded-full transition-colors ${setupStep === 'trainer' ? 'bg-violet-500' : 'bg-gray-300'}`} />
         </div>
+
       </div>
+    </div>
     </div>
   )
 }

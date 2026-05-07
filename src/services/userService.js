@@ -7,11 +7,16 @@ import { supabaseData as supabase } from './supabaseClient'
 export async function fetchUserProfile(authId) {
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select('*, gym:gym_id(onboarding_step)')
     .eq('id', authId)
     .maybeSingle()
 
   if (error) throw error
+  if (data) {
+    // Flatten onboarding_step from the joined gym row into the profile
+    data.onboarding_step = data.gym?.onboarding_step ?? null
+    delete data.gym
+  }
   return data
 }
 
@@ -26,7 +31,7 @@ export async function createGym({ gymName, city, ownerId }) {
 
   const { data, error } = await supabase
     .from('gyms')
-    .insert({
+    .upsert({
       name: gymName,
       city,
       slug,
@@ -112,13 +117,14 @@ export async function createPlan({ gymId, name, durationDays, price }) {
  * Add a trainer (invite) for a gym.
  * Stores a pending trainer entry that can be claimed later.
  */
-export async function addTrainerInvite({ gymId, name, phone }) {
+export async function addTrainerInvite({ gymId, name, phone, email }) {
   const { data, error } = await supabase
     .from('trainer_invites')
     .insert({
       gym_id: gymId,
       name,
-      phone,
+      phone: phone || null,
+      email: email || null,
     })
     .select('*')
     .single()
@@ -192,4 +198,43 @@ export async function fetchGym(gymId) {
 
   if (error) throw error
   return data
+}
+
+// ─── Member / trainer auto-detection on first login ───────────────────────────
+
+export async function findMemberByEmail(email) {
+  const { data, error } = await supabase
+    .from('members')
+    .select('id, gym_id, name, phone, email')
+    .eq('email', email)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function findTrainerInviteByEmail(email) {
+  const { data, error } = await supabase
+    .from('trainer_invites')
+    .select('id, gym_id, name, phone, email')
+    .eq('email', email)
+    .eq('claimed', false)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function claimTrainerInvite(inviteId) {
+  const { error } = await supabase
+    .from('trainer_invites')
+    .update({ claimed: true, status: 'accepted' })
+    .eq('id', inviteId)
+  if (error) throw error
+}
+
+// Insert a row into the legacy trainers table so existing queries still work
+export async function createTrainerRecord({ authId, gymId }) {
+  const { error } = await supabase
+    .from('trainers')
+    .insert({ user_id: authId, gym_id: gymId })
+  if (error) throw error
 }

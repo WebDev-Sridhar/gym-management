@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchMembers, createMember, assignPlan, deleteMember, updateMember, fetchPlans } from '../../services/membershipService'
+import { fetchTrainers, assignTrainerToMember } from '../../services/trainerService'
 import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
+import MemberDrawer from '../../components/ui/MemberDrawer'
 
 export default function MembersPage() {
   const dialog = useDialog()
@@ -17,6 +19,7 @@ export default function MembersPage() {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [drawerMember, setDrawerMember] = useState(null)
 
   // Add member form
   const [newName, setNewName] = useState('')
@@ -32,23 +35,43 @@ export default function MembersPage() {
   // Assign plan form
   const [selectedPlanId, setSelectedPlanId] = useState('')
 
+  // Assign trainer form
+  const [trainers, setTrainers]               = useState([])
+  const [assigningTrainerId, setAssigningTrainerId] = useState(null)
+  const [selectedTrainerId, setSelectedTrainerId]   = useState('')
+
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
 
     setLoading(true)
     let cancelled = false
 
-    Promise.all([fetchMembers(gymId), fetchPlans(gymId)])
-      .then(([m, p]) => {
+    Promise.all([fetchMembers(gymId), fetchPlans(gymId), fetchTrainers(gymId)])
+      .then(([m, p, t]) => {
         if (cancelled) return
         setMembers(m)
         setPlans(p)
+        setTrainers(t)
       })
       .catch((err) => console.error('Failed to load:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
   }, [gymId])
+
+  async function handleAssignTrainer(memberId) {
+    setSubmitting(true)
+    try {
+      const updated = await assignTrainerToMember({ memberId, trainerId: selectedTrainerId || null })
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, trainer_id: updated.trainer_id } : m))
+      setAssigningTrainerId(null)
+      setSelectedTrainerId('')
+    } catch (err) {
+      dialog.alert(err.message || 'Failed to assign trainer')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   async function handleAddMember(e) {
     e.preventDefault()
@@ -289,15 +312,18 @@ export default function MembersPage() {
                             <button type="button" onClick={() => setEditingId(null)} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
                           </form>
                         ) : (
-                          <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setDrawerMember(member)}
+                            className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                          >
                             <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-semibold text-sm shrink-0">
                               {member.name?.charAt(0).toUpperCase() || '?'}
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-gray-900">{member.name || 'Unnamed'}</p>
+                              <p className="text-sm font-medium text-gray-900 hover:text-violet-700 transition-colors">{member.name || 'Unnamed'}</p>
                               <p className="text-xs text-gray-400">{member.phone || member.email || 'No contact'}</p>
                             </div>
-                          </div>
+                          </button>
                         )}
                       </td>
                       <td className="px-5 py-4">
@@ -346,10 +372,26 @@ export default function MembersPage() {
                               <button onClick={() => handleAssignPlan(member.id)} disabled={!selectedPlanId || submitting} className="px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 cursor-pointer">{submitting ? '...' : 'Assign'}</button>
                               <button onClick={() => { setAssigningId(null); setSelectedPlanId('') }} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
                             </div>
+                          ) : assigningTrainerId === member.id ? (
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={selectedTrainerId}
+                                onChange={e => setSelectedTrainerId(e.target.value)}
+                                className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-violet-500 bg-gray-50"
+                              >
+                                <option value="">No trainer</option>
+                                {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                              </select>
+                              <button onClick={() => handleAssignTrainer(member.id)} disabled={submitting} className="px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 cursor-pointer">{submitting ? '...' : 'Save'}</button>
+                              <button onClick={() => { setAssigningTrainerId(null); setSelectedTrainerId('') }} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
+                            </div>
                           ) : editingId !== member.id ? (
                             <>
                               <button onClick={() => { setAssigningId(member.id); setSelectedPlanId(member.plan_id || '') }} className="text-xs text-violet-600 hover:text-violet-800 font-medium cursor-pointer">
                                 {member.plan_id ? 'Change Plan' : 'Assign Plan'}
+                              </button>
+                              <button onClick={() => { setAssigningTrainerId(member.id); setSelectedTrainerId(member.trainer_id || '') }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium cursor-pointer ml-1">
+                                {member.trainer_id ? 'Trainer' : '+ Trainer'}
                               </button>
                               <button onClick={() => startEdit(member)} className="text-xs text-blue-500 hover:text-blue-700 font-medium cursor-pointer ml-1">Edit</button>
                               <button onClick={() => handleDelete(member.id)} className="text-xs text-red-400 hover:text-red-600 cursor-pointer ml-1">Remove</button>
@@ -365,6 +407,8 @@ export default function MembersPage() {
           </div>
         </div>
       )}
+
+      <MemberDrawer member={drawerMember} onClose={() => setDrawerMember(null)} />
     </div>
   )
 }

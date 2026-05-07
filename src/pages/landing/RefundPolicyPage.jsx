@@ -1,9 +1,8 @@
 import SectionWrapper from '../../components/layout/SectionWrapper'
-import MarketingLayout from '../../components/layout/MarketingLayout'
 
 export default function RefundPolicyPage() {
   return (
-    <MarketingLayout>
+    
       <SectionWrapper>
 
         <div className="max-w-3xl mx-auto">
@@ -73,6 +72,5 @@ export default function RefundPolicyPage() {
         </div>
 
       </SectionWrapper>
-    </MarketingLayout>
   )
 }

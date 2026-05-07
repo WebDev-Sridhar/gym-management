@@ -1,176 +1,343 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  Dumbbell, Flame, MapPin, Check, CreditCard,
+  Zap, Salad, ChevronRight, Lightbulb, Droplets,
+  AlertCircle, ClipboardList, CheckCircle2, Loader2,
+} from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
-import { fetchMyMember, fetchMyPendingPayment } from '../../services/memberPaymentService'
+import { fetchMyMember, selfCheckIn, fetchMyAttendance, fetchMyActivePlans } from '../../services/memberService'
+import { fetchMyPendingPayment } from '../../services/memberPaymentService'
+
+function daysLeft(d) {
+  if (!d) return null
+  return Math.ceil((new Date(d) - new Date()) / 86400000)
+}
+
+function greeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function StreakDot({ date, attendance }) {
+  const ds = new Date(date).toISOString().split('T')[0]
+  const hit = attendance.some(a => a.check_in.startsWith(ds))
+  const today = ds === new Date().toISOString().split('T')[0]
+  return (
+    <div style={{
+      width: '10px', height: '10px', borderRadius: '3px',
+      background: hit ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : today ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.05)',
+      border: today ? '1px solid rgba(99,102,241,0.5)' : '1px solid transparent',
+    }} />
+  )
+}
+
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { delay, type: 'spring', stiffness: 300, damping: 28 },
+})
 
 export default function MemberApp() {
-  const { user, gymId } = useAuth()
-
-  const [member, setMember] = useState(null)
-  const [pending, setPending] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
+  const { gymId, profile } = useAuth()
+  const [member, setMember]             = useState(null)
+  const [attendance, setAtt]            = useState([])
+  const [plans, setPlans]               = useState([])
+  const [pending, setPending]           = useState(null)
+  const [loading, setLoading]           = useState(true)
+  const [loadError, setLoadError]       = useState('')
+  const [checkingIn, setCheckingIn]     = useState(false)
+  const [checkedToday, setCheckedToday] = useState(false)
+  const [justChecked, setJustChecked]   = useState(false)
 
   useEffect(() => {
-    if (!gymId || !user) { setLoading(false); return }
-    let cancelled = false
-    setLoading(true)
-    fetchMyMember({ gymId, phone: user.phone, email: user.email })
-      .then(async (m) => {
-        if (cancelled) return
+    if (!gymId || !profile) { setLoading(false); return }
+    let dead = false
+    fetchMyMember({ gymId, phone: profile.phone, email: profile.email })
+      .then(async m => {
+        if (dead) return
         setMember(m)
-        if (m?.id) {
-          const p = await fetchMyPendingPayment(m.id).catch(() => null)
-          if (!cancelled) setPending(p)
+        if (m) {
+          const [att, pl, pay] = await Promise.all([
+            fetchMyAttendance({ memberId: m.id, limit: 90 }),
+            fetchMyActivePlans(m.id),
+            fetchMyPendingPayment(m.id).catch(() => null),
+          ])
+          if (!dead) {
+            setAtt(att); setPlans(pl); setPending(pay)
+            setCheckedToday(att.some(a => a.check_in.startsWith(new Date().toISOString().split('T')[0])))
+          }
         }
       })
-      .catch((err) => console.error('Member load failed:', err))
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [gymId, user])
+      .catch(e => { console.error(e); setLoadError(e.message || 'Failed to load') })
+      .finally(() => { if (!dead) setLoading(false) })
+    return () => { dead = true }
+  }, [gymId, profile])
 
-  function handlePayLink() {
-    if (!pending?.pay_token) return
-    window.open(`/pay/${pending.pay_token}`, '_blank')
-  }
-
-  async function handleIPaid() {
-    if (!pending?.pay_token) return
-    setBusy(true)
+  async function doCheckIn() {
+    if (!member || checkedToday || checkingIn) return
+    setCheckingIn(true)
     try {
-      // Reuse the public /pay/{token} confirmation flow — same endpoint members hit anyway
-      window.location.href = `/pay/${pending.pay_token}`
-    } finally {
-      setBusy(false)
-    }
+      await selfCheckIn({ gymId, memberId: member.id })
+      setCheckedToday(true); setJustChecked(true)
+      setAtt(p => [{ check_in: new Date().toISOString() }, ...p])
+      setTimeout(() => setJustChecked(false), 4000)
+    } catch (e) { console.error(e) }
+    finally { setCheckingIn(false) }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '70vh', gap: '16px' }}>
+      <Loader2 size={36} color="#6366f1" style={{ animation: 'mspin .75s linear infinite' }} />
+      <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '13px', fontWeight: 500 }}>Loading your profile…</p>
+      <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+
+  if (!member) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '70vh', padding: '32px 24px', textAlign: 'center', gap: '14px' }}>
+      <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <AlertCircle size={28} color="#f59e0b" strokeWidth={1.5} />
       </div>
-    )
-  }
-
-  if (!member) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-        <h2 className="text-lg font-bold text-gray-900 mb-2">No membership found</h2>
-        <p className="text-sm text-gray-500">
-          We couldn&apos;t find a membership linked to your account. Please contact your gym to get set up.
+      <div>
+        <p style={{ color: 'white', fontWeight: 800, fontSize: '18px' }}>Profile not found</p>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginTop: '6px', lineHeight: 1.6 }}>
+          {loadError || "Your gym owner hasn't added your details yet. Contact them to get started."}
         </p>
       </div>
-    )
-  }
+    </div>
+  )
 
-  const status = member.status === 'active' && member.expiry_date && new Date(member.expiry_date) < new Date()
-    ? 'expired'
-    : member.status
+  const days = daysLeft(member.expiry_date)
+  const expired  = member.status === 'expired'
+  const expiring = !expired && days !== null && days <= 7 && days >= 0
+  const needsAction = expired || expiring
 
-  const initials = (member.name || '?').slice(0, 2).toUpperCase()
-  const expiry = member.expiry_date
-    ? new Date(member.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    : null
+  const streak = (() => {
+    let n = 0
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i)
+      if (attendance.some(a => a.check_in.startsWith(d.toISOString().split('T')[0]))) n++
+      else if (i > 0) break
+    }
+    return n
+  })()
+
+  const monthCheckins = attendance.filter(a => {
+    const d = new Date(a.check_in), n = new Date()
+    return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear()
+  }).length
+
+  const streakGrid = Array.from({ length: 35 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (34 - i)); return d
+  })
+
+  const workout = plans.find(p => p.plan_type === 'workout')
+  const diet    = plans.find(p => p.plan_type === 'diet')
+
+  const cardBg      = expired ? 'linear-gradient(145deg,#1c0a0a,#2a1010)' : expiring ? 'linear-gradient(145deg,#1c1500,#2a1f00)' : 'linear-gradient(145deg,#0e1035,#16104a,#0e1035)'
+  const accentColor = expired ? '#f87171' : expiring ? '#fbbf24' : '#818cf8'
+  const statusLabel = expired ? 'Expired' : expiring ? `${days}d left` : 'Active'
+  const statusBg    = expired ? 'rgba(239,68,68,0.15)' : expiring ? 'rgba(251,191,36,0.15)' : 'rgba(129,140,248,0.15)'
 
   return (
-    <div className="space-y-6">
-      {/* Membership card */}
-      <div className="bg-gradient-to-br from-violet-600 to-blue-500 rounded-2xl p-6 text-white">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-violet-100 text-xs uppercase tracking-wider">Member</p>
-            <h2 className="text-xl font-bold mt-1">{member.name}</h2>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-            <span className="text-white font-bold">{initials}</span>
-          </div>
-        </div>
-        <div className="flex items-center justify-between pt-4 border-t border-white/20">
-          <div>
-            <p className="text-violet-100 text-xs">Plan</p>
-            <p className="font-semibold">{member.plan?.name || '—'}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-violet-100 text-xs">{status === 'expired' ? 'Expired' : 'Valid until'}</p>
-            <p className="font-semibold">{expiry || '—'}</p>
-          </div>
-        </div>
-        <div className="mt-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/15">
-          {status === 'active'   ? '● Active'
-           : status === 'expired' ? '● Expired'
-           : status === 'verification_pending' ? '● Awaiting verification'
-           : '● Inactive'}
-        </div>
-      </div>
+    <div style={{ padding: '20px 16px 12px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-      {/* ── Pending payment ── */}
-      {pending && (
-        <div className="bg-white rounded-xl border-2 border-amber-300 p-5">
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
-                {pending.status === 'verification_pending' ? 'Awaiting verification' : 'Payment due'}
-              </p>
-              <h3 className="text-lg font-bold text-gray-900 mt-1">
-                ₹{Number(pending.amount).toLocaleString('en-IN')}
-              </h3>
-              {pending.plan?.name && <p className="text-sm text-gray-500 mt-0.5">{pending.plan.name}</p>}
-              {pending.due_date && (
-                <p className="text-xs text-gray-400 mt-2">
-                  Due {new Date(pending.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </p>
-              )}
-            </div>
-          </div>
+      {/* Greeting */}
+      <motion.div {...fadeUp(0)}>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', fontWeight: 500 }}>{greeting()},</p>
+        <h1 style={{ color: '#fff', fontSize: '26px', fontWeight: 800, letterSpacing: '-0.6px', marginTop: '2px', lineHeight: 1.15, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {member.name.split(' ')[0]}
+          <Dumbbell size={22} color="#818cf8" strokeWidth={2} />
+        </h1>
+      </motion.div>
 
-          {pending.status === 'verification_pending' ? (
-            <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-              We&apos;re confirming your payment. Your gym owner will activate your membership shortly.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {pending.razorpay_link_url || pending.razorpay_order_id ? (
-                <button
-                  onClick={handlePayLink}
-                  disabled={busy}
-                  className="w-full py-3 bg-violet-600 text-white font-semibold rounded-lg hover:bg-violet-700 transition-colors cursor-pointer text-sm disabled:opacity-50"
-                >
-                  Pay Now →
-                </button>
-              ) : pending.pay_token ? (
-                <>
-                  <button
-                    onClick={handlePayLink}
-                    disabled={busy}
-                    className="w-full py-3 bg-violet-600 text-white font-semibold rounded-lg hover:bg-violet-700 transition-colors cursor-pointer text-sm disabled:opacity-50"
-                  >
-                    Pay via UPI
-                  </button>
-                  <button
-                    onClick={handleIPaid}
-                    disabled={busy}
-                    className="w-full py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer disabled:opacity-50"
-                  >
-                    I&apos;ve Paid
-                  </button>
-                </>
-              ) : (
-                <p className="text-sm text-gray-500">Payment instructions will appear here shortly. Please check back or contact your gym.</p>
-              )}
-            </div>
-          )}
-        </div>
+      {/* Pending payment banner */}
+      {pending?.razorpay_link_url && (
+        <motion.a href={pending.razorpay_link_url} target="_blank" rel="noopener noreferrer"
+          {...fadeUp(0.05)} whileTap={{ scale: 0.98 }}
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 16px', borderRadius: '16px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.22)', textDecoration: 'none' }}>
+          <div style={{ width: '36px', height: '36px', borderRadius: '11px', background: 'rgba(251,191,36,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <CreditCard size={18} color="#fbbf24" strokeWidth={2} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: '13px' }}>Payment pending — ₹{(pending.amount / 100).toLocaleString('en-IN')}</p>
+            <p style={{ color: 'rgba(251,191,36,0.6)', fontSize: '11px', marginTop: '1px' }}>Tap to complete your renewal</p>
+          </div>
+          <ChevronRight size={16} color="rgba(251,191,36,0.5)" strokeWidth={2} />
+        </motion.a>
       )}
 
-      {/* ── Active state (no pending payment) ── */}
-      {!pending && status === 'active' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-base font-semibold text-gray-900">You&apos;re all set 💪</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Membership active until <span className="font-medium text-gray-700">{expiry}</span>.
+      {/* Membership card */}
+      <motion.div {...fadeUp(0.08)} style={{ position: 'relative', borderRadius: '24px', padding: '22px', background: cardBg, border: `1px solid ${accentColor}22`, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '140px', height: '140px', borderRadius: '50%', background: `${accentColor}0a`, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '-20px', left: '50%', width: '100px', height: '100px', borderRadius: '50%', background: `${accentColor}06`, pointerEvents: 'none' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
+          <div>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Member</p>
+            <p style={{ color: '#fff', fontSize: '19px', fontWeight: 800, letterSpacing: '-0.3px', marginTop: '3px' }}>{member.name}</p>
+          </div>
+          <span style={{ padding: '5px 11px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: statusBg, color: accentColor, border: `1px solid ${accentColor}33`, letterSpacing: '0.3px' }}>
+            {statusLabel}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Plan', value: member.plan?.name || 'No plan' },
+            member.expiry_date && { label: expired ? 'Expired' : 'Expires', value: new Date(member.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) },
+            !expired && days !== null && { label: 'Days Left', value: String(days) },
+          ].filter(Boolean).map(({ label, value }) => (
+            <div key={label}>
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px' }}>{label}</p>
+              <p style={{ color: label === 'Days Left' && days <= 7 ? accentColor : 'rgba(255,255,255,0.85)', fontSize: '14px', fontWeight: 700, marginTop: '3px' }}>{value}</p>
+            </div>
+          ))}
+        </div>
+        {needsAction && !pending && (
+          <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <p style={{ color: accentColor, fontSize: '12px', fontWeight: 600, lineHeight: 1.5 }}>
+              {expired ? 'Your membership has expired. Contact your gym to renew.' : `Expiring in ${days} day${days !== 1 ? 's' : ''}. Contact your gym owner to renew.`}
+            </p>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Check-in */}
+      <motion.div {...fadeUp(0.13)}>
+        <motion.button onClick={doCheckIn} disabled={checkedToday || checkingIn}
+          whileTap={checkedToday ? {} : { scale: 0.96 }}
+          style={{
+            width: '100%', padding: '17px', borderRadius: '20px', border: 'none',
+            cursor: checkedToday ? 'default' : 'pointer', fontFamily: 'inherit',
+            fontSize: '16px', fontWeight: 800, letterSpacing: '-0.2px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+            transition: 'box-shadow 0.3s',
+            ...(checkedToday
+              ? { background: 'rgba(34,197,94,0.1)', border: '1.5px solid rgba(34,197,94,0.25)', color: '#4ade80' }
+              : { background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', boxShadow: checkingIn ? 'none' : '0 8px 28px rgba(99,102,241,0.4)' }),
+          }}>
+          {checkingIn ? (
+            <><Loader2 size={20} style={{ animation: 'mspin .75s linear infinite' }} />Checking in…</>
+          ) : checkedToday ? (
+            <><CheckCircle2 size={22} strokeWidth={2.5} />{justChecked ? "You're in! Keep it up" : 'Checked In Today'}</>
+          ) : (
+            <><MapPin size={21} strokeWidth={2} />Check In to Gym</>
+          )}
+        </motion.button>
+        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.28)', fontSize: '12px', fontWeight: 500, marginTop: '9px' }}>
+          {monthCheckins} visit{monthCheckins !== 1 ? 's' : ''} this month
+          {streak > 1 && (
+            <span style={{ marginLeft: '8px', color: '#f97316', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <Flame size={13} color="#f97316" fill="#f97316" />
+              {streak}-day streak
+            </span>
+          )}
+        </p>
+      </motion.div>
+
+      {/* Streak grid */}
+      <motion.div {...fadeUp(0.18)} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '20px', padding: '16px 18px', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <p style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>Attendance Heatmap</p>
+          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>Last 35 days</p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px' }}>
+          {streakGrid.map((d, i) => <StreakDot key={i} date={d} attendance={attendance} />)}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }} />
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>Visited</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(255,255,255,0.05)' }} />
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>Missed</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Plans */}
+      {(workout || diet) ? (
+        <motion.div {...fadeUp(0.22)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <p style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>My Plans</p>
+            <Link to="/member-app/workouts" style={{ color: '#818cf8', fontSize: '13px', fontWeight: 600, textDecoration: 'none' }}>View all →</Link>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {workout && (
+              <Link to="/member-app/workouts" style={{ display: 'flex', alignItems: 'center', gap: '13px', padding: '14px 16px', borderRadius: '16px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.14)', textDecoration: 'none' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(99,102,241,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Zap size={20} color="#818cf8" strokeWidth={2} />
+                </div>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <p style={{ color: '#fff', fontWeight: 700, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{workout.title}</p>
+                  <p style={{ color: '#818cf8', fontSize: '12px', marginTop: '2px' }}>{Array.isArray(workout.data) ? workout.data.length : 0} training days</p>
+                </div>
+                <ChevronRight size={16} color="rgba(255,255,255,0.25)" strokeWidth={2} />
+              </Link>
+            )}
+            {diet && (
+              <Link to="/member-app/workouts" style={{ display: 'flex', alignItems: 'center', gap: '13px', padding: '14px 16px', borderRadius: '16px', background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.14)', textDecoration: 'none' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(16,185,129,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Salad size={20} color="#34d399" strokeWidth={2} />
+                </div>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <p style={{ color: '#fff', fontWeight: 700, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{diet.title}</p>
+                  <p style={{ color: '#34d399', fontSize: '12px', marginTop: '2px' }}>{Array.isArray(diet.data) ? diet.data.length : 0} days</p>
+                </div>
+                <ChevronRight size={16} color="rgba(255,255,255,0.25)" strokeWidth={2} />
+              </Link>
+            )}
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div {...fadeUp(0.22)} style={{ borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.08)', padding: '28px 16px', textAlign: 'center' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+            <ClipboardList size={24} color="rgba(129,140,248,0.7)" strokeWidth={1.8} />
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: '14px' }}>No plans assigned yet</p>
+          <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: '12px', marginTop: '5px', lineHeight: 1.5 }}>Your trainer will assign workout & diet plans here</p>
+        </motion.div>
+      )}
+
+      {/* Recent check-ins */}
+      {attendance.length > 0 && (
+        <motion.div {...fadeUp(0.26)}>
+          <p style={{ color: '#fff', fontSize: '14px', fontWeight: 700, marginBottom: '10px' }}>Recent Activity</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {attendance.slice(0, 5).map((a, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <Check size={14} color="#818cf8" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '13px', flex: 1 }}>
+                  {new Date(a.check_in).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
+                </p>
+                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px' }}>
+                  {new Date(a.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Tips */}
+      <motion.div {...fadeUp(0.3)} style={{ borderRadius: '20px', background: 'linear-gradient(145deg,rgba(99,102,241,0.06),rgba(139,92,246,0.06))', border: '1px solid rgba(99,102,241,0.12)', padding: '16px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '8px' }}>
+          <Lightbulb size={14} color="rgba(255,255,255,0.4)" strokeWidth={2} />
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Today's Tip</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+          <Droplets size={16} color="#60a5fa" strokeWidth={2} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '13px', lineHeight: 1.6 }}>
+            Stay hydrated — drink at least 3–4L of water on training days. Recovery starts with hydration.
           </p>
         </div>
-      )}
+      </motion.div>
+
+      <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }

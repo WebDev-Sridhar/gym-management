@@ -7,6 +7,7 @@ import PublicRoute from './components/layout/PublicRoute'
 import LandingPage from './pages/landing/LandingPage'
 import LoginPage from './pages/auth/LoginPage'
 import SignupPage from './pages/auth/SignupPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'  
 import CreateGymPage from './pages/auth/CreateGymPage'
 import OnboardingPage from './pages/auth/OnboardingPage'
 import BillingPage from './pages/auth/BillingPage'
@@ -22,9 +23,16 @@ import SettingsPage from './pages/owner/SettingsPage'
 import WebsitePage from './pages/owner/WebsitePage'
 import PaymentSettingsPage from './pages/owner/PaymentSettingsPage'
 import CommunicationPage from './pages/owner/CommunicationPage'
+import ProgramsPage from './pages/owner/ProgramsPage'
 import StarterWebsitePage from './pages/owner/StarterWebsitePage'
 import TrainerDashboard from './pages/trainer/TrainerDashboard'
+import TrainerMembersPage from './pages/trainer/TrainerMembersPage'
+import TrainerWorkoutsPage from './pages/trainer/TrainerWorkoutsPage'
+import TrainerSettingsPage from './pages/trainer/TrainerSettingsPage'
+import MemberLayout from './components/layout/MemberLayout'
 import MemberApp from './pages/member/MemberApp'
+import MemberWorkoutsPage from './pages/member/MemberWorkoutsPage'
+import MemberProfilePage from './pages/member/MemberProfilePage'
 import CheckinPage from './pages/checkin/CheckinPage'
 import PayLandingPage from './pages/pay/PayLandingPage'
 import GymLayout from './components/gym/GymLayout'
@@ -33,6 +41,8 @@ import GymAbout from './pages/gym/GymAbout'
 import GymPricing from './pages/gym/GymPricing'
 import GymTrainers from './pages/gym/GymTrainers'
 import GymContact from './pages/gym/GymContact'
+import GymLoginPage from './pages/gym/GymLoginPage'
+import GymJoinPage from './pages/gym/GymJoinPage'
 import FeaturesPage from './pages/landing/FeaturesPage'
 import PricingPage from './pages/landing/PricingPage'
 import DemoPage from './pages/landing/DemoPage'
@@ -60,6 +70,7 @@ const ownerLinks = [
   { to: '/owner-dashboard/payments', icon: 'payments', label: 'Payments' },
   { to: '/owner-dashboard/payment-settings', icon: 'settings', label: 'Payment Setup' },
   { to: '/owner-dashboard/communication', icon: 'message', label: 'Communication' },
+  { to: '/owner-dashboard/programs', icon: 'programs', label: 'Programs' },
   { to: '/owner-dashboard/trainers', icon: 'trainers', label: 'Trainers' },
   { to: '/owner-dashboard/analytics', icon: 'analytics', label: 'Analytics' },
   { to: '/owner-dashboard/checkin', icon: 'checkin', label: 'Check-in' },
@@ -73,11 +84,6 @@ const trainerLinks = [
   { to: '/trainer-dashboard/settings', icon: 'settings', label: 'Settings' },
 ]
 
-const memberLinks = [
-  { to: '/member-app', icon: 'dashboard', label: 'Home' },
-  { to: '/member-app/workouts', icon: 'workouts', label: 'Workouts' },
-  { to: '/member-app/profile', icon: 'profile', label: 'Profile' },
-]
 
 export default function App() {
   return (
@@ -111,6 +117,7 @@ export default function App() {
           <Route path="/signup" element={
             <PublicRoute><SignupPage /></PublicRoute>
           } />
+<Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/create-gym" element={<CreateGymPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
@@ -133,6 +140,7 @@ export default function App() {
             <Route path="website" element={<WebsitePageRouter />} />
             <Route path="payment-settings" element={<PaymentSettingsPage />} />
             <Route path="communication" element={<CommunicationPage />} />
+            <Route path="programs" element={<ProgramsPage />} />
           </Route>
 
           {/* Trainer dashboard — protected, trainer only */}
@@ -142,15 +150,20 @@ export default function App() {
             </ProtectedRoute>
           }>
             <Route index element={<TrainerDashboard />} />
+            <Route path="members" element={<TrainerMembersPage />} />
+            <Route path="workouts" element={<TrainerWorkoutsPage />} />
+            <Route path="settings" element={<TrainerSettingsPage />} />
           </Route>
 
-          {/* Member app — protected, member only */}
+          {/* Member app — mobile-first layout with bottom nav */}
           <Route path="/member-app" element={
             <ProtectedRoute allowedRoles={['member']}>
-              <DashboardLayout sidebarLinks={memberLinks} />
+              <MemberLayout />
             </ProtectedRoute>
           }>
             <Route index element={<MemberApp />} />
+            <Route path="workouts" element={<MemberWorkoutsPage />} />
+            <Route path="profile" element={<MemberProfilePage />} />
           </Route>
           {/* Public gym pages — must be LAST (dynamic :gymSlug param) */}
           <Route path="/:gymSlug" element={<GymLayout />}>
@@ -159,6 +172,8 @@ export default function App() {
             <Route path="pricing" element={<GymPricing />} />
             <Route path="trainers" element={<GymTrainers />} />
             <Route path="contact" element={<GymContact />} />
+            <Route path="login" element={<GymLoginPage />} />
+            <Route path="join" element={<GymJoinPage />} />
           </Route>
         </Routes>
       </AuthProvider>

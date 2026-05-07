@@ -145,7 +145,8 @@ export function AuthProvider({ children }) {
     refreshProfile,
     // Derived helpers
     isAuthenticated: !!session,
-    isOnboarded: !!profile,
+    onboardingStep: profile?.onboarding_step ?? null,
+    isOnboarded: profile?.onboarding_step === 'subscribed',
     role: profile?.role ?? null,
     gymId: profile?.gym_id ?? null,
     hasActiveSubscription: !!subscription && new Date(subscription.expires_at) > new Date(),

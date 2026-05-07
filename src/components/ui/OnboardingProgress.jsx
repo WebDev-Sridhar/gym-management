@@ -1,18 +1,14 @@
 const STEPS = [
-  { label: 'Sign Up', path: '/signup' },
-  { label: 'Create Gym', path: '/create-gym' },
-  { label: 'Quick Setup', path: '/onboarding' },
-  { label: 'Activate', path: '/billing' },
+  { label: 'Sign Up' },
+  { label: 'Create Gym' },
+  { label: 'Activate' },
 ]
 
 export default function OnboardingProgress({ currentStep }) {
   return (
     <div className="w-full max-w-lg mx-auto mb-10">
-      {/* Step indicators */}
       <div className="flex items-center justify-between relative">
-        {/* Background line */}
         <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200" />
-        {/* Progress line */}
         <div
           className="absolute top-4 left-0 h-0.5 bg-gradient-to-r from-violet-600 to-blue-500 transition-all duration-500"
           style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
@@ -40,16 +36,9 @@ export default function OnboardingProgress({ currentStep }) {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
-                ) : (
-                  stepNum
-                )}
+                ) : stepNum}
               </div>
-              <span
-                className={`
-                  mt-2 text-xs font-medium transition-colors
-                  ${isActive ? 'text-violet-600' : isCompleted ? 'text-gray-700' : 'text-gray-400'}
-                `}
-              >
+              <span className={`mt-2 text-xs font-medium transition-colors ${isActive ? 'text-violet-600' : isCompleted ? 'text-gray-700' : 'text-gray-400'}`}>
                 {step.label}
               </span>
             </div>

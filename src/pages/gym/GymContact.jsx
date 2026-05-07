@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useGym } from '../../store/GymContext'
 import { fetchGymContent } from '../../services/gymPublicService'
+import { submitContactMessage } from '../../services/contactService'
 import { staggerContainer, scrollViewport, slideInLeft, slideInRight } from '../../lib/animations'
 
 const DEFAULT_HOURS = [
@@ -19,15 +20,32 @@ export default function GymContact() {
   const [content, setContent] = useState(null)
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' })
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     if (!gym?.id) return
     fetchGymContent(gym.id).then(setContent).catch(() => null).finally(() => setLoading(false))
   }, [gym?.id])
 
-  const handleSubmit = (e) => {
+  async function handleSubmit(e) {
     e.preventDefault()
-    setSubmitted(true)
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      await submitContactMessage({
+        gymId: gym.id,
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        message: form.message.trim(),
+      })
+      setSubmitted(true)
+    } catch {
+      setSubmitError('Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (!gym) return null
@@ -127,11 +145,15 @@ export default function GymContact() {
                         onBlur={e => e.target.style.borderColor = 'var(--gym-border)'}
                       />
                     </div>
+                    {submitError && (
+                      <p className="text-red-400 text-xs font-sans">{submitError}</p>
+                    )}
                     <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit"
-                      className="w-full py-4 font-bold text-sm text-white font-sans cursor-pointer transition-all duration-300 hover:shadow-2xl"
+                      disabled={submitting}
+                      className="w-full py-4 font-bold text-sm text-white font-sans cursor-pointer transition-all duration-300 hover:shadow-2xl disabled:opacity-60"
                       style={{ background: 'var(--gym-gradient)', boxShadow: '0 6px 20px var(--gym-glow)', borderRadius: 'var(--gym-card-radius)' }}
                     >
-                      Send Message
+                      {submitting ? 'Sending…' : 'Send Message'}
                     </motion.button>
                   </form>
                 )}

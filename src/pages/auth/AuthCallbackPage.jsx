@@ -1,26 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../services/supabaseClient'
-import { fetchUserProfile } from '../../services/userService'
+import {
+  fetchUserProfile,
+  createUserProfile,
+  findMemberByEmail,
+  findTrainerInviteByEmail,
+  claimTrainerInvite,
+  createTrainerRecord,
+} from '../../services/userService'
 import { useAuth } from '../../store/AuthContext'
 
-/**
- * /auth/callback
- *
- * Supabase redirects here after a magic link click.
- * The URL hash contains the access_token + refresh_token.
- * Supabase JS client picks these up automatically via onAuthStateChange.
- *
- * Flow:
- *  1. Wait for Supabase to establish the session from the URL hash
- *  2. Check if user exists in the "users" table
- *  3. Existing user → redirect to role-based dashboard
- *  4. New user → redirect to /create-gym (onboarding)
- */
 export default function AuthCallbackPage() {
-  const [status, setStatus] = useState('processing') // 'processing' | 'error'
+  const [status, setStatus]   = useState('processing') // 'processing' | 'error'
   const [errorMsg, setErrorMsg] = useState('')
-  const navigate = useNavigate()
+  const navigate    = useNavigate()
   const { refreshProfile } = useAuth()
 
   useEffect(() => {
@@ -29,18 +23,10 @@ export default function AuthCallbackPage() {
 
   async function handleCallback() {
     try {
-      // Supabase automatically picks up the token from the URL hash
-      // when using PKCE flow. For implicit/hash flow, we may need to
-      // explicitly exchange the hash. getSession() handles both.
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-      if (sessionError) {
-        throw sessionError
-      }
+      if (sessionError) throw sessionError
 
       if (!session) {
-        // Session not yet available — listen for auth state change
-        // This handles the case where the token exchange is async
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, newSession) => {
             if (event === 'SIGNED_IN' && newSession) {
@@ -49,18 +35,14 @@ export default function AuthCallbackPage() {
             }
           }
         )
-
-        // Timeout after 10 seconds
         setTimeout(() => {
           subscription.unsubscribe()
           setStatus('error')
           setErrorMsg('Login timed out. Please try again.')
         }, 10000)
-
         return
       }
 
-      // Session already available
       await routeUser(session.user)
     } catch (err) {
       console.error('Auth callback error:', err)
@@ -71,24 +53,74 @@ export default function AuthCallbackPage() {
 
   async function routeUser(user) {
     try {
-      // Refresh the AuthContext so it picks up the new session
       await refreshProfile()
-
-      // Check if user has a profile in the users table
       const profile = await fetchUserProfile(user.id)
 
-      if (profile) {
-        // ── Existing user → redirect to their dashboard ──
-        const roleRoutes = {
-          owner: '/owner-dashboard',
-          trainer: '/trainer-dashboard',
-          member: '/member-app',
+      if (!profile) {
+        // ── Auto-detect member or trainer by email ──────────────────────────
+        if (user.email) {
+          // 1. Check if this email belongs to a gym member
+          const memberRecord = await findMemberByEmail(user.email)
+          if (memberRecord) {
+            await createUserProfile({
+              authId: user.id,
+              name: memberRecord.name,
+              email: user.email,
+              phone: memberRecord.phone || null,
+              role: 'member',
+              gymId: memberRecord.gym_id,
+            })
+            await refreshProfile()
+            navigate('/member-app', { replace: true })
+            return
+          }
+
+          // 2. Check if this email matches an unclaimed trainer invite
+          const trainerInvite = await findTrainerInviteByEmail(user.email)
+          if (trainerInvite) {
+            await createUserProfile({
+              authId: user.id,
+              name: trainerInvite.name,
+              email: user.email,
+              phone: trainerInvite.phone || null,
+              role: 'trainer',
+              gymId: trainerInvite.gym_id,
+            })
+            await Promise.all([
+              claimTrainerInvite(trainerInvite.id),
+              createTrainerRecord({ authId: user.id, gymId: trainerInvite.gym_id }),
+            ])
+            await refreshProfile()
+            navigate('/trainer-dashboard', { replace: true })
+            return
+          }
         }
-        navigate(roleRoutes[profile.role] || '/owner-dashboard', { replace: true })
-      } else {
-        // ── New user → onboarding ──
-        navigate('/create-gym', { replace: true })
+
+        // 3. Email not found in any gym — sign them out and show a clear error
+        await supabase.auth.signOut()
+        setStatus('error')
+        setErrorMsg('Your email is not registered with any gym. Ask your gym owner to add your email, then try again.')
+        return
       }
+
+      // ── Existing user — route by role ────────────────────────────────────
+      if (profile.role === 'owner') {
+        const step = profile.onboarding_step
+        if (step === 'subscribed') {
+          navigate('/owner-dashboard', { replace: true })
+        } else if (step === 'setup_done' || step === 'gym_created') {
+          navigate('/billing', { replace: true })
+        } else {
+          navigate('/create-gym', { replace: true })
+        }
+        return
+      }
+
+      const roleRoutes = {
+        trainer: '/trainer-dashboard',
+        member: '/member-app',
+      }
+      navigate(roleRoutes[profile.role] || '/owner-dashboard', { replace: true })
     } catch (err) {
       console.error('Route user error:', err)
       setStatus('error')
@@ -107,10 +139,7 @@ export default function AuthCallbackPage() {
           </div>
           <h2 className="text-lg font-bold text-gray-900 mb-2">Login failed</h2>
           <p className="text-sm text-gray-500 mb-6">{errorMsg}</p>
-          <a
-            href="/login"
-            className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-violet-600 to-blue-500 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity text-sm"
-          >
+          <a href="/login" className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity text-sm">
             Back to Login
           </a>
         </div>
@@ -118,7 +147,6 @@ export default function AuthCallbackPage() {
     )
   }
 
-  // Processing state
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="text-center">

@@ -57,7 +57,7 @@ const PLANS = [
 ]
 
 export default function BillingPage() {
-  const { profile, subscription, hasActiveSubscription, isAuthenticated, isOnboarded, loading, refreshProfile } = useAuth()
+  const { profile, subscription, hasActiveSubscription, isAuthenticated, gymId, loading, refreshProfile } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -80,13 +80,12 @@ export default function BillingPage() {
     }
   }, [searchParams])
 
-  // Not authenticated → signup
   if (!loading && !isAuthenticated) {
-    return <Navigate to="/signup" replace />
+    return <Navigate to="/login" replace />
   }
 
-  // Not onboarded → create gym
-  if (!loading && !isOnboarded) {
+  // No gym created yet
+  if (!loading && !gymId) {
     return <Navigate to="/create-gym" replace />
   }
 
@@ -242,7 +241,7 @@ export default function BillingPage() {
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
       <div className="max-w-4xl mx-auto">
-        {!isExpired && <OnboardingProgress currentStep={4} />}
+        {!isExpired && <OnboardingProgress currentStep={3} />}
 
         {/* Header */}
         <div className="text-center mb-10">
