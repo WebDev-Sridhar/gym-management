@@ -98,6 +98,7 @@ async function processMemberReminders(supabase: SupabaseClient) {
     .select('id, gym_id, name, phone, expiry_date, plan:plans(id, name, price)')
     .in('expiry_date', targets)
     .eq('status', 'active')
+    .is('deleted_at', null)
 
   if (error) throw error
   stats.found = members?.length ?? 0

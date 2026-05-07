@@ -3,13 +3,16 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { fetchContactMessages, markMessageRead, markAllMessagesRead } from '../../services/contactService'
 
+
 const routeTitles = {
   '/owner-dashboard': 'Dashboard',
   '/trainer-dashboard': 'Trainer Dashboard',
 }
 
 function timeAgo(iso) {
-  const ms = Date.now() - new Date(iso).getTime()
+  if (!iso) return ''
+  const s = iso.endsWith('Z') || iso.includes('+') || iso.includes('-', 10) ? iso : iso + 'Z'
+  const ms = Date.now() - new Date(s).getTime()
   const m = Math.floor(ms / 60000)
   if (m < 1)  return 'just now'
   if (m < 60) return `${m}m ago`
@@ -61,9 +64,8 @@ export default function Topbar({ title }) {
   }, [panelOpen])
 
   async function handleClearAll() {
-    if (unread === 0) return
     await markAllMessagesRead(gymId).catch(() => {})
-    setEnquiries(prev => prev.map(e => ({ ...e, read: true })))
+    setEnquiries([])
   }
 
   async function handleEnquiryClick(msg) {
@@ -149,7 +151,7 @@ export default function Topbar({ title }) {
                 )}
               </div>
               <div className="flex items-center gap-1">
-                {unread > 0 && (
+                {enquiries.length > 0 && (
                   <button onClick={handleClearAll}
                     className="px-2.5 py-1 text-[11px] font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
                     Clear all

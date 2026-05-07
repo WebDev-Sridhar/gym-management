@@ -68,6 +68,7 @@ export async function fetchMembers(gymId) {
     .from('members')
     .select('*, plan:plans(id, name, price, duration_days)')
     .eq('gym_id', gymId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -75,6 +76,35 @@ export async function fetchMembers(gymId) {
 }
 
 export async function createMember({ gymId, name, phone, email }) {
+  // Check for a soft-deleted member with the same phone or email — revive instead of duplicate
+  let existingId = null
+  if (phone || email) {
+    let q = supabase.from('members').select('id').eq('gym_id', gymId).not('deleted_at', 'is', null)
+    if (phone) q = q.eq('phone', phone)
+    else q = q.eq('email', email)
+    const { data: existing } = await q.limit(1).maybeSingle()
+    existingId = existing?.id ?? null
+  }
+
+  if (existingId) {
+    // Revive: clear deleted_at, update details, reset to inactive
+    const { data, error } = await supabase
+      .from('members')
+      .update({
+        name,
+        phone: phone || null,
+        email: email || null,
+        status: 'inactive',
+        deleted_at: null,
+        join_date: new Date().toISOString().split('T')[0],
+      })
+      .eq('id', existingId)
+      .select('*, plan:plans(id, name, price, duration_days)')
+      .single()
+    if (error) throw error
+    return data
+  }
+
   const { data, error } = await supabase
     .from('members')
     .insert({
@@ -132,7 +162,7 @@ export async function updateMember({ memberId, name, phone, email }) {
 export async function deleteMember(memberId) {
   const { error } = await supabase
     .from('members')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', memberId)
 
   if (error) throw error
@@ -145,9 +175,9 @@ export async function fetchDashboardStats(gymId) {
   const fiveDaysFromNow = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
   const [membersRes, activeRes, expiringRes, revenueRes, todayCheckinsRes] = await Promise.all([
-    supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId),
-    supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active'),
-    supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active').gte('expiry_date', today).lte('expiry_date', fiveDaysFromNow),
+    supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).is('deleted_at', null),
+    supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active').is('deleted_at', null),
+    supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active').gte('expiry_date', today).lte('expiry_date', fiveDaysFromNow).is('deleted_at', null),
     supabase.from('payments').select('amount').eq('gym_id', gymId).eq('status', 'paid'),
     supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).gte('check_in', today),
   ])
@@ -165,8 +195,8 @@ export async function fetchDashboardStats(gymId) {
 
 export async function fetchRecentActivity(gymId) {
   const [recentMembers, recentPayments, recentCheckins] = await Promise.all([
-    supabase.from('members').select('id, name, created_at').eq('gym_id', gymId).order('created_at', { ascending: false }).limit(5),
-    supabase.from('payments').select('id, amount, status, payment_date, member:members(name)').eq('gym_id', gymId).order('created_at', { ascending: false }).limit(5),
+    supabase.from('members').select('id, name, created_at').eq('gym_id', gymId).is('deleted_at', null).order('created_at', { ascending: false }).limit(5),
+    supabase.from('payments').select('id, amount, status, paid_at, member:members(name)').eq('gym_id', gymId).eq('status', 'paid').order('paid_at', { ascending: false }).limit(5),
     supabase.from('attendance').select('id, check_in, member:members(name)').eq('gym_id', gymId).order('check_in', { ascending: false }).limit(5),
   ])
 
@@ -177,9 +207,7 @@ export async function fetchRecentActivity(gymId) {
   }
   for (const p of recentPayments.data || []) {
     const name = p.member?.name || 'Unknown'
-    if (p.status === 'paid') {
-      activities.push({ text: `Payment received from ${name} — \u20B9${Number(p.amount).toLocaleString('en-IN')}`, time: p.payment_date, type: 'payment' })
-    }
+    activities.push({ text: `Payment received from ${name} — ₹${Number(p.amount).toLocaleString('en-IN')}`, time: p.paid_at, type: 'payment' })
   }
   for (const c of recentCheckins.data || []) {
     const name = c.member?.name || 'Unknown'

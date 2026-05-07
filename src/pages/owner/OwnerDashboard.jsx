@@ -4,7 +4,11 @@ import { useNavigate } from 'react-router-dom'
 import { fetchDashboardStats, fetchRecentActivity } from '../../services/membershipService'
 
 function timeAgo(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime()
+  if (!dateStr) return ''
+  // Supabase may return timestamps without timezone suffix — treat them as UTC
+  const s = dateStr.endsWith('Z') || dateStr.includes('+') || dateStr.includes('-', 10)
+    ? dateStr : dateStr + 'Z'
+  const diff = Date.now() - new Date(s).getTime()
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'just now'
   if (mins < 60) return `${mins} min ago`

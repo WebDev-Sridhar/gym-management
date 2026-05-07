@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import imageCompression from 'browser-image-compression'
 import { useAuth } from '../../store/AuthContext'
 import { supabaseData } from '../../services/supabaseClient'
 import { fetchGymDetails, updateGymDetails } from '../../services/membershipService'
@@ -344,14 +345,19 @@ function InlineForm({ title, children, onCancel, onSave, saving }) {
 }
 
 // ─── Theme Panel ────────────────────────────────────────────────────────────────
+const LOGO_COMPRESS_OPTS = { maxSizeMB: 0.15, maxWidthOrHeight: 400, fileType: 'image/webp', useWebWorker: true }
+
 function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
   const dialog = useDialog()
+  const logoInputRef = useRef(null)
   const [name, setName] = useState(gym?.name || '')
   const [city, setCity] = useState(gym?.city || '')
   const [description, setDescription] = useState(gym?.description || '')
   const [themeColor, setThemeColor] = useState(gym?.theme_color || '#8B5CF6')
   const [secondaryColor, setSecondaryColor] = useState(gym?.secondary_color || '#6366F1')
   const [themeMode, setThemeMode] = useState(gym?.theme_mode || 'dark')
+  const [logoUrl, setLogoUrl] = useState(gym?.logo_url || '')
+  const [logoUploading, setLogoUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
 
@@ -366,12 +372,48 @@ function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
   function handleSecondaryColor(val) { setSecondaryColor(val); pushOverride({ secondary_color: val }) }
   function handleThemeMode(val)      { setThemeMode(val);      pushOverride({ theme_mode:      val }) }
 
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoUploading(true)
+    try {
+      const compressed = await imageCompression(file, LOGO_COMPRESS_OPTS)
+      // Fixed path with upsert — always replaces the single logo file
+      const path = `gyms/${gymId}/logo/logo.webp`
+      const { error } = await supabaseData.storage
+        .from('gym-images')
+        .upload(path, compressed, { upsert: true, contentType: 'image/webp' })
+      if (error) throw error
+      const { data } = supabaseData.storage.from('gym-images').getPublicUrl(path)
+      // Bust cache with timestamp so new logo shows immediately
+      const bustedUrl = `${data.publicUrl}?v=${Date.now()}`
+      setLogoUrl(bustedUrl)
+    } catch (err) {
+      dialog.alert('Logo upload failed: ' + err.message)
+    } finally {
+      setLogoUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  async function handleRemoveLogo() {
+    if (!logoUrl) return
+    if (!await dialog.confirm('Remove the logo?')) return
+    setLogoUrl('')
+  }
+
   async function handleSave(e) {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true); setSuccess('')
     try {
-      const updated = await updateGymDetails({ gymId, name: name.trim(), city: city.trim(), description: description.trim(), theme_color: themeColor, secondary_color: secondaryColor, theme_mode: themeMode })
+      // Strip cache-bust param before saving to DB
+      const cleanLogoUrl = logoUrl ? logoUrl.split('?')[0] : ''
+      const updated = await updateGymDetails({
+        gymId, name: name.trim(), city: city.trim(), description: description.trim(),
+        theme_color: themeColor, secondary_color: secondaryColor, theme_mode: themeMode,
+        logo_url: cleanLogoUrl || null,
+      })
       onSave(updated)
       setSuccess('Saved!')
       setTimeout(() => setSuccess(''), 3000)
@@ -381,6 +423,42 @@ function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
   return (
     <form onSubmit={handleSave} className="space-y-5">
       <SectionHeader title="Theme Settings" description="Brand identity shown across your public gym website." />
+
+      {/* Logo upload */}
+      <Field label="Gym Logo">
+        <div className="flex items-center gap-4 mt-1">
+          {/* Preview / placeholder */}
+          <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 18h16.5M3 12V6.75A2.25 2.25 0 015.25 4.5h13.5A2.25 2.25 0 0121 6.75V18" />
+              </svg>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+            <button type="button" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors cursor-pointer disabled:opacity-50">
+              {logoUploading ? (
+                <><span className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />Uploading…</>
+              ) : (
+                <>{logoUrl ? 'Replace Logo' : 'Upload Logo'}</>
+              )}
+            </button>
+            {logoUrl && (
+              <button type="button" onClick={handleRemoveLogo}
+                className="text-xs text-red-500 hover:text-red-700 text-left transition-colors cursor-pointer">
+                Remove logo
+              </button>
+            )}
+            <p className="text-xs text-gray-400">PNG, JPG, SVG · Max 5 MB</p>
+          </div>
+        </div>
+      </Field>
+
       <Field label="Gym Name" required>
         <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Iron Paradise Fitness" className={inputCls} required />
       </Field>
@@ -437,9 +515,13 @@ function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
       </Field>
 
       <div className="rounded-xl px-4 py-3 flex items-center gap-3" style={{ backgroundColor: themeColor + '15' }}>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white text-xs font-bold" style={{ backgroundColor: themeColor }}>
-          {(name || 'G').charAt(0).toUpperCase()}
-        </div>
+        {logoUrl ? (
+          <img src={logoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-contain shrink-0" />
+        ) : (
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white text-xs font-bold" style={{ backgroundColor: themeColor }}>
+            {(name || 'G').charAt(0).toUpperCase()}
+          </div>
+        )}
         <div>
           <p className="text-sm font-semibold" style={{ color: themeColor }}>{name || 'Your Gym Name'}</p>
           <p className="text-xs text-gray-400">Color preview</p>
@@ -2337,8 +2419,10 @@ export default function WebsitePage() {
           style={{
             width: sidebarCollapsed ? 0 : '12rem',
             minWidth: 0,
+            overflow: 'hidden',
             height: 'calc(100vh - 8.5rem)',
-            transition: 'width 0.25s ease',
+            transition: 'width 0.25s ease, transform 0.25s ease',
+            transform: sidebarCollapsed ? 'translateX(-100%)' : 'translateX(0)',
           }}
         >
           <div className="cms-sidebar-inner w-48 h-full overflow-y-auto overscroll-contain">

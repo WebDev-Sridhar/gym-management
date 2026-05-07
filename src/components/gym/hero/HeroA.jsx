@@ -60,10 +60,10 @@ export default function HeroA({ data }) {
             'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.85) 100%)'
         }}
       />
-      <div
+      {/* <div
         className="absolute inset-0 opacity-10"
         style={{ background: 'var(--gym-gradient-diagonal)' }}
-      />
+      /> */}
 
       {/* Content */}
       <motion.div

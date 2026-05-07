@@ -202,13 +202,12 @@ export default function CommunicationPage() {
                   {/* Unread dot */}
                   <div className={`w-2 h-2 rounded-full shrink-0 ${!msg.read ? 'bg-violet-500' : 'bg-transparent'}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className={`text-sm truncate ${!msg.read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
-                        {msg.name}
-                      </p>
-                      <span className="text-xs text-gray-400 shrink-0">{msg.email}</span>
-                      {msg.phone && <span className="text-xs text-gray-400 shrink-0">{msg.phone}</span>}
-                    </div>
+                    <p className={`text-sm truncate ${!msg.read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                      {msg.name}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate mt-0.5">
+                      {msg.email}{msg.phone ? ` · ${msg.phone}` : ''}
+                    </p>
                     <p className="text-xs text-gray-500 truncate mt-0.5">{msg.message}</p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">

@@ -148,6 +148,7 @@ async function activateMember(supabase: SupabaseClient, memberId: string, planId
     ...(existing?.join_date ? {} : { join_date: now.toISOString().slice(0, 10) }),
     expiry_date: expiry.toISOString().slice(0, 10),
     status: 'active',
+    deleted_at: null,   // revive soft-deleted members who re-join via public checkout
   }).eq('id', memberId)
 }
 

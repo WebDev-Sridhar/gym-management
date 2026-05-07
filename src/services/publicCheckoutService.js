@@ -7,9 +7,9 @@
 
 import { supabaseAnon as supabase } from './supabaseClient'
 
-export async function createPublicOrder({ gymSlug, planId, name, phone, email }) {
+export async function createPublicOrder({ gymSlug, planId, name, phone, email, memberId }) {
   const { data, error } = await supabase.functions.invoke('create-public-order', {
-    body: { gymSlug, planId, name, phone, email },
+    body: { gymSlug, planId, name, phone, email, memberId },
   })
   // Check data.error first — Supabase sets both data + error on non-2xx responses,
   // so data still contains the JSON body with our specific error code.

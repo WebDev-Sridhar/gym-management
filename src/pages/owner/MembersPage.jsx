@@ -156,7 +156,7 @@ export default function MembersPage() {
   }
 
   async function handleDelete(memberId) {
-    if (!await dialog.confirm('Remove this member?')) return
+    if (!await dialog.confirm('Remove this member from the list? Their payment history and attendance records will be preserved.')) return
     try {
       await deleteMember(memberId)
       setMembers((prev) => prev.filter((m) => m.id !== memberId))
@@ -170,7 +170,7 @@ export default function MembersPage() {
     if (!member.expiry_date) return member.status || 'inactive'
     const today = new Date().toISOString().split('T')[0]
     if (member.expiry_date < today) return 'expired'
-    return 'active'
+    return member.status || 'active'
   }
 
   function daysLeft(expiryDate) {

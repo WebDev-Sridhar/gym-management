@@ -16,7 +16,7 @@ export async function fetchMyMember({ gymId, phone, email }) {
     email
       ? base.eq('email', email)
       : base.eq('phone', phone)
-  ).maybeSingle()
+  ).is('deleted_at', null).limit(1).maybeSingle()
 
   if (error) throw error
   return data
