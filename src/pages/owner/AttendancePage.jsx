@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../../store/AuthContext'
-import { fetchAttendance, fetchAttendanceSummary, manualCheckin, fetchMembers } from '../../services/membershipService'
+import { fetchAttendance, fetchAttendanceSummary, manualCheckin, fetchMembers, fetchGymDetails } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
 
@@ -17,12 +17,15 @@ export default function AttendancePage() {
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
+  const [gymName, setGymName] = useState('')
   const qrRef = useRef(null)
 
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
     setLoading(true)
     let cancelled = false
+
+    fetchGymDetails(gymId).then(g => { if (!cancelled && g) setGymName(g.name || '') }).catch(() => {})
 
     Promise.all([
       fetchAttendance(gymId, selectedDate),
@@ -92,25 +95,97 @@ export default function AttendancePage() {
   const checkinUrl = `${window.location.origin}/checkin?gymId=${gymId}`
 
   function downloadQR() {
-    // Serialise the rendered SVG and trigger a PNG download
     const svg = qrRef.current?.querySelector('svg')
     if (!svg) return
-    const SIZE = 512
+
+    const W = 600, H = 820
+    const QR = 280
+
     const xml = new XMLSerializer().serializeToString(svg)
-    const img = new Image()
-    img.onload = () => {
+    const qrImg = new Image()
+    qrImg.onload = () => {
       const canvas = document.createElement('canvas')
-      canvas.width = SIZE; canvas.height = SIZE
+      canvas.width = W; canvas.height = H
       const ctx = canvas.getContext('2d')
+
+      // Background
+      const bg = ctx.createLinearGradient(0, 0, 0, H)
+      bg.addColorStop(0, '#0e0f2a')
+      bg.addColorStop(1, '#1a1040')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, W, H)
+
+      // Top accent bar
+      const bar = ctx.createLinearGradient(0, 0, W, 0)
+      bar.addColorStop(0, '#6366f1')
+      bar.addColorStop(1, '#8b5cf6')
+      ctx.fillStyle = bar
+      ctx.fillRect(0, 0, W, 6)
+
+      // Gym name
       ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, SIZE, SIZE)
-      ctx.drawImage(img, 0, 0, SIZE, SIZE)
+      ctx.font = 'bold 38px system-ui, -apple-system, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(gymName || 'Gym Check-in', W / 2, 90)
+
+      // Tagline
+      ctx.fillStyle = 'rgba(255,255,255,0.45)'
+      ctx.font = '18px system-ui, -apple-system, sans-serif'
+      ctx.fillText('Scan to mark your attendance', W / 2, 128)
+
+      // QR white card
+      const cx = (W - QR) / 2, cy = 168
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.roundRect(cx - 24, cy - 24, QR + 48, QR + 48, 20)
+      ctx.fill()
+
+      // QR image
+      ctx.drawImage(qrImg, cx, cy, QR, QR)
+
+      // Divider
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(60, cy + QR + 60); ctx.lineTo(W - 60, cy + QR + 60)
+      ctx.stroke()
+
+      // Steps
+      const steps = [
+        { n: '1', text: 'Open your phone camera' },
+        { n: '2', text: 'Point at the QR code' },
+        { n: '3', text: 'Tap the link to check in' },
+      ]
+      let sy = cy + QR + 96
+      ctx.font = 'bold 15px system-ui, -apple-system, sans-serif'
+      steps.forEach(({ n, text }) => {
+        // Number circle
+        ctx.fillStyle = 'rgba(99,102,241,0.25)'
+        ctx.beginPath(); ctx.arc(W / 2 - 110, sy - 5, 14, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = '#818cf8'
+        ctx.font = 'bold 13px system-ui'
+        ctx.textAlign = 'center'
+        ctx.fillText(n, W / 2 - 110, sy)
+        // Text
+        ctx.fillStyle = 'rgba(255,255,255,0.65)'
+        ctx.font = '15px system-ui, -apple-system, sans-serif'
+        ctx.textAlign = 'left'
+        ctx.fillText(text, W / 2 - 88, sy)
+        sy += 38
+      })
+
+      // Footer
+      ctx.fillStyle = 'rgba(255,255,255,0.2)'
+      ctx.font = '13px system-ui, -apple-system, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('Powered by Gymmobius', W / 2, H - 28)
+
       const a = document.createElement('a')
-      a.download = 'gym-checkin-qr.png'
+      a.download = `${(gymName || 'gym').toLowerCase().replace(/\s+/g, '-')}-checkin-qr.png`
       a.href = canvas.toDataURL('image/png')
       a.click()
     }
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)))
+    qrImg.src = 'data:image/svg+xml;base64,' + btoa(encodeURIComponent(xml).replace(/%([0-9A-F]{2})/g, (_, p) => String.fromCharCode(parseInt(p, 16))))
   }
 
   return (
@@ -142,37 +217,109 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* QR Code card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          {/* QR */}
-          <div ref={qrRef} className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm shrink-0">
-            <QRCodeSVG value={checkinUrl} size={120} level="M" marginSize={0} />
+      {/* QR Code banner card */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Member Check-in QR Code</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Display at your gym entrance — members scan to check in instantly, no app needed.</p>
           </div>
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 mb-1">Member Check-in QR Code</p>
-            <p className="text-xs text-gray-500 mb-3 leading-relaxed">
-              Print or display this QR code at your gym entrance. Members scan it with their phone camera to check in instantly — no app needed.
-            </p>
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 mb-4">
-              <span className="text-xs text-gray-500 font-mono truncate flex-1">{checkinUrl}</span>
-              <button
-                onClick={() => { navigator.clipboard.writeText(checkinUrl) }}
-                className="text-xs font-semibold text-violet-600 hover:text-violet-800 shrink-0 cursor-pointer transition-colors"
-              >
-                Copy
-              </button>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => navigator.clipboard.writeText(checkinUrl)}
+              className="px-3 py-1.5 text-xs font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors cursor-pointer"
+            >
+              Copy Link
+            </button>
             <button
               onClick={downloadQR}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 transition-colors cursor-pointer"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Download PNG
+              Download Banner
             </button>
+          </div>
+        </div>
+
+        {/* Banner preview + instructions side by side */}
+        <div className="flex flex-col md:flex-row gap-0">
+
+          {/* Left — banner preview */}
+          <div className="flex items-center justify-center p-8 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-100 md:w-72 shrink-0">
+            <div style={{ width: 240, background: 'linear-gradient(160deg,#0e0f2a,#1a1040)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
+              <div style={{ height: 4, background: 'linear-gradient(90deg,#6366f1,#8b5cf6)' }} />
+              <div style={{ padding: '18px 18px 20px', textAlign: 'center' }}>
+                <p style={{ color: '#fff', fontWeight: 800, fontSize: 14, marginBottom: 3, letterSpacing: '-0.2px' }}>
+                  {gymName || 'Gym Check-in'}
+                </p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginBottom: 14 }}>
+                  Scan to mark your attendance
+                </p>
+                <div ref={qrRef} style={{ display: 'inline-block', background: '#fff', padding: 8, borderRadius: 8 }}>
+                  <QRCodeSVG value={checkinUrl} size={110} level="M" marginSize={0} />
+                </div>
+                <div style={{ marginTop: 14, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {[['1','Open phone camera'],['2','Point at QR code'],['3','Tap link to check in']].map(([n, t]) => (
+                    <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <div style={{ width: 17, height: 17, borderRadius: '50%', background: 'rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ color: '#818cf8', fontSize: 9, fontWeight: 800 }}>{n}</span>
+                      </div>
+                      <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10 }}>{t}</span>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.15)', fontSize: 8, marginTop: 14 }}>Powered by Gymmobius</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Right — instructions */}
+          <div className="flex-1 p-8">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">How to set up member check-in</h3>
+            <p className="text-xs text-gray-500 mb-6">Follow these steps to get your gym entrance ready for QR-based attendance.</p>
+
+            <ol className="space-y-5">
+              {[
+                {
+                  title: 'Download the banner',
+                  desc: 'Click "Download Banner" above to save a high-resolution 600×820 PNG. The banner includes your gym name, QR code, and instructions for members.',
+                },
+                {
+                  title: 'Print and display',
+                  desc: 'Print on A4 or A5 paper and place it at your reception desk, entrance gate, or gym floor. Laminating it keeps it durable. You can also display it on a tablet or TV screen.',
+                },
+                {
+                  title: 'Members scan with any camera',
+                  desc: 'No app download needed. Members open their phone camera, point at the QR code, and tap the link. If they\'re already signed in, check-in happens in one tap.',
+                },
+                {
+                  title: 'First-time members sign in once',
+                  desc: 'New members will be prompted to sign in the first time. After that, the session is remembered — every future scan is a single tap.',
+                },
+                {
+                  title: 'Attendance is recorded instantly',
+                  desc: 'Each check-in appears on this page in real time. A 1-hour cooldown prevents accidental double check-ins. You can also mark check-ins manually using the "+ Mark Check-in" button.',
+                },
+              ].map(({ title, desc }, i) => (
+                <li key={i} className="flex gap-4">
+                  <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs shrink-0 mt-0.5">
+                    {i + 1}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <div className="mt-6 p-3 bg-violet-50 border border-violet-100 rounded-lg">
+              <p className="text-xs text-violet-700 font-medium">
+                You can also share the check-in link directly via WhatsApp — members bookmark it and tap to check in anytime.
+              </p>
+            </div>
           </div>
         </div>
       </div>
