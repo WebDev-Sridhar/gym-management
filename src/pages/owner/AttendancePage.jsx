@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchAttendance, fetchAttendanceSummary, manualCheckin, fetchMembers } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
@@ -16,6 +17,7 @@ export default function AttendancePage() {
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
+  const qrRef = useRef(null)
 
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
@@ -87,6 +89,30 @@ export default function AttendancePage() {
     )
   }
 
+  const checkinUrl = `${window.location.origin}/checkin?gymId=${gymId}`
+
+  function downloadQR() {
+    // Serialise the rendered SVG and trigger a PNG download
+    const svg = qrRef.current?.querySelector('svg')
+    if (!svg) return
+    const SIZE = 512
+    const xml = new XMLSerializer().serializeToString(svg)
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = SIZE; canvas.height = SIZE
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, SIZE, SIZE)
+      ctx.drawImage(img, 0, 0, SIZE, SIZE)
+      const a = document.createElement('a')
+      a.download = 'gym-checkin-qr.png'
+      a.href = canvas.toDataURL('image/png')
+      a.click()
+    }
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)))
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -113,6 +139,41 @@ export default function AttendancePage() {
               {showCheckin ? 'Cancel' : '+ Mark Check-in'}
             </button>
           )}
+        </div>
+      </div>
+
+      {/* QR Code card */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+          {/* QR */}
+          <div ref={qrRef} className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm shrink-0">
+            <QRCodeSVG value={checkinUrl} size={120} level="M" marginSize={0} />
+          </div>
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900 mb-1">Member Check-in QR Code</p>
+            <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+              Print or display this QR code at your gym entrance. Members scan it with their phone camera to check in instantly — no app needed.
+            </p>
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 mb-4">
+              <span className="text-xs text-gray-500 font-mono truncate flex-1">{checkinUrl}</span>
+              <button
+                onClick={() => { navigator.clipboard.writeText(checkinUrl) }}
+                className="text-xs font-semibold text-violet-600 hover:text-violet-800 shrink-0 cursor-pointer transition-colors"
+              >
+                Copy
+              </button>
+            </div>
+            <button
+              onClick={downloadQR}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download PNG
+            </button>
+          </div>
         </div>
       </div>
 
