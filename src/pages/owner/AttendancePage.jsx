@@ -4,6 +4,7 @@ import { useAuth } from '../../store/AuthContext'
 import { fetchAttendance, fetchAttendanceSummary, manualCheckin, fetchMembers, fetchGymDetails } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
+import Pagination from '../../components/ui/Pagination'
 
 export default function AttendancePage() {
   const dialog = useDialog()
@@ -17,6 +18,8 @@ export default function AttendancePage() {
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
   const [gymName, setGymName] = useState('')
   const [gymLogo, setGymLogo] = useState('')
   const [bannerOpen, setBannerOpen] = useState(true)
@@ -76,6 +79,9 @@ export default function AttendancePage() {
     const q = search.toLowerCase()
     return (c.member?.name || '').toLowerCase().includes(q) || (c.member?.phone || '').includes(q)
   })
+  const totalPages = Math.max(1, Math.ceil(filteredCheckins.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pagedCheckins = filteredCheckins.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   // Last 7 days for the bar chart
   const last7Days = []
@@ -402,7 +408,7 @@ export default function AttendancePage() {
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
           placeholder="Search check-ins..."
           className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 w-full sm:w-64"
         />
@@ -432,7 +438,7 @@ export default function AttendancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredCheckins.map((checkin) => (
+                {pagedCheckins.map((checkin) => (
                   <tr key={checkin.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -455,6 +461,7 @@ export default function AttendancePage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={safePage} totalPages={totalPages} total={filteredCheckins.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </div>
       )}
     </div>

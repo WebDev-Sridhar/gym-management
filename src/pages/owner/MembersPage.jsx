@@ -5,6 +5,7 @@ import { fetchTrainers, assignTrainerToMember } from '../../services/trainerServ
 import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
 import MemberDrawer from '../../components/ui/MemberDrawer'
+import Pagination from '../../components/ui/Pagination'
 
 export default function MembersPage() {
   const dialog = useDialog()
@@ -20,6 +21,8 @@ export default function MembersPage() {
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [drawerMember, setDrawerMember] = useState(null)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
 
   // Add member form
   const [newName, setNewName] = useState('')
@@ -186,6 +189,9 @@ export default function MembersPage() {
     }
     return true
   })
+  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pagedMembers = filteredMembers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const counts = {
     all: members.length,
@@ -264,12 +270,12 @@ export default function MembersPage() {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
           {(['all', 'active', 'expired', 'inactive']).map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={`px-4 py-2 text-sm font-medium rounded-md transition-all cursor-pointer ${filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            <button key={f} onClick={() => { setFilter(f); setPage(1) }} className={`px-4 py-2 text-sm font-medium rounded-md transition-all cursor-pointer ${filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
               {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
             </button>
           ))}
         </div>
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search members..." className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 w-full sm:w-64" />
+        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search members..." className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 w-full sm:w-64" />
       </div>
 
       {/* Members table */}
@@ -296,7 +302,7 @@ export default function MembersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredMembers.map((member) => {
+                {pagedMembers.map((member) => {
                   const status = getMemberStatus(member)
                   const remaining = daysLeft(member.expiry_date)
 
@@ -405,6 +411,7 @@ export default function MembersPage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={safePage} totalPages={totalPages} total={filteredMembers.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </div>
       )}
 

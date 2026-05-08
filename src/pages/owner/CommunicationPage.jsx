@@ -6,6 +6,7 @@ import {
 } from '../../services/notificationService'
 import { fetchContactMessages, markMessageRead, deleteContactMessage } from '../../services/contactService'
 import { useDialog } from '../../components/ui/Dialog'
+import Pagination from '../../components/ui/Pagination'
 
 const TYPE_LABEL = {
   payment_reminder:     'Payment reminder',
@@ -70,6 +71,9 @@ export default function CommunicationPage() {
   const [testing, setTesting] = useState(null)
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [enquiryPage, setEnquiryPage] = useState(1)
+  const [notifPage, setNotifPage] = useState(1)
+  const PAGE_SIZE = 10
 
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
@@ -106,6 +110,14 @@ export default function CommunicationPage() {
 
   const unread = enquiries.filter(e => !e.read).length
 
+  const enquiryTotalPages = Math.max(1, Math.ceil(enquiries.length / PAGE_SIZE))
+  const safeEnquiryPage = Math.min(enquiryPage, enquiryTotalPages)
+  const pagedEnquiries = enquiries.slice((safeEnquiryPage - 1) * PAGE_SIZE, safeEnquiryPage * PAGE_SIZE)
+
+  const notifTotalPages = Math.max(1, Math.ceil(notifs.length / PAGE_SIZE))
+  const safeNotifPage = Math.min(notifPage, notifTotalPages)
+  const pagedNotifs = notifs.slice((safeNotifPage - 1) * PAGE_SIZE, safeNotifPage * PAGE_SIZE)
+
   async function refreshNotifs() {
     try {
       const n = await fetchNotifications(gymId, {
@@ -119,7 +131,7 @@ export default function CommunicationPage() {
     }
   }
 
-  useEffect(() => { if (!loading) refreshNotifs() }, [filterType, filterStatus])
+  useEffect(() => { if (!loading) { setNotifPage(1); refreshNotifs() } }, [filterType, filterStatus])
 
   async function handleSave() {
     setSaving(true)
@@ -193,8 +205,9 @@ export default function CommunicationPage() {
             <p className="text-xs text-gray-400 mt-1">Messages from your website contact form will appear here.</p>
           </div>
         ) : (
+          <>
           <div className="divide-y divide-gray-50">
-            {enquiries.map(msg => (
+            {pagedEnquiries.map(msg => (
               <div key={msg.id} className={`transition-colors ${!msg.read ? 'bg-violet-50/40' : ''}`}>
                 {/* Row header */}
                 <div className="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-gray-50/60 transition-colors"
@@ -255,6 +268,8 @@ export default function CommunicationPage() {
               </div>
             ))}
           </div>
+          <Pagination page={safeEnquiryPage} totalPages={enquiryTotalPages} total={enquiries.length} pageSize={PAGE_SIZE} onPageChange={setEnquiryPage} />
+          </>
         )}
       </div>
 
@@ -368,7 +383,7 @@ export default function CommunicationPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {notifs.map((n) => (
+                {pagedNotifs.map((n) => (
                   <tr key={n.id} className="hover:bg-gray-50/40 transition-colors">
                     <td className="px-5 py-3 text-sm text-gray-700">{TYPE_LABEL[n.type] || n.type}</td>
                     <td className="px-5 py-3 text-sm text-gray-700">
@@ -382,12 +397,10 @@ export default function CommunicationPage() {
                 ))}
               </tbody>
             </table>
+          <Pagination page={safeNotifPage} totalPages={notifTotalPages} total={notifs.length} pageSize={PAGE_SIZE} onPageChange={setNotifPage} />
           </div>
         )}
       </div>
-
-   
- 
     </div>
   )
 }

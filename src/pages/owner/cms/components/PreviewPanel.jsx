@@ -315,7 +315,7 @@ export default function PreviewPanel({ section, previewData, gym, plans = [], tr
   }
 
   return (
-    <div className="sticky top-6">
+    <div className="md:sticky md:top-6">
       {/* Header bar */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -329,8 +329,8 @@ export default function PreviewPanel({ section, previewData, gym, plans = [], tr
       <div className="w-full rounded-xl border border-gray-200 overflow-hidden bg-gray-900">
         <div
           data-gym-theme={gym?.theme_mode || 'dark'}
-          style={{ ...themeVars, background: 'var(--gym-bg)', height: 'calc(100vh - 190px)', overflowY: 'auto' }}
-          className="md:w-full w-[calc(100vw-50px)]"
+          style={{ ...themeVars, background: 'var(--gym-bg)' }}
+          className="md:w-full w-[calc(100vw-50px)] md:overflow-y-auto md:[height:calc(100vh-190px)]"
         >
           {fontStack && (
             <style>{`.font-display { font-family: ${fontStack} !important; }`}</style>

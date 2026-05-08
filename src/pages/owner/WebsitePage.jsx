@@ -428,9 +428,22 @@ function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
       <Field label="Gym Logo">
         <div className="flex items-center gap-4 mt-1">
           {/* Preview / placeholder */}
-          <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="relative w-20 h-20 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden group">
             {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              <>
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors rounded-2xl" />
+                <button
+                  type="button"
+                  onClick={handleRemoveLogo}
+                  title="Remove logo"
+                  className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-lg bg-red-500 hover:bg-red-600 text-white opacity-100 md:opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </>
             ) : (
               <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 18h16.5M3 12V6.75A2.25 2.25 0 015.25 4.5h13.5A2.25 2.25 0 0121 6.75V18" />
@@ -448,12 +461,6 @@ function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
                 <>{logoUrl ? 'Replace Logo' : 'Upload Logo'}</>
               )}
             </button>
-            {logoUrl && (
-              <button type="button" onClick={handleRemoveLogo}
-                className="text-xs text-red-500 hover:text-red-700 text-left transition-colors cursor-pointer">
-                Remove logo
-              </button>
-            )}
             <p className="text-xs text-gray-400">PNG, JPG, SVG · Max 5 MB</p>
           </div>
         </div>

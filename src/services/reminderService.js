@@ -11,7 +11,14 @@ export async function sendPaymentReminder({ paymentId, memberId, planId, dueDate
   const { data, error } = await supabase.functions.invoke('send-payment-reminder', {
     body: { paymentId, memberId, planId, dueDate },
   })
-  if (error) throw error
+  if (error) {
+    let message = error.message
+    try {
+      const body = await error.context?.json?.()
+      if (body?.error) message = body.error
+    } catch {}
+    throw new Error(message)
+  }
   if (data?.error) throw new Error(data.error)
   return data
 }

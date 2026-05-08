@@ -5,6 +5,7 @@ import { fetchMembers, fetchPlans, fetchGymDetails } from '../../services/member
 import { sendPaymentReminder, fetchLastReminders } from '../../services/reminderService'
 import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
+import Pagination from '../../components/ui/Pagination'
 
 export default function PaymentsPage() {
   const dialog = useDialog()
@@ -23,7 +24,6 @@ export default function PaymentsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [generatedLink, setGeneratedLink] = useState(null)
-  const [whatsappSent, setWhatsappSent] = useState(true)
   const [copied, setCopied] = useState(false)
 
   const [markingId, setMarkingId] = useState(null)
@@ -31,6 +31,8 @@ export default function PaymentsPage() {
   const [filter, setFilter] = useState('all')
   const [lastReminders, setLastReminders] = useState(new Map())
   const [reminderBusyId, setReminderBusyId] = useState(null)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
 
   const memberInputRef = useRef(null)
   const dropdownRef = useRef(null)
@@ -81,7 +83,7 @@ export default function PaymentsPage() {
   }
 
   function resetCollect() {
-    setError(''); setGeneratedLink(null); setWhatsappSent(true); setMemberSearch('')
+    setError(''); setGeneratedLink(null); setMemberSearch('')
     setSelectedMemberId(''); setSelectedPlanId(''); setMemberDropdownOpen(false)
   }
 
@@ -99,7 +101,6 @@ export default function PaymentsPage() {
     try {
       const result = await sendPaymentReminder({ memberId: member.id, planId: plan.id })
       setGeneratedLink(result.payLink)
-      setWhatsappSent(result.whatsappSent !== false)
       const [updated, reminders] = await Promise.all([
         fetchPayments(gymId),
         fetchLastReminders(gymId).catch(() => new Map()),
@@ -116,14 +117,14 @@ export default function PaymentsPage() {
   async function handleSendReminder(paymentId) {
     setReminderBusyId(paymentId)
     try {
-      await sendPaymentReminder({ paymentId })
+      const result = await sendPaymentReminder({ paymentId })
       const [updated, reminders] = await Promise.all([
         fetchPayments(gymId),
         fetchLastReminders(gymId).catch(() => new Map()),
       ])
       setPayments(updated)
       setLastReminders(reminders)
-      dialog.alert('Reminder sent on WhatsApp')
+      dialog.alert('Reminder sent')
     } catch (err) {
       dialog.alert(err.message || 'Failed to send reminder')
     } finally {
@@ -155,6 +156,9 @@ export default function PaymentsPage() {
   }
 
   const filteredPayments = payments.filter((p) => filter === 'all' || p.status === filter)
+  const totalPages = Math.max(1, Math.ceil(filteredPayments.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pagedPayments = filteredPayments.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
   const counts = {
     all: payments.length,
     pending: payments.filter((p) => p.status === 'pending').length,
@@ -345,41 +349,24 @@ export default function PaymentsPage() {
 
             {/* Generated link panel */}
             {generatedLink && (
-              <div className={`rounded-lg p-4 border ${whatsappSent ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+              <div className="rounded-lg p-4 border bg-green-50 border-green-200">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${whatsappSent ? 'bg-green-500' : 'bg-amber-500'}`}>
-                    {whatsappSent ? (
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                    )}
+                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shrink-0">
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
                   </div>
-                  <div>
-                    <p className={`text-sm font-medium ${whatsappSent ? 'text-green-800' : 'text-amber-800'}`}>
-                      {whatsappSent
-                        ? (gym?.payment_mode === 'razorpay' ? 'Payment link created & sent via WhatsApp' : 'UPI pay page created & sent via WhatsApp')
-                        : 'Payment link created — WhatsApp not configured'}
-                    </p>
-                    {!whatsappSent && (
-                      <p className="text-xs text-amber-600 mt-0.5">Copy the link below and share it manually with the member.</p>
-                    )}
-                  </div>
+                  <p className="text-sm font-medium text-green-800">
+                    {gym?.payment_mode === 'razorpay' ? 'Payment link created & sent' : 'UPI pay page created & sent'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <code className={`flex-1 px-3 py-2 bg-white border rounded-lg text-xs text-gray-600 truncate ${whatsappSent ? 'border-green-200' : 'border-amber-200'}`}>{generatedLink}</code>
+                  <code className="flex-1 px-3 py-2 bg-white border border-green-200 rounded-lg text-xs text-gray-600 truncate">{generatedLink}</code>
                   <button
                     type="button"
                     onClick={() => { navigator.clipboard.writeText(generatedLink); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
                     className={`px-3 py-2 text-xs font-medium rounded-lg border cursor-pointer shrink-0 transition-colors ${
-                      copied
-                        ? 'bg-green-600 text-white border-green-600'
-                        : whatsappSent
-                          ? 'bg-white text-green-700 border-green-300 hover:bg-green-50'
-                          : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'
+                      copied ? 'bg-green-600 text-white border-green-600' : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
                     }`}
                   >
                     {copied ? 'Copied!' : 'Copy'}
@@ -393,15 +380,15 @@ export default function PaymentsPage() {
                         navigator.clipboard.writeText(generatedLink); setCopied(true); setTimeout(() => setCopied(false), 2000)
                       }
                     }}
-                    className={`px-3 py-2 bg-white border text-xs font-medium rounded-lg shrink-0 cursor-pointer ${whatsappSent ? 'border-green-300 text-green-700 hover:bg-green-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}
+                    className="px-3 py-2 bg-white border border-green-300 text-green-700 text-xs font-medium rounded-lg shrink-0 cursor-pointer hover:bg-green-50"
                   >
                     Share
                   </button>
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setGeneratedLink(null); setWhatsappSent(true); setSelectedMemberId(''); setSelectedPlanId(''); setMemberSearch('') }}
-                  className={`mt-3 text-xs font-medium cursor-pointer ${whatsappSent ? 'text-green-700 hover:text-green-900' : 'text-amber-700 hover:text-amber-900'}`}
+                  onClick={() => { setGeneratedLink(null); setSelectedMemberId(''); setSelectedPlanId(''); setMemberSearch('') }}
+                  className="mt-3 text-xs font-medium cursor-pointer text-green-700 hover:text-green-900"
                 >
                   + Create another
                 </button>
@@ -431,7 +418,7 @@ export default function PaymentsPage() {
           return (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => { setFilter(f); setPage(1) }}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-all cursor-pointer ${
                 filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               } ${f === 'verification_pending' && counts[f] > 0 ? 'text-amber-700' : ''}`}
@@ -463,7 +450,7 @@ export default function PaymentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredPayments.map((payment) => (
+                {pagedPayments.map((payment) => (
                   <tr key={payment.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -523,17 +510,36 @@ export default function PaymentsPage() {
                       ) : payment.status === 'pending' ? (
                         <div className="flex flex-col items-end gap-1">
                           <div className="flex items-center justify-end gap-3">
-                            <button
-                              onClick={() => handleSendReminder(payment.id)}
-                              disabled={reminderBusyId === payment.id || !payment.member?.phone}
-                              title={!payment.member?.phone ? 'Member has no phone number' : 'Send WhatsApp reminder'}
-                              className="text-xs text-emerald-600 hover:text-emerald-800 font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              {reminderBusyId === payment.id ? 'Sending...' : 'Send Reminder'}
-                            </button>
+                            {(() => {
+                              const lastSent = lastReminders.get(payment.id)?.last_sent_at
+                              const sentRecently = lastSent && (Date.now() - new Date(lastSent).getTime()) < 24 * 60 * 60 * 1000
+                              const isDisabled = reminderBusyId === payment.id || !payment.member?.phone || sentRecently
+                              return (
+                                <button
+                                  onClick={() => handleSendReminder(payment.id)}
+                                  disabled={isDisabled}
+                                  title={
+                                    !payment.member?.phone ? 'Member has no phone number'
+                                    : sentRecently ? 'Already sent today — 1 reminder per day'
+                                    : 'Send reminder'
+                                  }
+                                  className="text-xs text-emerald-600 hover:text-emerald-800 font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  {reminderBusyId === payment.id ? 'Sending...' : 'Send Reminder'}
+                                </button>
+                              )
+                            })()}
                             <button onClick={() => setMarkingId(payment.id)} className="text-xs text-green-600 hover:text-green-800 font-medium cursor-pointer">Mark Paid</button>
-                            {payment.razorpay_link_url && (
-                              <button onClick={() => navigator.clipboard.writeText(payment.razorpay_link_url)} className="text-xs text-violet-600 hover:text-violet-800 font-medium cursor-pointer">Copy Link</button>
+                            {(payment.razorpay_link_url || payment.pay_token) && (
+                              <button
+                                onClick={() => {
+                                  const link = payment.razorpay_link_url || `${window.location.origin}/pay/${payment.pay_token}`
+                                  navigator.clipboard.writeText(link)
+                                }}
+                                className="text-xs text-violet-600 hover:text-violet-800 font-medium cursor-pointer"
+                              >
+                                Copy Link
+                              </button>
                             )}
                           </div>
                           {lastReminders.get(payment.id)?.last_sent_at && (
@@ -553,6 +559,8 @@ export default function PaymentsPage() {
               </tbody>
             </table>
           </div>
+
+          <Pagination page={safePage} totalPages={totalPages} total={filteredPayments.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </div>
       )}
     </div>
