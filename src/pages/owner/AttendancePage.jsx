@@ -18,6 +18,8 @@ export default function AttendancePage() {
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
   const [gymName, setGymName] = useState('')
+  const [gymLogo, setGymLogo] = useState('')
+  const [bannerOpen, setBannerOpen] = useState(true)
   const qrRef = useRef(null)
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function AttendancePage() {
     setLoading(true)
     let cancelled = false
 
-    fetchGymDetails(gymId).then(g => { if (!cancelled && g) setGymName(g.name || '') }).catch(() => {})
+    fetchGymDetails(gymId).then(g => { if (!cancelled && g) { setGymName(g.name || ''); setGymLogo(g.logo_url || '') } }).catch(() => {})
 
     Promise.all([
       fetchAttendance(gymId, selectedDate),
@@ -103,88 +105,90 @@ export default function AttendancePage() {
 
     const xml = new XMLSerializer().serializeToString(svg)
     const qrImg = new Image()
+
     qrImg.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = W; canvas.height = H
-      const ctx = canvas.getContext('2d')
+      function render(logoImg) {
+        const canvas = document.createElement('canvas')
+        canvas.width = W; canvas.height = H
+        const ctx = canvas.getContext('2d')
 
-      // Background
-      const bg = ctx.createLinearGradient(0, 0, 0, H)
-      bg.addColorStop(0, '#0e0f2a')
-      bg.addColorStop(1, '#1a1040')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, W, H)
+        // Background
+        const bg = ctx.createLinearGradient(0, 0, 0, H)
+        bg.addColorStop(0, '#0e0f2a'); bg.addColorStop(1, '#1a1040')
+        ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H)
 
-      // Top accent bar
-      const bar = ctx.createLinearGradient(0, 0, W, 0)
-      bar.addColorStop(0, '#6366f1')
-      bar.addColorStop(1, '#8b5cf6')
-      ctx.fillStyle = bar
-      ctx.fillRect(0, 0, W, 6)
+        // Top accent bar
+        const bar = ctx.createLinearGradient(0, 0, W, 0)
+        bar.addColorStop(0, '#6366f1'); bar.addColorStop(1, '#8b5cf6')
+        ctx.fillStyle = bar; ctx.fillRect(0, 0, W, 6)
 
-      // Gym name
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 38px system-ui, -apple-system, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText(gymName || 'Gym Check-in', W / 2, 90)
+        // Logo circle
+        let headerBottom = 60
+        if (logoImg) {
+          const LOGO = 64, cx0 = W / 2, cy0 = 54
+          ctx.fillStyle = '#ffffff'
+          ctx.beginPath(); ctx.arc(cx0, cy0, LOGO / 2 + 5, 0, Math.PI * 2); ctx.fill()
+          ctx.save()
+          ctx.beginPath(); ctx.arc(cx0, cy0, LOGO / 2, 0, Math.PI * 2); ctx.clip()
+          ctx.drawImage(logoImg, cx0 - LOGO / 2, cy0 - LOGO / 2, LOGO, LOGO)
+          ctx.restore()
+          headerBottom = 108
+        }
 
-      // Tagline
-      ctx.fillStyle = 'rgba(255,255,255,0.45)'
-      ctx.font = '18px system-ui, -apple-system, sans-serif'
-      ctx.fillText('Scan to mark your attendance', W / 2, 128)
-
-      // QR white card
-      const cx = (W - QR) / 2, cy = 168
-      ctx.fillStyle = '#ffffff'
-      ctx.beginPath()
-      ctx.roundRect(cx - 24, cy - 24, QR + 48, QR + 48, 20)
-      ctx.fill()
-
-      // QR image
-      ctx.drawImage(qrImg, cx, cy, QR, QR)
-
-      // Divider
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(60, cy + QR + 60); ctx.lineTo(W - 60, cy + QR + 60)
-      ctx.stroke()
-
-      // Steps
-      const steps = [
-        { n: '1', text: 'Open your phone camera' },
-        { n: '2', text: 'Point at the QR code' },
-        { n: '3', text: 'Tap the link to check in' },
-      ]
-      let sy = cy + QR + 96
-      ctx.font = 'bold 15px system-ui, -apple-system, sans-serif'
-      steps.forEach(({ n, text }) => {
-        // Number circle
-        ctx.fillStyle = 'rgba(99,102,241,0.25)'
-        ctx.beginPath(); ctx.arc(W / 2 - 110, sy - 5, 14, 0, Math.PI * 2); ctx.fill()
-        ctx.fillStyle = '#818cf8'
-        ctx.font = 'bold 13px system-ui'
+        // Gym name
+        ctx.fillStyle = '#ffffff'
+        ctx.font = 'bold 38px system-ui, -apple-system, sans-serif'
         ctx.textAlign = 'center'
-        ctx.fillText(n, W / 2 - 110, sy)
-        // Text
-        ctx.fillStyle = 'rgba(255,255,255,0.65)'
-        ctx.font = '15px system-ui, -apple-system, sans-serif'
-        ctx.textAlign = 'left'
-        ctx.fillText(text, W / 2 - 88, sy)
-        sy += 38
-      })
+        ctx.fillText(gymName || 'Gym Check-in', W / 2, headerBottom + 36)
 
-      // Footer
-      ctx.fillStyle = 'rgba(255,255,255,0.2)'
-      ctx.font = '13px system-ui, -apple-system, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText('Powered by Gymmobius', W / 2, H - 28)
+        // Tagline
+        ctx.fillStyle = 'rgba(255,255,255,0.45)'
+        ctx.font = '18px system-ui, -apple-system, sans-serif'
+        ctx.fillText('Scan to mark your attendance', W / 2, headerBottom + 72)
 
-      const a = document.createElement('a')
-      a.download = `${(gymName || 'gym').toLowerCase().replace(/\s+/g, '-')}-checkin-qr.png`
-      a.href = canvas.toDataURL('image/png')
-      a.click()
+        // QR white card
+        const cy = headerBottom + 112, cx = (W - QR) / 2
+        ctx.fillStyle = '#ffffff'
+        ctx.beginPath(); ctx.roundRect(cx - 24, cy - 24, QR + 48, QR + 48, 20); ctx.fill()
+        ctx.drawImage(qrImg, cx, cy, QR, QR)
+
+        // Divider
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1
+        ctx.beginPath(); ctx.moveTo(60, cy + QR + 60); ctx.lineTo(W - 60, cy + QR + 60); ctx.stroke()
+
+        // Steps
+        let sy = cy + QR + 100
+        ;[['1','Open your phone camera'],['2','Point at the QR code'],['3','Tap the link to check in']].forEach(([n, text]) => {
+          const circleX = W / 2 - 130
+          ctx.fillStyle = 'rgba(99,102,241,0.3)'
+          ctx.beginPath(); ctx.arc(circleX, sy - 7, 18, 0, Math.PI * 2); ctx.fill()
+          ctx.fillStyle = '#818cf8'; ctx.font = 'bold 16px system-ui'
+          ctx.textAlign = 'center'; ctx.fillText(n, circleX, sy)
+          ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = '20px system-ui, -apple-system, sans-serif'
+          ctx.textAlign = 'left'; ctx.fillText(text, circleX + 28, sy)
+          sy += 52
+        })
+
+        // Footer
+        ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '13px system-ui, -apple-system, sans-serif'
+        ctx.textAlign = 'center'; ctx.fillText('Powered by Gymmobius', W / 2, H - 28)
+
+        const a = document.createElement('a')
+        a.download = `${(gymName || 'gym').toLowerCase().replace(/\s+/g, '-')}-checkin-qr.png`
+        a.href = canvas.toDataURL('image/png'); a.click()
+      }
+
+      if (gymLogo) {
+        const logo = new Image()
+        logo.crossOrigin = 'anonymous'
+        logo.onload  = () => render(logo)
+        logo.onerror = () => render(null)   // fallback: skip logo if CORS fails
+        logo.src = gymLogo
+      } else {
+        render(null)
+      }
     }
+
     qrImg.src = 'data:image/svg+xml;base64,' + btoa(encodeURIComponent(xml).replace(/%([0-9A-F]{2})/g, (_, p) => String.fromCharCode(parseInt(p, 16))))
   }
 
@@ -219,12 +223,24 @@ export default function AttendancePage() {
 
       {/* QR Code banner card */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setBannerOpen(o => !o)}
+          className="w-full px-6 pt-5 pb-4 flex items-center justify-between text-left hover:bg-gray-50/60 transition-colors cursor-pointer"
+        >
           <div>
             <h2 className="text-base font-semibold text-gray-900">Member Check-in QR Code</h2>
             <p className="text-xs text-gray-500 mt-0.5">Display at your gym entrance — members scan to check in instantly, no app needed.</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <svg className={`w-4 h-4 text-gray-400 shrink-0 ml-4 transition-transform duration-200 ${bannerOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {bannerOpen && (
+        <div className="border-t border-gray-100">
+          {/* Action buttons */}
+          <div className="px-6 py-3 flex items-center gap-2 border-b border-gray-100 bg-gray-50/50">
             <button
               onClick={() => navigator.clipboard.writeText(checkinUrl)}
               className="px-3 py-1.5 text-xs font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors cursor-pointer"
@@ -241,16 +257,22 @@ export default function AttendancePage() {
               Download Banner
             </button>
           </div>
-        </div>
 
-        {/* Banner preview + instructions side by side */}
-        <div className="flex flex-col md:flex-row gap-0">
+          {/* Banner preview + instructions side by side */}
+          <div className="flex flex-col md:flex-row gap-0">
 
           {/* Left — banner preview */}
           <div className="flex items-center justify-center p-8 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-100 md:w-72 shrink-0">
             <div style={{ width: 240, background: 'linear-gradient(160deg,#0e0f2a,#1a1040)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
               <div style={{ height: 4, background: 'linear-gradient(90deg,#6366f1,#8b5cf6)' }} />
               <div style={{ padding: '18px 18px 20px', textAlign: 'center' }}>
+                {/* Logo */}
+                {gymLogo && (
+                  <div style={{ marginBottom: 10 }}>
+                    <img src={gymLogo} alt="logo"
+                      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.15)', display: 'inline-block' }} />
+                  </div>
+                )}
                 <p style={{ color: '#fff', fontWeight: 800, fontSize: 14, marginBottom: 3, letterSpacing: '-0.2px' }}>
                   {gymName || 'Gym Check-in'}
                 </p>
@@ -322,6 +344,8 @@ export default function AttendancePage() {
             </div>
           </div>
         </div>
+        </div>
+        )}
       </div>
 
       {/* Manual check-in form */}
