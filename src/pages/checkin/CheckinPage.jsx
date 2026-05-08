@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { performCheckin, fetchGymForCheckin } from '../../services/checkinService'
 
@@ -8,6 +8,7 @@ export default function CheckinPage() {
   const gymId = searchParams.get('gymId')
 
   const { isAuthenticated, profile, loading: authLoading } = useAuth()
+  const navigate = useNavigate()
 
   const [gym, setGym] = useState(null)
   const [status, setStatus] = useState('idle') // 'idle' | 'loading' | 'success' | 'error' | 'cooldown'
@@ -38,6 +39,7 @@ export default function CheckinPage() {
       if (data.success) {
         setStatus('success')
         setResult(data)
+        setTimeout(() => navigate('/member-app', { replace: true }), 2000)
       } else if (data.error === 'cooldown') {
         setStatus('cooldown')
         setResult(data)
