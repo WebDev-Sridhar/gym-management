@@ -153,7 +153,7 @@ function Shell({ children, themeColor }) {
         <div className="w-full max-w-md">
           {children}
           <p className="text-center text-xs text-gray-400 mt-8">
-            Powered by <span className="font-semibold" style={{ color: themeColor || '#8B5CF6' }}>GymOS</span>
+            Powered by <span className="font-semibold" style={{ color: themeColor || '#8B5CF6' }}>Gymmobius</span>
           </p>
         </div>
       </main>

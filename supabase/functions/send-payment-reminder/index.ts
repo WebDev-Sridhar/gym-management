@@ -285,14 +285,14 @@ Deno.serve(async (req) => {
       }),
     ])
 
-    if (sendErr) throw new HttpError(502, `Interakt send failed: ${sendErr}`)
-
     return jsonResponse({
       ok: true,
       paymentId: payment.id,
       payLink,
       templateName,
       providerMessageId: interaktId ?? null,
+      whatsappSent: !sendErr,
+      whatsappError: sendErr ?? null,
     })
   } catch (err) {
     return errorResponse(err)

@@ -23,6 +23,7 @@ export default function PaymentsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [generatedLink, setGeneratedLink] = useState(null)
+  const [whatsappSent, setWhatsappSent] = useState(true)
   const [copied, setCopied] = useState(false)
 
   const [markingId, setMarkingId] = useState(null)
@@ -80,7 +81,7 @@ export default function PaymentsPage() {
   }
 
   function resetCollect() {
-    setError(''); setGeneratedLink(null); setMemberSearch('')
+    setError(''); setGeneratedLink(null); setWhatsappSent(true); setMemberSearch('')
     setSelectedMemberId(''); setSelectedPlanId(''); setMemberDropdownOpen(false)
   }
 
@@ -98,6 +99,7 @@ export default function PaymentsPage() {
     try {
       const result = await sendPaymentReminder({ memberId: member.id, planId: plan.id })
       setGeneratedLink(result.payLink)
+      setWhatsappSent(result.whatsappSent !== false)
       const [updated, reminders] = await Promise.all([
         fetchPayments(gymId),
         fetchLastReminders(gymId).catch(() => new Map()),
@@ -343,24 +345,41 @@ export default function PaymentsPage() {
 
             {/* Generated link panel */}
             {generatedLink && (
-              <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+              <div className={`rounded-lg p-4 border ${whatsappSent ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shrink-0">
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${whatsappSent ? 'bg-green-500' : 'bg-amber-500'}`}>
+                    {whatsappSent ? (
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
-                  <p className="text-sm font-medium text-green-800">
-                    {gym?.payment_mode === 'razorpay' ? 'Payment link created & sent via WhatsApp' : 'UPI pay page created & sent via WhatsApp'}
-                  </p>
+                  <div>
+                    <p className={`text-sm font-medium ${whatsappSent ? 'text-green-800' : 'text-amber-800'}`}>
+                      {whatsappSent
+                        ? (gym?.payment_mode === 'razorpay' ? 'Payment link created & sent via WhatsApp' : 'UPI pay page created & sent via WhatsApp')
+                        : 'Payment link created — WhatsApp not configured'}
+                    </p>
+                    {!whatsappSent && (
+                      <p className="text-xs text-amber-600 mt-0.5">Copy the link below and share it manually with the member.</p>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-white border border-green-200 rounded-lg text-xs text-gray-600 truncate">{generatedLink}</code>
+                  <code className={`flex-1 px-3 py-2 bg-white border rounded-lg text-xs text-gray-600 truncate ${whatsappSent ? 'border-green-200' : 'border-amber-200'}`}>{generatedLink}</code>
                   <button
                     type="button"
                     onClick={() => { navigator.clipboard.writeText(generatedLink); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
                     className={`px-3 py-2 text-xs font-medium rounded-lg border cursor-pointer shrink-0 transition-colors ${
-                      copied ? 'bg-green-600 text-white border-green-600' : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
+                      copied
+                        ? 'bg-green-600 text-white border-green-600'
+                        : whatsappSent
+                          ? 'bg-white text-green-700 border-green-300 hover:bg-green-50'
+                          : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'
                     }`}
                   >
                     {copied ? 'Copied!' : 'Copy'}
@@ -369,15 +388,15 @@ export default function PaymentsPage() {
                     href={generatedLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-2 bg-white border border-green-300 text-green-700 text-xs font-medium rounded-lg hover:bg-green-50 shrink-0"
+                    className={`px-3 py-2 bg-white border text-xs font-medium rounded-lg shrink-0 ${whatsappSent ? 'border-green-300 text-green-700 hover:bg-green-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}
                   >
                     Open ↗
                   </a>
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setGeneratedLink(null); setSelectedMemberId(''); setSelectedPlanId(''); setMemberSearch('') }}
-                  className="mt-3 text-xs text-green-700 hover:text-green-900 font-medium cursor-pointer"
+                  onClick={() => { setGeneratedLink(null); setWhatsappSent(true); setSelectedMemberId(''); setSelectedPlanId(''); setMemberSearch('') }}
+                  className={`mt-3 text-xs font-medium cursor-pointer ${whatsappSent ? 'text-green-700 hover:text-green-900' : 'text-amber-700 hover:text-amber-900'}`}
                 >
                   + Create another
                 </button>
