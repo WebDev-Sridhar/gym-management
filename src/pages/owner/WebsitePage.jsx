@@ -2482,8 +2482,8 @@ export default function WebsitePage() {
         {/* Live preview panel — Pro+ only, sticky */}
         {showPreview && (
           <div
-            className="flex-1 min-w-0 sticky top-6 overflow-y-auto overscroll-contain"
-            style={{ height: 'calc(100vh - 8.5rem)' }}
+            className="flex-1 min-w-0 md:sticky md:top-6 md:overflow-y-auto md:h-[calc(100vh-8.5rem)]"
+            style={{ overscrollBehavior: 'contain' }}
           >
             <PreviewPanel
               section={activeSection}

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect } from 'react'
 import { MotionConfig } from 'framer-motion'
 import { getFullThemeCSSVars, getFontStack } from '../../../../lib/gymTheme'
 import { getDefaultContent } from '../../../../lib/gymDefaultContent'
@@ -266,6 +266,74 @@ export default function PreviewPanel({ section, previewData, gym, plans = [], tr
   const themeVars = useMemo(() => getFullThemeCSSVars(gym || {}), [gym])
   const defaults = useMemo(() => getDefaultContent(gym?.name, gym?.city), [gym?.name, gym?.city])
   const fontStack = gym?.font_family && gym.font_family !== 'default' ? getFontStack(gym.font_family) : null
+  const scrollRef = useRef(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let lastY = 0
+
+    // Finds the nearest scrollable ancestor (e.g. the <main> in DashboardLayout).
+    // window.scrollBy won't work because DashboardLayout uses overflow-y-auto on <main>.
+    function getScrollParent(node) {
+      let cur = node.parentElement
+      while (cur && cur !== document.body) {
+        const style = window.getComputedStyle(cur)
+        if (/(auto|scroll)/.test(style.overflowY) && cur.scrollHeight > cur.clientHeight) {
+          return cur
+        }
+        cur = cur.parentElement
+      }
+      return window
+    }
+
+    // ── Desktop: prevent wheel scroll chaining ──────────────────────────────
+    function onWheel(e) {
+      const { scrollTop, scrollHeight, clientHeight } = el
+      const atTop    = scrollTop <= 0
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1
+      const scrollingUp   = e.deltaY < 0
+      const scrollingDown = e.deltaY > 0
+      // Only block the event from bubbling when the inner scroll
+      // has already hit the boundary in the direction being scrolled.
+      if ((atTop && scrollingUp) || (atBottom && scrollingDown)) {
+        e.preventDefault()
+      }
+    }
+
+    // ── Mobile: propagate overscroll to the real page scroll container ───────
+    function onTouchStart(e) {
+      lastY = e.touches[0].clientY
+    }
+
+    function onTouchMove(e) {
+      const y = e.touches[0].clientY
+      const dy = lastY - y   // positive = scrolling down, negative = scrolling up
+      lastY = y
+      const { scrollTop, scrollHeight, clientHeight } = el
+      const atTop    = scrollTop < 1
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1
+      if ((atTop && dy < 0) || (atBottom && dy > 0)) {
+        e.preventDefault()
+        // Scroll the real page container (not window — DashboardLayout uses <main>)
+        const parent = getScrollParent(el)
+        if (parent === window) {
+          window.scrollBy(0, dy)
+        } else {
+          parent.scrollTop += dy
+        }
+      }
+    }
+
+    el.addEventListener('wheel',      onWheel,      { passive: false })
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false })
+    return () => {
+      el.removeEventListener('wheel',      onWheel)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove',  onTouchMove)
+    }
+  }, [])
 
   if (!gym) {
     return (
@@ -315,7 +383,7 @@ export default function PreviewPanel({ section, previewData, gym, plans = [], tr
   }
 
   return (
-    <div className="md:sticky md:top-6">
+    <div className="sticky top-6">
       {/* Header bar */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -329,8 +397,9 @@ export default function PreviewPanel({ section, previewData, gym, plans = [], tr
       <div className="w-full rounded-xl border border-gray-200 overflow-hidden bg-gray-900">
         <div
           data-gym-theme={gym?.theme_mode || 'dark'}
-          style={{ ...themeVars, background: 'var(--gym-bg)' }}
-          className="md:w-full w-[calc(100vw-50px)] md:overflow-y-auto md:[height:calc(100vh-190px)]"
+          ref={scrollRef}
+          style={{ ...themeVars, background: 'var(--gym-bg)', height: 'calc(100vh - 190px)', overflowY: 'auto' }}
+          className="md:w-full w-[calc(100vw-50px)]"
         >
           {fontStack && (
             <style>{`.font-display { font-family: ${fontStack} !important; }`}</style>
