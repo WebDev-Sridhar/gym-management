@@ -171,14 +171,18 @@ function WeeklyPlanView({ plan }) {
 
 export default function MemberWorkoutsPage() {
   const { gymId, profile } = useAuth()
-  const [plans, setPlans]   = useState([])
-  const [loading, setLoading] = useState(true)
+  const [plans, setPlans]       = useState([])
+  const [memberStatus, setMemberStatus] = useState(null)
+  const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
     if (!gymId || !profile) { setLoading(false); return }
     let dead = false
     fetchMyMember({ gymId, phone: profile.phone, email: profile.email })
-      .then(m => m ? fetchMyActivePlans(m.id) : [])
+      .then(async m => {
+        if (!dead && m) setMemberStatus(m.status)
+        return m ? fetchMyActivePlans(m.id) : []
+      })
       .then(p => { if (!dead) setPlans(p) })
       .catch(e => console.error(e))
       .finally(() => { if (!dead) setLoading(false) })
@@ -191,6 +195,23 @@ export default function MemberWorkoutsPage() {
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
       <Loader2 size={36} color="#6366f1" style={{ animation: 'mspin .75s linear infinite' }} />
+      <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+
+  const isLocked = memberStatus === 'inactive' || memberStatus === 'expired' || memberStatus === 'pending_payment'
+
+  if (isLocked) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '70vh', padding: '32px 24px', textAlign: 'center', gap: '16px' }}>
+      <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Calendar size={28} color="rgba(255,255,255,0.2)" strokeWidth={1.5} />
+      </div>
+      <div>
+        <p style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 800, fontSize: '18px' }}>Plans locked</p>
+        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '13px', marginTop: '8px', lineHeight: 1.6 }}>
+          An active membership is required to access your workout and diet plans.
+        </p>
+      </div>
       <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )

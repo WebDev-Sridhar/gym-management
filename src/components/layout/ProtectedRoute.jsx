@@ -2,9 +2,12 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 
 export default function ProtectedRoute({ allowedRoles, children }) {
-  const { isAuthenticated, profile, role, gymId, hasActiveSubscription, loading } = useAuth()
+  const { isAuthenticated, profile, role, gymId, hasActiveSubscription, loading, initialized } = useAuth()
 
-  if (loading) {
+  // Block ALL route decisions until the first auth check finishes.
+  // Without this, a re-render between setSession() and loadProfile()
+  // completing can briefly satisfy !profile → redirect to /create-gym.
+  if (!initialized || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">

@@ -87,7 +87,7 @@ export async function createMember({ gymId, name, phone, email }) {
   }
 
   if (existingId) {
-    // Revive: clear deleted_at, update details, reset to inactive
+    // Revive: clear deleted_at, reset plan/expiry, update details
     const { data, error } = await supabase
       .from('members')
       .update({
@@ -95,6 +95,8 @@ export async function createMember({ gymId, name, phone, email }) {
         phone: phone || null,
         email: email || null,
         status: 'inactive',
+        plan_id: null,
+        expiry_date: null,
         deleted_at: null,
         join_date: new Date().toISOString().split('T')[0],
       })
@@ -162,7 +164,12 @@ export async function updateMember({ memberId, name, phone, email }) {
 export async function deleteMember(memberId) {
   const { error } = await supabase
     .from('members')
-    .update({ deleted_at: new Date().toISOString() })
+    .update({
+      deleted_at: new Date().toISOString(),
+      status: 'inactive',
+      plan_id: null,
+      expiry_date: null,
+    })
     .eq('id', memberId)
 
   if (error) throw error

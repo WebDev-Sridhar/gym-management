@@ -10,6 +10,10 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
+  // True once the very first getSession()+loadProfile() cycle finishes.
+  // One-way door — never goes back to false. Used by ProtectedRoute to
+  // prevent rendering routes before auth has resolved even once.
+  const [initialized, setInitialized] = useState(false)
   // Guard so getSession() and onAuthStateChange() don't both call loadProfile()
   const initializedRef = useRef(false)
 
@@ -17,22 +21,26 @@ export function AuthProvider({ children }) {
     // Safety timeout: if loading is still true after 8s, force it false
     const safetyTimer = setTimeout(() => {
       setLoading(false)
+      setInitialized(true)
     }, 8000)
 
     // Initialize auth: getSession() handles token refresh before returning,
     // so we always get a valid session if one exists.
     async function initAuth() {
-      const { data: { session: s } } = await supabase.auth.getSession()
-      setSession(s)
-      // Cache the access token for the data client
-      setAccessToken(s?.access_token ?? null)
-      if (s?.user) {
-        await loadProfile(s.user.id)
-      } else {
-        setLoading(false)
+      try {
+        const { data: { session: s } } = await supabase.auth.getSession()
+        setSession(s)
+        setAccessToken(s?.access_token ?? null)
+        if (s?.user) {
+          await loadProfile(s.user.id)
+        } else {
+          setLoading(false)
+        }
+      } finally {
+        clearTimeout(safetyTimer)
+        initializedRef.current = true
+        setInitialized(true)   // one-way door — routes are now safe to render
       }
-      clearTimeout(safetyTimer)
-      initializedRef.current = true
     }
 
     initAuth()
@@ -141,6 +149,7 @@ export function AuthProvider({ children }) {
     profile,
     subscription,
     loading,
+    initialized,
     logout,
     refreshProfile,
     // Derived helpers

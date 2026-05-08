@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -45,44 +45,73 @@ const fadeUp = (delay = 0) => ({
 })
 
 // ─── Renewal modal ────────────────────────────────────────────────────────────
+function fmtDuration(days) {
+  if (!days) return ''
+  if (days < 30) return `${days} days`
+  const m = Math.round(days / 30)
+  if (m === 12) return '1 year'
+  return `${m} month${m !== 1 ? 's' : ''}`
+}
+
+function PlanRow({ plan, selected, onSelect }) {
+  return (
+    <button onClick={() => onSelect(plan.id)}
+      style={{
+        width: '100%', textAlign: 'left', padding: '13px 14px', borderRadius: '12px', border: 'none',
+        background: selected ? 'rgba(99,102,241,0.1)' : 'transparent',
+        cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '12px',
+        transition: 'background 0.15s',
+      }}>
+      {/* Radio dot */}
+      <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: `2px solid ${selected ? '#6366f1' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'border-color 0.15s' }}>
+        {selected && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#6366f1' }} />}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ color: selected ? '#fff' : 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: '14px' }}>{plan.name}</p>
+        {plan.duration_days && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginTop: '1px' }}>{fmtDuration(plan.duration_days)}</p>}
+      </div>
+      <p style={{ color: selected ? '#818cf8' : 'rgba(255,255,255,0.5)', fontWeight: 800, fontSize: '15px', flexShrink: 0 }}>
+        ₹{Number(plan.price).toLocaleString('en-IN')}
+      </p>
+    </button>
+  )
+}
+
 function RenewModal({ member, gymSlug, gymName, plans, onClose, onSuccess }) {
-  const [selectedId, setSelectedId] = useState(plans[0]?.id ?? null)
-  const [paying, setPaying]         = useState(false)
-  const [error, setError]           = useState('')
+  const isExpired    = member.status === 'expired'
+  const currentPlan  = plans.find(p => p.id === member.plan?.id)
+  const defaultId    = isExpired && currentPlan ? currentPlan.id : plans[0]?.id ?? null
+  const [selectedId, setSelectedId] = useState(defaultId)
+  const [showChange,  setShowChange] = useState(false)
+  const [paying, setPaying]          = useState(false)
+  const [error, setError]            = useState('')
+  const listRef = useRef(null)
+  const [listHeight, setListHeight]  = useState(0)
+
+  useEffect(() => {
+    if (listRef.current) setListHeight(listRef.current.scrollHeight)
+  }, [plans.length])
 
   const selectedPlan = plans.find(p => p.id === selectedId)
+  const otherPlans   = plans.filter(p => p.id !== selectedId)
 
   async function handlePay() {
     if (!selectedPlan || paying) return
-    setPaying(true)
-    setError('')
+    setPaying(true); setError('')
     try {
-      const order = await createPublicOrder({
-        gymSlug,
-        planId: selectedPlan.id,
-        memberId: member.id,   // skips member lookup/create in edge fn
-      })
+      const order = await createPublicOrder({ gymSlug, planId: selectedPlan.id, memberId: member.id })
       const result = await openPublicCheckout({
-        orderId: order.orderId,
-        amount: order.amount,
-        currency: order.currency,
+        orderId: order.orderId, amount: order.amount, currency: order.currency,
         razorpayKeyId: order.razorpayKeyId,
-        gymName: order.gymName || gymName,
-        planName: order.planName || selectedPlan.name,
-        prefill: order.prefill,
-        themeColor: '#6366f1',
+        gymName: order.gymName || gymName, planName: order.planName || selectedPlan.name,
+        prefill: order.prefill, themeColor: '#6366f1',
       })
       onSuccess(result)
     } catch (err) {
-      if (err.message !== 'checkout_dismissed') {
-        setError(err.message || 'Payment failed. Please try again.')
-      }
-    } finally {
-      setPaying(false)
-    }
+      if (err.message !== 'checkout_dismissed') setError(err.message || 'Payment failed. Please try again.')
+    } finally { setPaying(false) }
   }
 
-  // Portal onto document.body so position:fixed escapes Framer Motion's transform context
   return createPortal(
     <AnimatePresence>
       <motion.div
@@ -98,51 +127,73 @@ function RenewModal({ member, gymSlug, gymName, plans, onClose, onSuccess }) {
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
             <div>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Renew Membership</p>
-              <p style={{ color: '#fff', fontSize: '18px', fontWeight: 800, marginTop: '3px' }}>Choose a plan</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                {isExpired ? 'Renew Membership' : 'Activate Membership'}
+              </p>
+              <p style={{ color: '#fff', fontSize: '18px', fontWeight: 800, marginTop: '3px' }}>
+                {isExpired ? 'Continue with your plan' : 'Choose a plan'}
+              </p>
             </div>
             <button onClick={onClose} style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               <X size={18} color="rgba(255,255,255,0.5)" strokeWidth={2} />
             </button>
           </div>
 
-          {/* Plan list */}
           {plans.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>No plans available. Contact your gym.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-              {plans.map(plan => {
-                const selected = plan.id === selectedId
-                return (
-                  <button key={plan.id} onClick={() => setSelectedId(plan.id)}
-                    style={{
-                      width: '100%', textAlign: 'left', padding: '16px', borderRadius: '16px',
-                      background: selected ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.04)',
-                      border: selected ? '1.5px solid rgba(99,102,241,0.5)' : '1.5px solid rgba(255,255,255,0.07)',
-                      cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.18s',
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    }}>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', textAlign: 'center', padding: '32px 0' }}>
+              No plans available. Contact your gym.
+            </p>
+          ) : isExpired ? (
+            /* ── Expired: show selected plan + optional change ── */
+            <>
+              {/* Selected plan card */}
+              {selectedPlan && (
+                <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>{plan.name}</p>
-                      {plan.duration_days && (
-                        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', marginTop: '2px' }}>
-                          {plan.duration_days} days
-                        </p>
-                      )}
+                      <p style={{ color: '#fff', fontWeight: 800, fontSize: '16px' }}>{selectedPlan.name}</p>
+                      {selectedPlan.duration_days && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '2px' }}>{fmtDuration(selectedPlan.duration_days)}</p>}
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ color: selected ? '#818cf8' : 'rgba(255,255,255,0.7)', fontWeight: 800, fontSize: '17px' }}>
-                        ₹{Number(plan.price).toLocaleString('en-IN')}
-                      </p>
-                      {selected && (
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#818cf8', marginLeft: 'auto', marginTop: '4px' }} />
-                      )}
-                    </div>
+                    <p style={{ color: '#818cf8', fontWeight: 800, fontSize: '20px' }}>₹{Number(selectedPlan.price).toLocaleString('en-IN')}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Change plan toggle */}
+              {plans.length > 1 && (
+                <>
+                  <button onClick={() => setShowChange(v => !v)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 12px', fontFamily: 'inherit' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', fontWeight: 600 }}>Change plan</span>
+                    <ChevronRight size={14} color="rgba(255,255,255,0.3)" strokeWidth={2}
+                      style={{ transform: showChange ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                   </button>
-                )
-              })}
+                  <motion.div
+                    animate={{ height: showChange ? listHeight : 0, opacity: showChange ? 1 : 0 }}
+                    transition={{ duration: 0.28, ease: [0.04, 0.62, 0.23, 0.98] }}
+                    style={{ overflow: 'hidden', marginBottom: '12px' }}>
+                    <div ref={listRef} style={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', overflow: 'hidden' }}>
+                      <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                        {otherPlans.map(plan => (
+                          <PlanRow key={plan.id} plan={plan} selected={false}
+                            onSelect={id => { setSelectedId(id); setShowChange(false) }} />
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </>
+          ) : (
+            /* ── Inactive: compact scrollable plan list ── */
+            <div style={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', overflow: 'hidden', marginBottom: '16px' }}>
+              <div style={{ maxHeight: '260px', overflowY: 'auto' }}>
+                {plans.map((plan, i) => (
+                  <div key={plan.id} style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                    <PlanRow plan={plan} selected={plan.id === selectedId} onSelect={setSelectedId} />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -155,23 +206,19 @@ function RenewModal({ member, gymSlug, gymName, plans, onClose, onSuccess }) {
 
           {/* Pay button */}
           {plans.length > 0 && (
-            <motion.button
-              whileTap={{ scale: paying ? 1 : 0.97 }}
+            <motion.button whileTap={{ scale: paying ? 1 : 0.97 }}
               onClick={handlePay} disabled={!selectedPlan || paying}
               style={{
                 width: '100%', padding: '16px', borderRadius: '16px', border: 'none',
-                background: paying || !selectedPlan ? 'rgba(99,102,241,0.3)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                color: '#fff', fontSize: '15px', fontWeight: 800, cursor: paying || !selectedPlan ? 'default' : 'pointer',
+                background: paying || !selectedPlan ? 'rgba(99,102,241,0.25)' : '#6366f1',
+                color: '#fff', fontSize: '15px', fontWeight: 800,
+                cursor: paying || !selectedPlan ? 'default' : 'pointer',
                 fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                boxShadow: paying || !selectedPlan ? 'none' : '0 8px 28px rgba(99,102,241,0.4)',
               }}>
-              {paying ? (
-                <><Loader2 size={18} style={{ animation: 'mspin .75s linear infinite' }} />Processing…</>
-              ) : (
-                <><CreditCard size={18} strokeWidth={2} />
-                  Pay ₹{selectedPlan ? Number(selectedPlan.price).toLocaleString('en-IN') : '—'}
-                </>
-              )}
+              {paying
+                ? <><Loader2 size={18} style={{ animation: 'mspin .75s linear infinite' }} />Processing…</>
+                : <><CreditCard size={18} strokeWidth={2} />Pay ₹{selectedPlan ? Number(selectedPlan.price).toLocaleString('en-IN') : '—'}</>
+              }
             </motion.button>
           )}
 
@@ -310,10 +357,11 @@ export default function MemberApp() {
   const workout = plans.find(p => p.plan_type === 'workout')
   const diet    = plans.find(p => p.plan_type === 'diet')
 
-  const cardBg      = expired ? 'linear-gradient(145deg,#1c0a0a,#2a1010)' : expiring ? 'linear-gradient(145deg,#1c1500,#2a1f00)' : 'linear-gradient(145deg,#0e1035,#16104a,#0e1035)'
-  const accentColor = expired ? '#f87171' : expiring ? '#fbbf24' : '#818cf8'
-  const statusLabel = expired ? 'Expired' : expiring ? `${days}d left` : 'Active'
-  const statusBg    = expired ? 'rgba(239,68,68,0.15)' : expiring ? 'rgba(251,191,36,0.15)' : 'rgba(129,140,248,0.15)'
+  const inactive    = member.status === 'inactive' || member.status === 'pending_payment'
+  const cardBg      = expired ? 'linear-gradient(145deg,#1c0a0a,#2a1010)' : expiring ? 'linear-gradient(145deg,#1c1500,#2a1f00)' : inactive ? 'linear-gradient(145deg,#111118,#18181f)' : 'linear-gradient(145deg,#0e1035,#16104a,#0e1035)'
+  const accentColor = expired ? '#f87171' : expiring ? '#fbbf24' : inactive ? 'rgba(255,255,255,0.35)' : '#818cf8'
+  const statusLabel = expired ? 'Expired' : expiring ? `${days}d left` : inactive ? 'Inactive' : 'Active'
+  const statusBg    = expired ? 'rgba(239,68,68,0.15)' : expiring ? 'rgba(251,191,36,0.15)' : inactive ? 'rgba(255,255,255,0.06)' : 'rgba(129,140,248,0.15)'
 
   return (
     <>
@@ -383,23 +431,24 @@ export default function MemberApp() {
           </div>
 
           {/* Renewal CTA */}
-          {needsAction && !pending?.razorpay_link_url && (
+          {(needsAction || inactive) && !pending?.razorpay_link_url && (
             <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: `1px solid ${accentColor}18` }}>
-              {expired && razorpayEnabled && gymSlug ? (
+              {(expired || inactive) && razorpayEnabled && gymSlug ? (
                 <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowRenewModal(true)}
                   style={{
                     width: '100%', padding: '13px', borderRadius: '14px', border: 'none',
-                    background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                    background: '#6366f1',
                     color: '#fff', fontSize: '14px', fontWeight: 800, cursor: 'pointer',
                     fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                    boxShadow: '0 6px 20px rgba(99,102,241,0.4)',
                   }}>
                   <CreditCard size={16} strokeWidth={2.2} />
-                  Renew Membership Now
+                  {inactive ? 'Activate Membership' : 'Renew Membership Now'}
                 </motion.button>
               ) : (
                 <p style={{ color: accentColor, fontSize: '12px', fontWeight: 600, lineHeight: 1.55 }}>
-                  {expired
+                  {inactive
+                    ? 'No active membership. Contact your gym to get started.'
+                    : expired
                     ? 'Your membership has expired. Contact your gym to renew.'
                     : `Expiring in ${days} day${days !== 1 ? 's' : ''}. Contact your gym owner to renew.`}
                 </p>
@@ -410,35 +459,44 @@ export default function MemberApp() {
 
         {/* Check-in */}
         <motion.div {...fadeUp(0.13)}>
-          <motion.button onClick={doCheckIn} disabled={checkedToday || checkingIn}
-            whileTap={checkedToday ? {} : { scale: 0.96 }}
-            style={{
-              width: '100%', padding: '17px', borderRadius: '20px', border: 'none',
-              cursor: checkedToday ? 'default' : 'pointer', fontFamily: 'inherit',
-              fontSize: '16px', fontWeight: 800, letterSpacing: '-0.2px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-              transition: 'box-shadow 0.3s',
-              ...(checkedToday
-                ? { background: 'rgba(34,197,94,0.1)', border: '1.5px solid rgba(34,197,94,0.25)', color: '#4ade80' }
-                : { background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', boxShadow: checkingIn ? 'none' : '0 8px 28px rgba(99,102,241,0.4)' }),
-            }}>
-            {checkingIn ? (
-              <><Loader2 size={20} style={{ animation: 'mspin .75s linear infinite' }} />Checking in…</>
-            ) : checkedToday ? (
-              <><CheckCircle2 size={22} strokeWidth={2.5} />{justChecked ? "You're in! Keep it up" : 'Checked In Today'}</>
-            ) : (
-              <><MapPin size={21} strokeWidth={2} />Check In to Gym</>
-            )}
-          </motion.button>
-          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.28)', fontSize: '12px', fontWeight: 500, marginTop: '9px' }}>
-            {monthCheckins} visit{monthCheckins !== 1 ? 's' : ''} this month
-            {streak > 1 && (
-              <span style={{ marginLeft: '8px', color: '#f97316', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                <Flame size={13} color="#f97316" fill="#f97316" />
-                {streak}-day streak
-              </span>
-            )}
-          </p>
+          {(inactive || expired) ? (
+            <div style={{ width: '100%', padding: '17px', borderRadius: '20px', border: '1.5px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+              <MapPin size={20} color="rgba(255,255,255,0.15)" strokeWidth={2} />
+              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '15px', fontWeight: 700 }}>Check-in unavailable</span>
+            </div>
+          ) : (
+            <motion.button onClick={doCheckIn} disabled={checkedToday || checkingIn}
+              whileTap={checkedToday ? {} : { scale: 0.96 }}
+              style={{
+                width: '100%', padding: '17px', borderRadius: '20px', border: 'none',
+                cursor: checkedToday ? 'default' : 'pointer', fontFamily: 'inherit',
+                fontSize: '16px', fontWeight: 800, letterSpacing: '-0.2px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                transition: 'box-shadow 0.3s',
+                ...(checkedToday
+                  ? { background: 'rgba(34,197,94,0.1)', border: '1.5px solid rgba(34,197,94,0.25)', color: '#4ade80' }
+                  : { background: '#6366f1', color: '#fff' }),
+              }}>
+              {checkingIn ? (
+                <><Loader2 size={20} style={{ animation: 'mspin .75s linear infinite' }} />Checking in…</>
+              ) : checkedToday ? (
+                <><CheckCircle2 size={22} strokeWidth={2.5} />{justChecked ? "You're in! Keep it up" : 'Checked In Today'}</>
+              ) : (
+                <><MapPin size={21} strokeWidth={2} />Check In to Gym</>
+              )}
+            </motion.button>
+          )}
+          {!inactive && !expired && (
+            <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.28)', fontSize: '12px', fontWeight: 500, marginTop: '9px' }}>
+              {monthCheckins} visit{monthCheckins !== 1 ? 's' : ''} this month
+              {streak > 1 && (
+                <span style={{ marginLeft: '8px', color: '#f97316', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                  <Flame size={13} color="#f97316" fill="#f97316" />
+                  {streak}-day streak
+                </span>
+              )}
+            </p>
+          )}
         </motion.div>
 
         {/* Streak grid */}
@@ -463,7 +521,17 @@ export default function MemberApp() {
         </motion.div>
 
         {/* Plans */}
-        {(workout || diet) ? (
+        {(inactive || expired) ? (
+          <motion.div {...fadeUp(0.22)} style={{ borderRadius: '20px', border: '1px solid rgba(255,255,255,0.06)', padding: '24px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '13px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ClipboardList size={22} color="rgba(255,255,255,0.15)" strokeWidth={1.8} />
+            </div>
+            <div>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 700, fontSize: '14px' }}>Plans locked</p>
+              <p style={{ color: 'rgba(255,255,255,0.18)', fontSize: '12px', marginTop: '3px' }}>Active membership required to access workout & diet plans.</p>
+            </div>
+          </motion.div>
+        ) : (workout || diet) ? (
           <motion.div {...fadeUp(0.22)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <p style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>My Plans</p>
