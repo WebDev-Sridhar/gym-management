@@ -384,14 +384,19 @@ export default function PaymentsPage() {
                   >
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
-                  <a
-                    href={generatedLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`px-3 py-2 bg-white border text-xs font-medium rounded-lg shrink-0 ${whatsappSent ? 'border-green-300 text-green-700 hover:bg-green-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.share) {
+                        navigator.share({ title: 'Payment Link', url: generatedLink }).catch(() => {})
+                      } else {
+                        navigator.clipboard.writeText(generatedLink); setCopied(true); setTimeout(() => setCopied(false), 2000)
+                      }
+                    }}
+                    className={`px-3 py-2 bg-white border text-xs font-medium rounded-lg shrink-0 cursor-pointer ${whatsappSent ? 'border-green-300 text-green-700 hover:bg-green-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}
                   >
-                    Open ↗
-                  </a>
+                    Share
+                  </button>
                 </div>
                 <button
                   type="button"
