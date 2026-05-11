@@ -25,6 +25,7 @@ import PaymentSettingsPage from './pages/owner/PaymentSettingsPage'
 import CommunicationPage from './pages/owner/CommunicationPage'
 import ProgramsPage from './pages/owner/ProgramsPage'
 import StarterWebsitePage from './pages/owner/StarterWebsitePage'
+import TrainerLayout from './components/layout/TrainerLayout'
 import TrainerDashboard from './pages/trainer/TrainerDashboard'
 import TrainerMembersPage from './pages/trainer/TrainerMembersPage'
 import TrainerWorkoutsPage from './pages/trainer/TrainerWorkoutsPage'
@@ -77,12 +78,6 @@ const ownerLinks = [
   { to: '/owner-dashboard/website', icon: 'website', label: 'Website' },
 ]
 
-const trainerLinks = [
-  { to: '/trainer-dashboard', icon: 'dashboard', label: 'Dashboard' },
-  { to: '/trainer-dashboard/members', icon: 'members', label: 'My Members' },
-  { to: '/trainer-dashboard/workouts', icon: 'workouts', label: 'Workouts' },
-  { to: '/trainer-dashboard/settings', icon: 'settings', label: 'Settings' },
-]
 
 
 export default function App() {
@@ -146,7 +141,7 @@ export default function App() {
           {/* Trainer dashboard — protected, trainer only */}
           <Route path="/trainer-dashboard" element={
             <ProtectedRoute allowedRoles={['trainer']}>
-              <DashboardLayout sidebarLinks={trainerLinks} />
+              <TrainerLayout />
             </ProtectedRoute>
           }>
             <Route index element={<TrainerDashboard />} />

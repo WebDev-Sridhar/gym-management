@@ -1,25 +1,26 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation, Link } from 'react-router-dom'
+import { NavLink, Outlet, useLocation,Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Home, ClipboardList, User } from 'lucide-react'
+import { Home, Users, Dumbbell, User } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 import { supabaseData as supabase } from '../../services/supabaseClient'
 
 const navItems = [
-  { to: '/member-app',          label: 'Home',    end: true,  Icon: Home },
-  { to: '/member-app/workouts', label: 'Plans',   end: false, Icon: ClipboardList },
-  { to: '/member-app/profile',  label: 'Profile', end: false, Icon: User },
+  { to: '/trainer-dashboard',          label: 'Home',     end: true,  Icon: Home },
+  { to: '/trainer-dashboard/members',  label: 'Members',  end: false, Icon: Users },
+  { to: '/trainer-dashboard/workouts', label: 'Workouts', end: false, Icon: Dumbbell },
+  { to: '/trainer-dashboard/settings', label: 'Profile',  end: false, Icon: User },
 ]
 
-export default function MemberLayout() {
+export default function TrainerLayout() {
   const { profile, gymId } = useAuth()
-  const location = useLocation()
+  const location = useLocation() 
   const [gym, setGym] = useState(null)
 
   useEffect(() => {
-    if (!document.getElementById('pjs-font')) {
+    if (!document.getElementById('pjs-font-trainer')) {
       const l = document.createElement('link')
-      l.id = 'pjs-font'; l.rel = 'stylesheet'
+      l.id = 'pjs-font-trainer'; l.rel = 'stylesheet'
       l.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap'
       document.head.appendChild(l)
     }
@@ -33,7 +34,6 @@ export default function MemberLayout() {
   }, [gymId])
 
   return (
-    // Full-page backdrop — dark on desktop, matches the app on mobile
     <div style={{
       fontFamily: "'Plus Jakarta Sans', sans-serif",
       minHeight: '100dvh',
@@ -42,16 +42,13 @@ export default function MemberLayout() {
       justifyContent: 'center',
       alignItems: 'flex-start',
     }}>
-      {/* Centered phone-width shell */}
       <div style={{
         width: '100%',
-        // maxWidth: '480px',
         minHeight: '100dvh',
         background: '#080910',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        // Subtle card shadow on desktop to lift it off the backdrop
         boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 32px 80px rgba(0,0,0,0.6)',
       }} className="md:max-w-[1080px]">
 
@@ -83,8 +80,13 @@ export default function MemberLayout() {
               {gym?.name || '…'}
             </span>
           </div>
-          <Link to="/member-app/profile" style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800, color: 'white' }}>
-            {profile?.name?.charAt(0).toUpperCase() || 'M'}
+          <Link to="/trainer-dashboard/settings" style={{
+            width: '34px', height: '34px', borderRadius: '50%',
+            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '13px', fontWeight: 800, color: 'white',
+          }}>
+            {profile?.name?.charAt(0).toUpperCase() || 'T'}
           </Link>
         </header>
 
@@ -99,7 +101,7 @@ export default function MemberLayout() {
           </AnimatePresence>
         </main>
 
-        {/* Bottom nav — sticky inside the shell */}
+        {/* Bottom nav */}
         <nav style={{
           position: 'sticky',
           bottom: 0,
@@ -124,7 +126,7 @@ export default function MemberLayout() {
                       {label}
                     </span>
                     {isActive && (
-                      <motion.span layoutId="nav-dot"
+                      <motion.span layoutId="trainer-nav-dot"
                         style={{ position: 'absolute', bottom: '6px', width: '4px', height: '4px', borderRadius: '50%', background: '#818cf8' }} />
                     )}
                   </>
