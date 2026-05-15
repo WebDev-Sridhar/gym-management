@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+﻿import { Link } from 'react-router-dom'
 import {
   Users,
   CreditCard,
@@ -25,8 +25,8 @@ export default function HomePage() {
       icon: Globe,
       link: '/owner-dashboard/website',
       button: 'Customize Website',
-      iconBg: 'bg-violet-100',
-      iconColor: 'text-violet-600',
+      iconBg: 'bg-indigo-100',
+      iconColor: 'text-indigo-600',
     },
     {
       title: 'Configure Payment System',
@@ -54,8 +54,8 @@ export default function HomePage() {
       desc: 'Register a new gym member',
       icon: UserPlus,
       link: '/owner-dashboard/members',
-      iconBg: 'bg-violet-100',
-      iconColor: 'text-violet-600',
+      iconBg: 'bg-indigo-100',
+      iconColor: 'text-indigo-600',
     },
     {
       title: 'Add Trainer',
@@ -97,13 +97,13 @@ export default function HomePage() {
       <div className="bg-white rounded-xl border border-gray-200 p-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-600 text-xs font-medium mb-4">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs font-medium mb-4">
               <Sparkles className="w-3.5 h-3.5" />
               Gymmobius Owner Workspace
             </div>
             <h1 className="text-2xl font-bold text-gray-900 leading-tight">
               Welcome back,{' '}
-              <span className="text-violet-600">{gymName}</span>
+              <span className="text-indigo-600">{gymName}</span>
             </h1>
             <p className="text-sm text-gray-500 mt-2 max-w-xl leading-relaxed">
               Manage your gym operations, members, payments, trainers, and website —
@@ -113,7 +113,7 @@ export default function HomePage() {
           <div className="flex flex-wrap gap-3 shrink-0">
             <Link
               to="/owner-dashboard/members"
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm"
             >
               Open Dashboard
               <ArrowRight className="w-4 h-4" />
@@ -143,7 +143,7 @@ export default function HomePage() {
             return (
               <div
                 key={index}
-                className="bg-white rounded-xl border border-gray-200 p-6 hover:border-violet-300 hover:shadow-sm transition-all group"
+                className="bg-white rounded-xl border border-gray-200 p-6 hover:border-indigo-300 hover:shadow-sm transition-all group"
               >
                 <div className={`w-11 h-11 rounded-xl ${item.iconBg} flex items-center justify-center mb-4`}>
                   <Icon className={`w-5 h-5 ${item.iconColor}`} />
@@ -152,7 +152,7 @@ export default function HomePage() {
                 <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
                 <Link
                   to={item.link}
-                  className="inline-flex items-center gap-1.5 mt-5 text-sm font-medium text-violet-600 hover:text-violet-800 transition-colors"
+                  className="inline-flex items-center gap-1.5 mt-5 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
                 >
                   {item.button}
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -179,7 +179,7 @@ export default function HomePage() {
               <Link
                 key={index}
                 to={item.link}
-                className="bg-white rounded-xl border border-gray-200 p-5 hover:border-violet-300 hover:shadow-sm transition-all group flex flex-col"
+                className="bg-white rounded-xl border border-gray-200 p-5 hover:border-indigo-300 hover:shadow-sm transition-all group flex flex-col"
               >
                 <div className={`w-10 h-10 rounded-lg ${item.iconBg} flex items-center justify-center mb-3`}>
                   <Icon className={`w-4.5 h-4.5 ${item.iconColor}`} />
@@ -212,7 +212,7 @@ export default function HomePage() {
         </div>
 
         {/* CTA card */}
-        <div className="bg-violet-600 rounded-xl p-6 flex flex-col justify-between">
+        <div className="bg-indigo-600 rounded-xl p-6 flex flex-col justify-between">
           <div>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-white/20 text-white text-xs font-medium mb-4">
               Premium Experience
@@ -220,7 +220,7 @@ export default function HomePage() {
             <h2 className="text-xl font-bold text-white leading-snug max-w-xs">
               Build a modern digital experience for your gym members.
             </h2>
-            <p className="text-sm text-violet-100 mt-3 leading-relaxed max-w-sm">
+            <p className="text-sm text-indigo-100 mt-3 leading-relaxed max-w-sm">
               Use Gymmobius to manage memberships, automate operations,
               create a premium website, collect payments online, and scale
               your fitness business professionally.
@@ -228,7 +228,7 @@ export default function HomePage() {
           </div>
           <Link
             to="/owner-dashboard/website"
-            className="inline-flex items-center gap-2 mt-6 px-4 py-2.5 bg-white text-violet-700 font-semibold text-sm rounded-lg hover:bg-violet-50 transition-colors w-fit"
+            className="inline-flex items-center gap-2 mt-6 px-4 py-2.5 bg-white text-indigo-700 font-semibold text-sm rounded-lg hover:bg-indigo-50 transition-colors w-fit"
           >
             Open Website Builder
             <ArrowRight className="w-4 h-4" />

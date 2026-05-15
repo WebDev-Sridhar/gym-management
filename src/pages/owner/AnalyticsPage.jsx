@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo } from 'react'
+﻿import { useState, useEffect, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import {
@@ -58,7 +58,7 @@ function formatRelDate(iso) {
 
 function Sk({ h = '100%', w = '100%', r = 10 }) {
   return (
-    <div className="skeleton-shimmer" style={{ height: h, width: w, borderRadius: r, background: 'rgba(0,0,0,0.06)' }} />
+    <div className="skeleton-shimmer" style={{ height: h, width: w, borderRadius: r }} />
   )
 }
 
@@ -375,7 +375,7 @@ export default function AnalyticsPage() {
                 key={label}
                 onClick={() => setRange(days)}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  range === days ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                  range === days ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
                 {label}
@@ -405,7 +405,7 @@ export default function AnalyticsPage() {
         <>
           {/* ── KPI Cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
-            <KPICard label="Total Revenue"       value={formatRupee(revenue?.total || 0)}                       sub="collected in period"  Icon={IndianRupee} iconBg="bg-violet-50"  iconColor="text-violet-600" sparkData={revenueSparkData} sparkColor="#6366f1" />
+            <KPICard label="Total Revenue"       value={formatRupee(revenue?.total || 0)}                       sub="collected in period"  Icon={IndianRupee} iconBg="bg-indigo-50"  iconColor="text-indigo-600" sparkData={revenueSparkData} sparkColor="#6366f1" />
             <KPICard label="Active Members"       value={membership?.statusCounts?.active ?? 0}                  sub={`of ${membership?.totalMembers ?? 0} total`} Icon={Users}       iconBg="bg-green-50"   iconColor="text-green-600" />
             <KPICard label="Retention Rate"       value={`${retentionRate.toFixed(1)}%`}                        sub="active / total"       Icon={UserCheck}   iconBg="bg-blue-50"    iconColor="text-blue-600" />
             <KPICard label="Avg Daily Check-ins"  value={(attend?.avgPerDay || 0).toFixed(1)}                   sub={`${attend?.total || 0} total visits`} Icon={Activity} iconBg="bg-indigo-50"  iconColor="text-indigo-600" sparkData={attendSparkData} sparkColor="#6366f1" />
@@ -687,7 +687,7 @@ export default function AnalyticsPage() {
                           {m.riskLevel !== 'low' && (
                             <button
                               onClick={() => navigate('/owner-dashboard/members')}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 cursor-pointer transition-colors"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors"
                             >
                               <Eye size={12} />
                               View
@@ -730,7 +730,7 @@ export default function AnalyticsPage() {
                     <div className="space-y-2.5">
                       {payIns.topPayers.map((p, i) => (
                         <div key={i} className="flex items-center gap-3">
-                          <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-xs font-bold text-violet-700 shrink-0">
+                          <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 shrink-0">
                             {p.name?.charAt(0)?.toUpperCase() || '?'}
                           </div>
                           <p className="text-sm text-gray-700 flex-1 truncate">{p.name}</p>
@@ -745,7 +745,7 @@ export default function AnalyticsPage() {
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Pending Dues</p>
                       <button onClick={() => navigate('/owner-dashboard/payments')}
-                        className="text-xs text-violet-600 font-semibold hover:text-violet-800 cursor-pointer transition-colors">
+                        className="text-xs text-indigo-600 font-semibold hover:text-indigo-800 cursor-pointer transition-colors">
                         View all →
                       </button>
                     </div>

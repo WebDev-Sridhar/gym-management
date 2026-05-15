@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { useDialog } from '../../components/ui/Dialog'
 import FormModal from '../../components/ui/FormModal'
@@ -44,12 +44,12 @@ function DbSearch({ type, onAdd }) {
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 border border-violet-200 rounded-xl">
-        <svg className="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" /></svg>
+      <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-xl">
+        <svg className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" /></svg>
         <input value={query} onChange={e => setQuery(e.target.value)}
           placeholder={`Search ${type === 'workout' ? 'exercises' : 'meals'} from library…`}
-          className="flex-1 bg-transparent text-xs text-gray-700 placeholder-violet-300 outline-none" />
-        {query && <button type="button" onClick={() => setQuery('')} className="text-violet-300 hover:text-violet-500 cursor-pointer">
+          className="flex-1 bg-transparent text-xs text-gray-700 placeholder-indigo-300 outline-none" />
+        {query && <button type="button" onClick={() => setQuery('')} className="text-indigo-300 hover:text-indigo-500 cursor-pointer">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>}
       </div>
@@ -59,14 +59,14 @@ function DbSearch({ type, onAdd }) {
           {results.map((item, i) => (
             <button key={i} type="button"
               onClick={() => { onAdd({ ...item, sets: String(item.sets ?? ''), protein: String(item.protein ?? ''), calories: String(item.calories ?? '') }); setQuery('') }}
-              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-violet-50 cursor-pointer text-left border-b border-gray-50 last:border-0">
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-indigo-50 cursor-pointer text-left border-b border-gray-50 last:border-0">
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-gray-900">{item[nameKey]}</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">
                   {type === 'workout' ? `${item.sets} sets · ${item.reps} reps · ${item.rest} rest` : `${item.calories} kcal · ${item.protein}g protein`}
                 </p>
               </div>
-              <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-lg shrink-0">+ Add</span>
+              <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg shrink-0">+ Add</span>
             </button>
           ))}
         </div>
@@ -79,7 +79,7 @@ function DbSearch({ type, onAdd }) {
 function DayEditor({ type, day, onChange }) {
   const items   = type === 'workout' ? (day.exercises || []) : (day.meals || [])
   const itemKey = type === 'workout' ? 'exercises' : 'meals'
-  const inputCls = 'px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-violet-500 w-full transition-all'
+  const inputCls = 'px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-500 w-full transition-all'
 
   const setItems = (fn) => onChange({ ...day, [itemKey]: fn(items) })
   const addItem  = (item) => setItems(r => [...r, item])
@@ -192,7 +192,7 @@ function TemplateForm({ type, initial, onSave, onCancel }) {
           <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Template Title</label>
           <input value={title} onChange={e => setTitle(e.target.value)} autoFocus
             placeholder={type === 'workout' ? 'e.g. 5-Day Strength Split' : 'e.g. High Protein Cut — Weekly'}
-            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all" />
+            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all" />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">
@@ -200,7 +200,7 @@ function TemplateForm({ type, initial, onSave, onCancel }) {
           </label>
           <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
             placeholder="Brief overview of the plan…"
-            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-violet-500 resize-none transition-all" />
+            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 resize-none transition-all" />
         </div>
       </div>
 
@@ -217,13 +217,13 @@ function TemplateForm({ type, initial, onSave, onCancel }) {
             return (
               <button key={i} type="button" onClick={() => setActiveDay(i)}
                 className={`flex flex-col items-center px-3 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all cursor-pointer border ${
-                  isActive ? 'bg-violet-600 text-white border-violet-600 shadow-sm' :
+                  isActive ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' :
                   d.rest ? 'bg-gray-50 text-gray-400 border-gray-200' :
-                  count > 0 ? 'bg-violet-50 text-violet-700 border-violet-200' :
-                  'bg-white text-gray-500 border-gray-200 hover:border-violet-200'
+                  count > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                  'bg-white text-gray-500 border-gray-200 hover:border-indigo-200'
                 }`}>
                 <span>{d.name.slice(0, 3)}</span>
-                <span className={`text-[9px] mt-0.5 font-normal ${isActive ? 'text-violet-200' : d.rest ? 'text-gray-300' : count > 0 ? 'text-violet-400' : 'text-gray-300'}`}>
+                <span className={`text-[9px] mt-0.5 font-normal ${isActive ? 'text-indigo-200' : d.rest ? 'text-gray-300' : count > 0 ? 'text-indigo-400' : 'text-gray-300'}`}>
                   {d.rest ? 'Rest' : count > 0 ? `${count} ${type === 'workout' ? 'ex' : 'ml'}` : 'Empty'}
                 </span>
               </button>
@@ -240,7 +240,7 @@ function TemplateForm({ type, initial, onSave, onCancel }) {
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Day Name</label>
             <input value={currentDay.name} onChange={e => updateDay(activeDay, { name: e.target.value })}
               placeholder="e.g. Chest & Triceps"
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-violet-500 transition-all" />
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all" />
           </div>
           <div className="shrink-0 pt-5">
             <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -262,7 +262,7 @@ function TemplateForm({ type, initial, onSave, onCancel }) {
 
       <div className="flex gap-3 pt-1 border-t border-gray-100">
         <button type="button" onClick={handleSave} disabled={saving}
-          className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer">
+          className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer">
           {saving ? 'Saving…' : initial ? 'Update Template' : 'Create Template'}
         </button>
         <button type="button" onClick={onCancel}
@@ -327,25 +327,25 @@ function AssignModal({ template, planType, gymId, onClose, onAssigned }) {
         <div>
           <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Assign to Member</label>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name or phone…" autoFocus
-            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-violet-500 transition-all" />
+            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all" />
         </div>
 
         <div className="max-h-52 overflow-y-auto space-y-1 -mx-1 px-1">
           {loading ? (
-            <div className="flex justify-center py-6"><div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>
+            <div className="flex justify-center py-6"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
           ) : filtered.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6">No members found</p>
           ) : filtered.map(m => (
             <button key={m.id} type="button" onClick={() => setSelected(m)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left cursor-pointer border transition-all ${selected?.id === m.id ? 'bg-violet-50 border-violet-200' : 'hover:bg-gray-50 border-transparent'}`}>
-              <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold text-xs shrink-0">
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left cursor-pointer border transition-all ${selected?.id === m.id ? 'bg-indigo-50 border-indigo-200' : 'hover:bg-gray-50 border-transparent'}`}>
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-xs shrink-0">
                 {m.name.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-900 truncate">{m.name}</p>
                 {m.phone && <p className="text-xs text-gray-400">{m.phone}</p>}
               </div>
-              {selected?.id === m.id && <svg className="w-4 h-4 text-violet-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+              {selected?.id === m.id && <svg className="w-4 h-4 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
             </button>
           ))}
         </div>
@@ -354,7 +354,7 @@ function AssignModal({ template, planType, gymId, onClose, onAssigned }) {
 
         <div className="flex gap-3 pt-1">
           <button type="button" onClick={handleAssign} disabled={!selected || saving}
-            className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 cursor-pointer transition-all">
+            className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 cursor-pointer transition-all">
             {saving ? 'Assigning…' : selected ? `Assign to ${selected.name}` : 'Select a member'}
           </button>
           <button type="button" onClick={onClose} className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 cursor-pointer">Cancel</button>
@@ -378,7 +378,7 @@ function TemplateCard({ template, type, onEdit, onDelete, onAssign }) {
           <p className="font-semibold text-gray-900 truncate">{template.title}</p>
           {template.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{template.description}</p>}
         </div>
-        <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${type === 'workout' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
+        <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${type === 'workout' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
           {type === 'workout' ? 'Workout' : 'Diet'}
         </span>
       </div>
@@ -416,7 +416,7 @@ function TemplateCard({ template, type, onEdit, onDelete, onAssign }) {
       </div>
 
       <div className="flex gap-2 mt-auto pt-3 border-t border-gray-100">
-        <button onClick={() => onAssign(template)} className="flex-1 py-1.5 text-xs font-semibold text-violet-700 bg-violet-50 rounded-lg hover:bg-violet-100 cursor-pointer transition-colors">Assign</button>
+        <button onClick={() => onAssign(template)} className="flex-1 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 cursor-pointer transition-colors">Assign</button>
         <button onClick={() => onEdit(template)} className="flex-1 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">Edit</button>
         <button onClick={() => onDelete(template)} className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 rounded-lg hover:bg-red-100 cursor-pointer transition-colors">Delete</button>
       </div>
@@ -485,7 +485,7 @@ export default function ProgramsPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -497,7 +497,7 @@ export default function ProgramsPage() {
           <p className="text-sm text-gray-500 mt-0.5">Create weekly workout and diet templates, then assign them to members.</p>
         </div>
         <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 cursor-pointer shadow-sm shadow-violet-200">
+          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 cursor-pointer shadow-sm shadow-indigo-200">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
           New Template
         </button>
@@ -506,9 +506,9 @@ export default function ProgramsPage() {
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
         {[['workout', 'Workouts'], ['diet', 'Diet Plans']].map(([val, label]) => (
           <button key={val} onClick={() => setActiveTab(val)}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-all ${activeTab === val ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`px-5 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-all ${activeTab === val ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {label}
-            <span className={`ml-2 text-xs font-normal ${activeTab === val ? 'text-violet-400' : 'text-gray-400'}`}>
+            <span className={`ml-2 text-xs font-normal ${activeTab === val ? 'text-indigo-400' : 'text-gray-400'}`}>
               {val === 'workout' ? workoutTemplates.length : dietTemplates.length}
             </span>
           </button>
@@ -517,8 +517,8 @@ export default function ProgramsPage() {
 
       {templates.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200">
-          <div className="w-12 h-12 rounded-full bg-violet-50 flex items-center justify-center mb-3">
-            <svg className="w-6 h-6 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
+            <svg className="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
           </div>
           <p className="text-sm font-medium text-gray-700">No {activeTab === 'workout' ? 'workout' : 'diet'} templates yet</p>
           <p className="text-xs text-gray-400 mt-1">Create a weekly template and assign it to your members</p>

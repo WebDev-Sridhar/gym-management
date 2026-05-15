@@ -1,8 +1,34 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchContactMessages, markMessageRead, deleteContactMessage, clearAllMessages } from '../../services/contactService'
 import { useDialog } from '../../components/ui/Dialog'
 import Pagination from '../../components/ui/Pagination'
+import { Sk } from '../../components/ui/Skeleton'
+
+function MessagesSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px]">
+      <div className="space-y-2"><Sk h={28} w={140} /><Sk h={14} w={260} /></div>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 space-y-1.5">
+          <Sk h={16} w={80} /><Sk h={12} w={100} />
+        </div>
+        {Array(7).fill(0).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-50">
+            <Sk h={8} w={8} r={99} />
+            <div className="flex-1 space-y-1.5">
+              <Sk h={13} w="40%" />
+              <Sk h={11} w="55%" />
+              <Sk h={11} w="70%" />
+            </div>
+            <Sk h={11} w={48} />
+            <Sk h={16} w={16} r={4} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function formatRelative(iso) {
   if (!iso) return ''
@@ -68,13 +94,7 @@ export default function MessagesPage() {
   const safeEnquiryPage = Math.min(enquiryPage, enquiryTotalPages)
   const pagedEnquiries = enquiries.slice((safeEnquiryPage - 1) * PAGE_SIZE, safeEnquiryPage * PAGE_SIZE)
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <MessagesSkeleton />
 
   return (
     <div className="space-y-6 max-w-[1200px]">
@@ -89,7 +109,7 @@ export default function MessagesPage() {
             <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
               Inbox
               {unread > 0 && (
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-violet-600 text-white text-[10px] font-bold">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
                   {unread}
                 </span>
               )}
@@ -112,12 +132,12 @@ export default function MessagesPage() {
           <>
             <div className="divide-y divide-gray-50">
               {pagedEnquiries.map(msg => (
-                <div key={msg.id} className={`transition-colors ${!msg.read ? 'bg-violet-50/40' : ''}`}>
+                <div key={msg.id} className={`transition-colors ${!msg.read ? 'bg-indigo-50/40' : ''}`}>
                   <div
                     className="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-gray-50/60 transition-colors"
                     onClick={() => handleExpand(msg.id)}
                   >
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${!msg.read ? 'bg-violet-500' : 'bg-transparent'}`} />
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${!msg.read ? 'bg-indigo-500' : 'bg-transparent'}`} />
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm truncate ${!msg.read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
                         {msg.name}
@@ -143,7 +163,7 @@ export default function MessagesPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <a
                           href={`mailto:${msg.email}?subject=Re: Your enquiry&body=Hi ${msg.name},%0A%0A`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

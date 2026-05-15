@@ -1,4 +1,4 @@
-import { useAuth } from '../../store/AuthContext'
+﻿import { useAuth } from '../../store/AuthContext'
 
 export default function SettingsPage() {
   const { gymId, profile } = useAuth()

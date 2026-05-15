@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchGymDetails, updateGymDetails } from '../../services/membershipService'
 import {
@@ -6,6 +6,27 @@ import {
   saveRazorpayKeys,
   getWebhookUrl,
 } from '../../services/paymentSettingsService'
+import { Sk } from '../../components/ui/Skeleton'
+
+function PaymentSettingsSkeleton() {
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div className="space-y-2"><Sk h={28} w={200} /><Sk h={14} w={280} /></div>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <div className="space-y-1.5"><Sk h={16} w={140} /><Sk h={12} w={220} /></div>
+        <div className="flex gap-4"><Sk h={44} w="50%" r={10} /><Sk h={44} w="50%" r={10} /></div>
+        <Sk h={52} r={10} />
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <div className="space-y-1.5"><Sk h={16} w={160} /><Sk h={12} w={240} /></div>
+        {Array(4).fill(0).map((_, i) => (
+          <div key={i} className="space-y-1.5"><Sk h={12} w={100} /><Sk h={40} r={8} /></div>
+        ))}
+        <Sk h={38} w={120} r={8} />
+      </div>
+    </div>
+  )
+}
 
 export default function PaymentSettingsPage() {
   const { gymId } = useAuth()
@@ -106,13 +127,7 @@ export default function PaymentSettingsPage() {
     setTimeout(() => setCopiedWebhook(false), 1500)
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <PaymentSettingsSkeleton />
 
   const rzpStatus =
     !settings ? 'not_configured'
@@ -136,7 +151,7 @@ export default function PaymentSettingsPage() {
             type="button"
             onClick={() => setPaymentMode('upi')}
             className={`p-4 rounded-lg border-2 text-left transition-all cursor-pointer ${
-              paymentMode === 'upi' ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-300'
+              paymentMode === 'upi' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300'
             }`}
           >
             <p className="text-sm font-semibold text-gray-900">UPI</p>
@@ -148,8 +163,8 @@ export default function PaymentSettingsPage() {
             disabled={!gym?.razorpay_enabled}
             className={`p-4 rounded-lg border-2 text-left transition-all ${
               !gym?.razorpay_enabled ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
-                : paymentMode === 'razorpay' ? 'border-violet-500 bg-violet-50 cursor-pointer'
-                  : 'border-gray-200 hover:border-violet-300 cursor-pointer'
+                : paymentMode === 'razorpay' ? 'border-indigo-500 bg-indigo-50 cursor-pointer'
+                  : 'border-gray-200 hover:border-indigo-300 cursor-pointer'
             }`}
           >
             <p className="text-sm font-semibold text-gray-900">Razorpay</p>
@@ -165,7 +180,7 @@ export default function PaymentSettingsPage() {
               value={upiId}
               onChange={(e) => setUpiId(e.target.value)}
               placeholder="yourname@upi"
-              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
         )}
@@ -203,7 +218,7 @@ export default function PaymentSettingsPage() {
                   type="button"
                   onClick={() => setRzpMode(m)}
                   className={`px-4 py-1.5 text-xs font-medium rounded-lg cursor-pointer transition-all ${
-                    rzpMode === m ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    rzpMode === m ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
                   {m === 'test' ? 'Test' : 'Live'}
@@ -219,7 +234,7 @@ export default function PaymentSettingsPage() {
               value={keyId}
               onChange={(e) => setKeyId(e.target.value)}
               placeholder="rzp_test_..."
-              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 font-mono"
+              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono"
             />
           </div>
 
@@ -232,7 +247,7 @@ export default function PaymentSettingsPage() {
               value={keySecret}
               onChange={(e) => setKeySecret(e.target.value)}
               placeholder={settings?.has_key_secret ? '••••••••••••' : 'Razorpay Key Secret'}
-              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 font-mono"
+              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono"
             />
           </div>
 
@@ -245,7 +260,7 @@ export default function PaymentSettingsPage() {
               value={webhookSecret}
               onChange={(e) => setWebhookSecret(e.target.value)}
               placeholder={settings?.has_webhook_secret ? '••••••••••••' : 'Webhook Secret from Razorpay'}
-              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 font-mono"
+              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono"
             />
           </div>
 
@@ -271,7 +286,7 @@ export default function PaymentSettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
+            className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
           >
             {saving ? 'Validating with Razorpay...' : 'Test & Save Keys'}
           </button>

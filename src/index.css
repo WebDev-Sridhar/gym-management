@@ -1,6 +1,48 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
 
+/* ─── Design System Tokens ────────────────────────────────────────────────── */
+:root {
+  /* Brand — Indigo is the single primary across all apps */
+  --p:          #6366f1;               /* indigo-500 */
+  --p-dark:     #4f46e5;               /* indigo-600 */
+  --p-light:    #818cf8;               /* indigo-400 */
+  --p-pale:     #c7d2fe;               /* indigo-200 */
+  --p-tint:     rgba(99,102,241,0.10); /* subtle bg tint */
+  --p-glow:     rgba(99,102,241,0.22); /* border / glow */
+  --p-gradient: linear-gradient(135deg, #6366f1, #818cf8);
+
+  /* Semantic */
+  --c-success:  #10b981;
+  --c-success-t:rgba(16,185,129,0.12);
+  --c-warning:  #f59e0b;
+  --c-warning-t:rgba(245,158,11,0.12);
+  --c-danger:   #ef4444;
+  --c-danger-t: rgba(239,68,68,0.12);
+  --c-info:     #3b82f6;
+  --c-info-t:   rgba(59,130,246,0.12);
+
+  /* Dark shell — owner sidebar + topbar */
+  --shell-bg:      #09090f;
+  --shell-border:  rgba(255,255,255,0.06);
+  --shell-surface: rgba(255,255,255,0.05);
+  --shell-text:    rgba(255,255,255,0.85);
+  --shell-muted:   rgba(255,255,255,0.45);
+  --shell-faint:   rgba(255,255,255,0.25);
+
+  /* Dark app — trainer + member */
+  --app-bg:        #04050d;
+  --app-canvas:    #080910;
+  --app-header:    rgba(8,9,16,0.95);
+  --app-card:      rgba(255,255,255,0.03);
+  --app-card-b:    rgba(255,255,255,0.07);
+  --app-text:      #f5f5f7;
+  --app-muted:     rgba(255,255,255,0.45);
+  --app-faint:     rgba(255,255,255,0.25);
+  --app-nav-bg:    rgba(8,9,16,0.97);
+  --app-nav-b:     rgba(255,255,255,0.06);
+}
+
 @keyframes fadeScaleIn {
   from { opacity: 0; transform: scale(0.95); }
   to   { opacity: 1; transform: scale(1); }
@@ -100,7 +142,7 @@ html.lenis body {
 
 /* Selection styling */
 ::selection {
-  background-color: rgba(139, 92, 246, 0.3);
+  background-color: var(--p-glow);
   color: var(--color-text-primary);
 }
 
@@ -157,20 +199,35 @@ html.lenis body {
 [data-gym-theme="light"] [data-force-white] .placeholder-white\/20::placeholder { color: rgba(255,255,255,0.20) !important; opacity: 1; }
 
 /* ─── Skeleton shimmer ─────────────────────────────────────────────────────── */
-@keyframes trainer-shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position:  400px 0; }
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
 }
+
+/* Light variant — owner dashboard (white card backgrounds) */
 .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #ebebeb 0%,
+    #f5f5f5 50%,
+    #ebebeb 100%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Dark variant — trainer + member app (dark card backgrounds) */
+.skeleton-shimmer-dark {
   background: linear-gradient(
     90deg,
     rgba(255,255,255,0.04) 0%,
     rgba(255,255,255,0.09) 50%,
     rgba(255,255,255,0.04) 100%
   );
-  background-size: 400px 100%;
-  animation: trainer-shimmer 1.4s ease-in-out infinite;
-  border-radius: 10px;
+  background-size: 600px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
 }
 
 /* Screen shell — hide scrollbar on mobile for both trainer and member apps */

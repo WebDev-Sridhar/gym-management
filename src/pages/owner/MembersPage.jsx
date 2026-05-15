@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchMembers, createMember, assignPlan, deleteMember, updateMember, fetchPlans } from '../../services/membershipService'
 import { fetchTrainers, assignTrainerToMember } from '../../services/trainerService'
@@ -6,6 +6,36 @@ import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
 import MemberDrawer from '../../components/ui/MemberDrawer'
 import Pagination from '../../components/ui/Pagination'
+import { Sk } from '../../components/ui/Skeleton'
+
+function MembersSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px]">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2"><Sk h={28} w={140} /><Sk h={14} w={180} /></div>
+        <Sk h={38} w={120} r={10} />
+      </div>
+      <div className="flex gap-2">
+        {Array(5).fill(0).map((_, i) => <Sk key={i} h={32} w={72} r={20} />)}
+      </div>
+      <Sk h={38} w={260} r={10} />
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 flex gap-4">
+          {['Member','Phone','Plan','Status','Actions'].map(c => <Sk key={c} h={12} w={80} />)}
+        </div>
+        {Array(8).fill(0).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-gray-50">
+            <Sk h={36} w={36} r={99} />
+            <div className="flex-1 space-y-1.5"><Sk h={14} w="45%" /><Sk h={11} w="30%" /></div>
+            <Sk h={12} w={90} />
+            <Sk h={22} w={64} r={20} />
+            <Sk h={12} w={60} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function MembersPage() {
   const dialog = useDialog()
@@ -200,13 +230,7 @@ export default function MembersPage() {
     inactive: members.filter((m) => getMemberStatus(m) === 'inactive').length,
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <MembersSkeleton />
 
   return (
     <div className="space-y-6 max-w-[1200px]">
@@ -218,7 +242,7 @@ export default function MembersPage() {
         </div>
         <button
           onClick={() => { setShowAddForm(!showAddForm); setError(''); setNewPlanId('') }}
-          className="px-4 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer"
+          className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
         >
           {showAddForm ? 'Cancel' : '+ Add Member'}
         </button>
@@ -232,15 +256,15 @@ export default function MembersPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Name <span className="text-red-500">*</span></label>
-                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" autoFocus />
+                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" autoFocus />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
-                <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, ''))} placeholder="10-digit mobile" maxLength={10} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, ''))} placeholder="10-digit mobile" maxLength={10} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email address" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email address" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -258,7 +282,7 @@ export default function MembersPage() {
               </div>
             </div>
             {error && !editingId && <p className="text-red-500 text-xs">{error}</p>}
-            <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2">
+            <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2">
               {submitting && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               {submitting ? 'Adding...' : 'Add Member'}
             </button>
@@ -275,7 +299,7 @@ export default function MembersPage() {
             </button>
           ))}
         </div>
-        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search members..." className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 w-full sm:w-64" />
+        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search members..." className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full sm:w-64" />
       </div>
 
       {/* Members table */}
@@ -311,10 +335,10 @@ export default function MembersPage() {
                       <td className="px-5 py-4">
                         {editingId === member.id ? (
                           <form onSubmit={handleEditMember} className="flex flex-wrap items-center gap-2">
-                            <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm w-28 outline-none focus:border-violet-500" />
-                            <input value={editPhone} onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, ''))} placeholder="Phone" maxLength={10} className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm w-24 outline-none focus:border-violet-500" />
-                            <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email" className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm w-36 outline-none focus:border-violet-500" />
-                            <button type="submit" disabled={submitting} className="px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 cursor-pointer disabled:opacity-50">Save</button>
+                            <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm w-28 outline-none focus:border-indigo-500" />
+                            <input value={editPhone} onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, ''))} placeholder="Phone" maxLength={10} className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm w-24 outline-none focus:border-indigo-500" />
+                            <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email" className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm w-36 outline-none focus:border-indigo-500" />
+                            <button type="submit" disabled={submitting} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 cursor-pointer disabled:opacity-50">Save</button>
                             <button type="button" onClick={() => setEditingId(null)} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
                           </form>
                         ) : (
@@ -322,11 +346,11 @@ export default function MembersPage() {
                             onClick={() => setDrawerMember(member)}
                             className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity cursor-pointer"
                           >
-                            <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-semibold text-sm shrink-0">
+                            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-sm shrink-0">
                               {member.name?.charAt(0).toUpperCase() || '?'}
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-gray-900 hover:text-violet-700 transition-colors">{member.name || 'Unnamed'}</p>
+                              <p className="text-sm font-medium text-gray-900 hover:text-indigo-700 transition-colors">{member.name || 'Unnamed'}</p>
                               <p className="text-xs text-gray-400">{member.phone || member.email || 'No contact'}</p>
                             </div>
                           </button>
@@ -375,7 +399,7 @@ export default function MembersPage() {
                                   label: `${p.name} \u2014 \u20B9${Number(p.price).toLocaleString('en-IN')}`,
                                 }))}
                               />
-                              <button onClick={() => handleAssignPlan(member.id)} disabled={!selectedPlanId || submitting} className="px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 cursor-pointer">{submitting ? '...' : 'Assign'}</button>
+                              <button onClick={() => handleAssignPlan(member.id)} disabled={!selectedPlanId || submitting} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">{submitting ? '...' : 'Assign'}</button>
                               <button onClick={() => { setAssigningId(null); setSelectedPlanId('') }} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
                             </div>
                           ) : assigningTrainerId === member.id ? (
@@ -383,17 +407,17 @@ export default function MembersPage() {
                               <select
                                 value={selectedTrainerId}
                                 onChange={e => setSelectedTrainerId(e.target.value)}
-                                className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-violet-500 bg-gray-50"
+                                className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-500 bg-gray-50"
                               >
                                 <option value="">No trainer</option>
                                 {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                               </select>
-                              <button onClick={() => handleAssignTrainer(member.id)} disabled={submitting} className="px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 cursor-pointer">{submitting ? '...' : 'Save'}</button>
+                              <button onClick={() => handleAssignTrainer(member.id)} disabled={submitting} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">{submitting ? '...' : 'Save'}</button>
                               <button onClick={() => { setAssigningTrainerId(null); setSelectedTrainerId('') }} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
                             </div>
                           ) : editingId !== member.id ? (
                             <>
-                              <button onClick={() => { setAssigningId(member.id); setSelectedPlanId(member.plan_id || '') }} className="text-xs text-violet-600 hover:text-violet-800 font-medium cursor-pointer">
+                              <button onClick={() => { setAssigningId(member.id); setSelectedPlanId(member.plan_id || '') }} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">
                                 {member.plan_id ? 'Change Plan' : 'Assign Plan'}
                               </button>
                               <button onClick={() => { setAssigningTrainerId(member.id); setSelectedTrainerId(member.trainer_id || '') }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium cursor-pointer ml-1">

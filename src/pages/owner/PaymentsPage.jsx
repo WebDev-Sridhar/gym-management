@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchPayments, markPaymentPaid } from '../../services/paymentService'
 import { fetchMembers, fetchPlans, fetchGymDetails } from '../../services/membershipService'
@@ -6,6 +6,35 @@ import { sendPaymentReminder, fetchLastReminders } from '../../services/reminder
 import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
 import Pagination from '../../components/ui/Pagination'
+import { Sk } from '../../components/ui/Skeleton'
+
+function PaymentsSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px]">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2"><Sk h={28} w={140} /><Sk h={14} w={200} /></div>
+        <Sk h={38} w={140} r={10} />
+      </div>
+      <div className="flex gap-2">
+        {Array(4).fill(0).map((_, i) => <Sk key={i} h={32} w={80} r={20} />)}
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 grid grid-cols-5 gap-4">
+          {Array(5).fill(0).map((_, i) => <Sk key={i} h={12} w="80%" />)}
+        </div>
+        {Array(8).fill(0).map((_, i) => (
+          <div key={i} className="grid grid-cols-5 gap-4 items-center px-5 py-4 border-b border-gray-50">
+            <div className="space-y-1.5"><Sk h={14} w="80%" /><Sk h={11} w="60%" /></div>
+            <Sk h={12} w="70%" />
+            <Sk h={14} w="60%" />
+            <Sk h={22} w={64} r={20} />
+            <div className="flex gap-2"><Sk h={28} w={60} r={8} /><Sk h={28} w={60} r={8} /></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function PaymentsPage() {
   const dialog = useDialog()
@@ -177,13 +206,7 @@ export default function PaymentsPage() {
   const selectedPlan = plans.find((p) => p.id === selectedPlanId)
   const autoSelectedPlan = selectedMemberId && selectedMember?.plan_id === selectedPlanId
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <PaymentsSkeleton />
 
   return (
     <div className="space-y-6 max-w-[1200px]">
@@ -195,7 +218,7 @@ export default function PaymentsPage() {
         </div>
         <button
           onClick={() => { setShowCollect(!showCollect); resetCollect() }}
-          className="px-4 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer"
+          className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
         >
           {showCollect ? 'Cancel' : '+ Collect Payment'}
         </button>
@@ -207,7 +230,7 @@ export default function PaymentsPage() {
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-base font-semibold text-gray-900">Create &amp; Send Payment</h2>
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-              gym?.payment_mode === 'razorpay' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'
+              gym?.payment_mode === 'razorpay' ? 'bg-indigo-50 text-indigo-700' : 'bg-blue-50 text-blue-700'
             }`}>
               {gym?.payment_mode === 'razorpay' ? 'Razorpay link' : 'UPI pay page'}
             </span>
@@ -221,12 +244,12 @@ export default function PaymentsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Member</label>
                 <div
                   className={`flex items-center w-full px-3 py-2.5 bg-gray-50 border rounded-lg text-sm transition-colors ${
-                    memberDropdownOpen ? 'border-violet-500 ring-1 ring-violet-500 bg-white' : 'border-gray-200'
+                    memberDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500 bg-white' : 'border-gray-200'
                   }`}
                 >
                   {/* Avatar dot when a member is selected */}
                   {selectedMemberId && (
-                    <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-semibold text-xs mr-2 shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-xs mr-2 shrink-0">
                       {selectedMember?.name?.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -268,11 +291,11 @@ export default function PaymentsPage() {
                             <button
                               type="button"
                               onMouseDown={(e) => { e.preventDefault(); selectMember(m) }}
-                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-violet-50 transition-colors cursor-pointer ${
-                                selectedMemberId === m.id ? 'bg-violet-50' : ''
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-indigo-50 transition-colors cursor-pointer ${
+                                selectedMemberId === m.id ? 'bg-indigo-50' : ''
                               }`}
                             >
-                              <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-semibold text-xs shrink-0">
+                              <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-xs shrink-0">
                                 {m.name.charAt(0).toUpperCase()}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -282,7 +305,7 @@ export default function PaymentsPage() {
                                   : <p className="text-xs text-amber-500">No phone</p>}
                               </div>
                               {selectedMemberId === m.id && (
-                                <svg className="w-4 h-4 text-violet-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <svg className="w-4 h-4 text-indigo-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>
                               )}
@@ -300,7 +323,7 @@ export default function PaymentsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Plan
                   {autoSelectedPlan && (
-                    <span className="ml-2 text-xs font-normal text-violet-500">auto-selected</span>
+                    <span className="ml-2 text-xs font-normal text-indigo-500">auto-selected</span>
                   )}
                 </label>
                 <CustomSelect
@@ -318,7 +341,7 @@ export default function PaymentsPage() {
             {/* Summary preview */}
             {selectedMemberId && selectedPlanId && selectedMember && selectedPlan && (
               <div className="flex items-start gap-3 bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
-                <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-semibold text-sm shrink-0 mt-0.5">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-sm shrink-0 mt-0.5">
                   {selectedMember.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -399,7 +422,7 @@ export default function PaymentsPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
               >
                 {submitting && (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -454,7 +477,7 @@ export default function PaymentsPage() {
                   <tr key={payment.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-semibold text-sm shrink-0">{payment.member?.name?.charAt(0).toUpperCase() || '?'}</div>
+                        <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-sm shrink-0">{payment.member?.name?.charAt(0).toUpperCase() || '?'}</div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">{payment.member?.name || 'Unknown'}</p>
                           <p className="text-xs text-gray-400">{payment.member?.phone || payment.member?.email || ''}</p>
@@ -536,7 +559,7 @@ export default function PaymentsPage() {
                                   const link = payment.razorpay_link_url || `${window.location.origin}/pay/${payment.pay_token}`
                                   navigator.clipboard.writeText(link)
                                 }}
-                                className="text-xs text-violet-600 hover:text-violet-800 font-medium cursor-pointer"
+                                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
                               >
                                 Copy Link
                               </button>

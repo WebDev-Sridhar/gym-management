@@ -75,7 +75,7 @@ export default function TrainerLayout() {
       <div style={{
         fontFamily: "'Plus Jakarta Sans', sans-serif",
         minHeight: '100dvh',
-        background: '#04050d',
+        background: 'var(--app-bg)',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'flex-start',
@@ -83,7 +83,7 @@ export default function TrainerLayout() {
         <div style={{
           width: '100%',
           minHeight: '100dvh',
-          background: '#080910',
+          background: 'var(--app-canvas)',
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
@@ -92,7 +92,7 @@ export default function TrainerLayout() {
 
           {/* ── Header ─────────────────────────────────────────────────────── */}
           <header style={{
-            background: 'rgba(8,9,16,0.95)',
+            background: 'var(--app-header)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
             borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -111,7 +111,7 @@ export default function TrainerLayout() {
               ) : (
                 <div style={{
                   width: 32, height: 32, borderRadius: 10,
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  background: 'var(--p-gradient)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <span style={{ color: 'white', fontWeight: 800, fontSize: 14 }}>
@@ -129,7 +129,7 @@ export default function TrainerLayout() {
               onClick={() => goTo('/trainer-dashboard/settings')}
               style={{
                 width: 34, height: 34, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                background: 'var(--p-gradient)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 13, fontWeight: 800, color: 'white',
                 border: 'none', cursor: 'pointer', padding: 0,
@@ -160,10 +160,10 @@ export default function TrainerLayout() {
           <nav style={{
             position: 'sticky',
             bottom: 0,
-            background: 'rgba(8,9,16,0.97)',
+            background: 'var(--app-nav-bg)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
-            borderTop: '1px solid rgba(255,255,255,0.06)',
+            borderTop: '1px solid var(--app-nav-b)',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             zIndex: 50,
           }}>
@@ -184,14 +184,14 @@ export default function TrainerLayout() {
                     <motion.span
                       animate={{ scale: isActive ? 1.08 : 1 }}
                       transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-                      style={{ color: isActive ? '#818cf8' : 'rgba(255,255,255,0.28)', display: 'block' }}
+                      style={{ color: isActive ? 'var(--p-light)' : 'var(--app-faint)', display: 'block' }}
                     >
                       <Icon size={22} strokeWidth={isActive ? 2.2 : 1.8} />
                     </motion.span>
                     <span style={{
                       fontSize: 10,
                       fontWeight: isActive ? 700 : 500,
-                      color: isActive ? '#818cf8' : 'rgba(255,255,255,0.28)',
+                      color: isActive ? 'var(--p-light)' : 'var(--app-faint)',
                       letterSpacing: '0.2px',
                     }}>
                       {label}
@@ -202,7 +202,7 @@ export default function TrainerLayout() {
                         style={{
                           position: 'absolute', top: 0,
                           width: 20, height: 3, borderRadius: 99,
-                          background: '#818cf8',
+                          background: 'var(--p-light)',
                         }}
                       />
                     )}

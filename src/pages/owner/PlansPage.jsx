@@ -1,10 +1,37 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchPlans, createPlan, updatePlan, deletePlan, fetchMembers } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
 import FormModal from '../../components/ui/FormModal'
+import { Sk } from '../../components/ui/Skeleton'
 
-const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500'
+function PlansSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px]">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2"><Sk h={28} w={120} /><Sk h={14} w={180} /></div>
+        <Sk h={38} w={120} r={10} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array(6).fill(0).map((_, i) => (
+          <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <Sk h={40} w={40} r={12} />
+              <Sk h={22} w={48} r={20} />
+            </div>
+            <div className="space-y-2"><Sk h={18} w="60%" /><Sk h={13} w="40%" /></div>
+            <div className="space-y-1.5"><Sk h={12} w="70%" /><Sk h={12} w="55%" /></div>
+            <div className="flex gap-2 pt-2 border-t border-gray-50">
+              <Sk h={32} w="50%" r={8} /><Sk h={32} w="50%" r={8} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 
 function PlanForm({ initial, onSave, onCancel }) {
   const [name, setName] = useState(initial?.name ?? '')
@@ -76,7 +103,7 @@ function PlanForm({ initial, onSave, onCancel }) {
         <button
           type="submit"
           disabled={submitting}
-          className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+          className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
         >
           {submitting && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {submitting ? 'Saving...' : (initial ? 'Save Changes' : 'Create Plan')}
@@ -146,13 +173,7 @@ export default function PlansPage() {
     return months === 1 ? '1 month' : months === 12 ? '1 year' : `${months} months`
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <PlansSkeleton />
 
   return (
     <div className="space-y-6 max-w-[1200px]">
@@ -164,7 +185,7 @@ export default function PlansPage() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="px-4 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer"
+          className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
         >
           + New Plan
         </button>
@@ -204,7 +225,7 @@ export default function PlansPage() {
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-gray-900 leading-tight">{plan.name}</h3>
                   {memberCount > 0 && (
-                    <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 font-medium">
+                    <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium">
                       {memberCount} member{memberCount !== 1 ? 's' : ''}
                     </span>
                   )}
@@ -216,7 +237,7 @@ export default function PlansPage() {
                 <div className="mt-auto pt-4 flex items-center gap-4">
                   <button
                     onClick={() => setEditingPlan(plan)}
-                    className="text-xs text-violet-600 hover:text-violet-800 font-medium cursor-pointer transition-colors"
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer transition-colors"
                   >
                     Edit
                   </button>

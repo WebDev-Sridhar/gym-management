@@ -7,9 +7,6 @@ import {
   Settings, LogOut, User, Gem, CheckCircle2, AlertCircle, Clock,
 } from 'lucide-react'
 
-const TOPBAR_BG = '#07050aff'
-// const TOPBAR_BG = '#0e1035'
-
 const NAV_LINKS = [
   { to: '/owner-dashboard/home',            label: 'Home',          Icon: Home },
   { to: '/owner-dashboard',                  label: 'Dashboard',     Icon: LayoutDashboard, end: true },
@@ -110,7 +107,7 @@ export default function Topbar({ onMenuToggle }) {
     <>
       <header style={{
         height: 64,
-        background: TOPBAR_BG,
+        background: 'var(--shell-bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -118,7 +115,7 @@ export default function Topbar({ onMenuToggle }) {
         flexShrink: 0,
         zIndex: 30,
         position: 'relative',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid var(--shell-border)',
       }}>
 
         {/* Left — Hamburger (mobile) + Logo */}
@@ -126,7 +123,7 @@ export default function Topbar({ onMenuToggle }) {
           <button
             className="flex md:hidden"
             onClick={onMenuToggle}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', padding: '4px 6px', alignItems: 'center', borderRadius: 8 }}
+            style={{ background: 'none', border: 'none', color: 'var(--shell-text)', cursor: 'pointer', padding: '4px 6px', alignItems: 'center', borderRadius: 8 }}
           >
             <Menu size={22} strokeWidth={2} />
           </button>
@@ -141,7 +138,7 @@ export default function Topbar({ onMenuToggle }) {
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            background: 'rgba(255,255,255,0.07)',
+            background: 'var(--shell-surface)',
             borderRadius: 12,
             padding: '4px',
           }}>
@@ -160,8 +157,8 @@ export default function Topbar({ onMenuToggle }) {
                   fontWeight: 600,
                   textDecoration: 'none',
                   transition: 'all 0.15s',
-                  background: isActive ? '#8B5CF6' : 'transparent',
-                  color: isActive ? '#fff' : 'rgba(255,255,255,0.6)',
+                  background: isActive ? 'var(--p)' : 'transparent',
+                  color: isActive ? '#fff' : 'var(--shell-muted)',
                 })}
               >
                 {Icon && <Icon size={14} strokeWidth={2} />}
@@ -178,14 +175,14 @@ export default function Topbar({ onMenuToggle }) {
           {isOwner && (
             <button
               onClick={() => setPanelOpen(v => !v)}
-              style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'rgba(255,255,255,0.7)', display: 'flex' }}
+              style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--shell-text)', display: 'flex' }}
             >
               <Bell size={20} strokeWidth={1.8} />
               {unread > 0 && (
                 <span style={{
                   position: 'absolute', top: 2, right: 2,
                   minWidth: 16, height: 16, padding: '0 4px',
-                  background: '#ef4444', color: '#fff', fontSize: 9, fontWeight: 700,
+                  background: 'var(--c-danger)', color: '#fff', fontSize: 9, fontWeight: 700,
                   borderRadius: 99, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   {unread > 9 ? '9+' : unread}
@@ -202,7 +199,7 @@ export default function Topbar({ onMenuToggle }) {
             >
               <div style={{
                 width: 36, height: 36, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                background: 'var(--p-gradient)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0,
               }}>
@@ -210,11 +207,11 @@ export default function Topbar({ onMenuToggle }) {
               </div>
               <div className="hidden sm:block" style={{ lineHeight: 1.2, textAlign: 'left' }}>
                 <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, margin: 0 }}>{profile?.name?.split(' ')[0] || 'Owner'}</p>
-                <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, margin: 0, textTransform: 'capitalize' }}>{profile?.role || 'Owner'}</p>
+                <p style={{ color: 'var(--shell-muted)', fontSize: 11, margin: 0, textTransform: 'capitalize' }}>{profile?.role || 'Owner'}</p>
               </div>
               <ChevronDown
                 className="hidden sm:block"
-                size={14} color="rgba(255,255,255,0.4)" strokeWidth={2}
+                size={14} color="var(--shell-faint)" strokeWidth={2}
                 style={{ transition: 'transform 0.2s', transform: profileOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
               />
             </button>
@@ -235,14 +232,14 @@ export default function Topbar({ onMenuToggle }) {
                   overflow: 'hidden', zIndex: 100,
                 }}>
                   {/* Account header */}
-                  <div style={{ padding: '18px 18px 14px', background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ padding: '18px 18px 14px', background: 'linear-gradient(135deg, #eef2ff, #e0e7ff)', borderBottom: '1px solid #e5e7eb' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{
                         width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                        background: 'var(--p-gradient)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 16, fontWeight: 800, color: '#fff',
-                        boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
+                        boxShadow: '0 4px 12px var(--p-glow)',
                       }}>
                         {initials}
                       </div>
@@ -258,12 +255,12 @@ export default function Topbar({ onMenuToggle }) {
                           display: 'inline-block', marginTop: 5,
                           fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
                           padding: '2px 8px', borderRadius: 20,
-                          background: 'rgba(99,102,241,0.12)', color: '#6366f1',
+                          background: 'var(--p-tint)', color: 'var(--p)',
                         }}>
                           {profile?.role || 'Owner'}
                         </span>
                         {gymName && (
-                          <p style={{ fontSize: 11, color: '#6366f1', margin: '3px 0 0', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <p style={{ fontSize: 11, color: 'var(--p)', margin: '3px 0 0', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {gymName}
                           </p>
                         )}
@@ -278,7 +275,7 @@ export default function Topbar({ onMenuToggle }) {
                     <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Gem size={14} color="#6366f1" strokeWidth={2} />
+                          <Gem size={14} color="var(--p)" strokeWidth={2} />
                           <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{sub.plan_name || 'Plan'}</span>
                         </div>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${sc.color} ${sc.bg} ${sc.border}`}>
@@ -325,13 +322,13 @@ export default function Topbar({ onMenuToggle }) {
                       width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                       padding: '9px 10px', borderRadius: 10, border: 'none', background: 'none',
                       cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-                      color: '#ef4444', fontSize: 13, fontWeight: 600,
+                      color: 'var(--c-danger)', fontSize: 13, fontWeight: 600,
                       transition: 'background 0.12s',
                     }}
                       onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}
                     >
-                      <LogOut size={15} strokeWidth={2} color="#ef4444" />
+                      <LogOut size={15} strokeWidth={2} color="var(--c-danger)" />
                       Sign out
                     </button>
                   </div>

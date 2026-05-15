@@ -1,5 +1,38 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import { Sk } from '../../components/ui/Skeleton'
+
+function WebsiteSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px]">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2"><Sk h={28} w={180} /><Sk h={14} w={260} /></div>
+        <Sk h={36} w={110} r={10} />
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        {Array(7).fill(0).map((_, i) => <Sk key={i} h={34} w={90} r={8} />)}
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <Sk h={18} w={160} />
+        {Array(4).fill(0).map((_, i) => (
+          <div key={i} className="space-y-1.5"><Sk h={12} w={120} /><Sk h={42} r={8} /></div>
+        ))}
+        <div className="flex gap-4">
+          <div className="flex-1 space-y-1.5"><Sk h={12} w={80} /><Sk h={100} r={8} /></div>
+          <div className="flex-1 space-y-1.5"><Sk h={12} w={80} /><Sk h={100} r={8} /></div>
+        </div>
+        <Sk h={38} w={100} r={8} />
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <Sk h={18} w={140} />
+        {Array(3).fill(0).map((_, i) => (
+          <div key={i} className="space-y-1.5"><Sk h={12} w={100} /><Sk h={42} r={8} /></div>
+        ))}
+        <Sk h={38} w={100} r={8} />
+      </div>
+    </div>
+  )
+}
 import imageCompression from 'browser-image-compression'
 import { useAuth } from '../../store/AuthContext'
 import { supabaseData } from '../../services/supabaseClient'
@@ -237,7 +270,7 @@ function SectionVisibilityToggle({ sectionId, gymId, content, onSave, label }) {
 
 // ─── Shared UI Atoms ────────────────────────────────────────────────────────────
 const inputCls =
-  'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors'
+  'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors'
 
 function Field({ label, hint, children, required }) {
   return (
@@ -254,7 +287,7 @@ function Field({ label, hint, children, required }) {
 function SaveBtn({ saving, label = 'Save Changes', type = 'submit', onClick }) {
   return (
     <button type={type} onClick={onClick} disabled={saving}
-      className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-60">
+      className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-60">
       {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />}
       {saving ? 'Saving…' : label}
     </button>
@@ -308,12 +341,12 @@ function ItemRow({ title, subtitle, badge, onEdit, onDelete, deleting }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-medium text-gray-900 truncate">{title}</p>
-          {badge && <span className="shrink-0 text-xs px-2 py-0.5 bg-violet-50 text-violet-700 rounded-full font-medium">{badge}</span>}
+          {badge && <span className="shrink-0 text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-medium">{badge}</span>}
         </div>
         {subtitle && <p className="text-xs text-gray-400 mt-0.5 truncate">{subtitle}</p>}
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <button type="button" onClick={onEdit} className="px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors cursor-pointer">Edit</button>
+        <button type="button" onClick={onEdit} className="px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer">Edit</button>
         <button type="button" onClick={onDelete} disabled={deleting} className="px-2.5 py-1.5 text-xs font-medium text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer disabled:opacity-40">
           {deleting ? '…' : 'Delete'}
         </button>
@@ -325,7 +358,7 @@ function ItemRow({ title, subtitle, badge, onEdit, onDelete, deleting }) {
 function AddBtn({ onClick, label }) {
   return (
     <button type="button" onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 cursor-pointer transition-colors">
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 cursor-pointer transition-colors">
       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
       {label}
     </button>
@@ -454,9 +487,9 @@ function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
           <div className="flex flex-col gap-2">
             <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
             <button type="button" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors cursor-pointer disabled:opacity-50">
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer disabled:opacity-50">
               {logoUploading ? (
-                <><span className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />Uploading…</>
+                <><span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />Uploading…</>
               ) : (
                 <>{logoUrl ? 'Replace Logo' : 'Upload Logo'}</>
               )}
@@ -484,11 +517,11 @@ function ThemePanel({ gym, gymId, onSave, setPreviewData }) {
           ].map(m => (
             <button key={m.value} type="button" onClick={() => handleThemeMode(m.value)}
               className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all cursor-pointer text-left ${
-                themeMode === m.value ? 'border-violet-500 bg-violet-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                themeMode === m.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'
               }`}>
-              <m.Icon size={18} className={themeMode === m.value ? 'text-violet-600' : 'text-gray-400'} />
+              <m.Icon size={18} className={themeMode === m.value ? 'text-indigo-600' : 'text-gray-400'} />
               <div>
-                <p className={`text-sm font-semibold ${themeMode === m.value ? 'text-violet-700' : 'text-gray-700'}`}>{m.label}</p>
+                <p className={`text-sm font-semibold ${themeMode === m.value ? 'text-indigo-700' : 'text-gray-700'}`}>{m.label}</p>
                 <p className="text-xs text-gray-400">{m.desc}</p>
               </div>
             </button>
@@ -616,7 +649,7 @@ function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
             {FONT_OPTIONS.map(f => (
               <button key={f.value} type="button" onClick={() => handleFontFamily(f.value)}
                 className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all cursor-pointer ${
-                  fontFamily === f.value ? 'border-violet-500 bg-violet-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                  fontFamily === f.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}>
                 <span className="text-lg font-bold text-gray-800 mb-1" style={f.style}>{f.sample}</span>
                 <span className="text-xs text-gray-500">{f.label}</span>
@@ -632,7 +665,7 @@ function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
             {HEADING_SIZE_OPTIONS.map(h => (
               <button key={h.value} type="button" onClick={() => handleHeadingSize(h.value)}
                 className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all cursor-pointer ${
-                  headingSize === h.value ? 'border-violet-500 bg-violet-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                  headingSize === h.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}>
                 <span className={`font-bold text-gray-800 mb-1 ${
                   h.value === 'sm' ? 'text-base' : h.value === 'md' ? 'text-lg' : h.value === 'lg' ? 'text-xl' : 'text-2xl'
@@ -650,7 +683,7 @@ function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
             {[{ value: 'rounded', label: 'Rounded', radius: '1rem' }, { value: 'sharp', label: 'Sharp', radius: '0.25rem' }].map(s => (
               <button key={s.value} type="button" onClick={() => handleCardStyle(s.value)}
                 className={`flex-1 py-4 border-2 transition-all cursor-pointer text-sm font-medium ${
-                  cardStyle === s.value ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  cardStyle === s.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                 }`}
                 style={{ borderRadius: s.radius }}>
                 {s.label}
@@ -664,14 +697,14 @@ function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
         <div className="space-y-5">
           <Field label={`Border Radius — ${borderRadius}px`} hint="Controls corner rounding for cards, images and buttons globally. (default: 12px)">
             <input type="range" min={0} max={24} step={2} value={borderRadius} onChange={e => handleBorderRadius(Number(e.target.value))}
-              className="w-full accent-violet-600 mt-1" />
+              className="w-full accent-indigo-600 mt-1" />
           </Field>
           <Field label="Shadow Intensity" hint="Controls the shadow intensity for cards globally. (default: md)">
             <div className="flex gap-2 mt-1">
               {['none', 'sm', 'md', 'lg'].map(s => (
                 <button key={s} type="button" onClick={() => handleShadowIntensity(s)}
                   className={`flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-all cursor-pointer uppercase tracking-wide ${
-                    shadowIntensity === s ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                    shadowIntensity === s ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
                   }`}>
                   {s}
                 </button>
@@ -683,7 +716,7 @@ function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
               {['compact', 'normal', 'spacious'].map(s => (
                 <button key={s} type="button" onClick={() => handleSpacing(s)}
                   className={`flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-all cursor-pointer capitalize ${
-                    spacing === s ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                    spacing === s ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
                   }`}>
                   {s}
                 </button>
@@ -954,7 +987,7 @@ function PageHeroForm({ pageKey, content, gymId, planName, onSave, setPreviewDat
                   onClick={() => updateAlign(opt.value)}
                   className={`flex-1 flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl border-2 text-xs font-semibold transition-all ${
                     align === opt.value
-                      ? 'border-violet-500 bg-violet-50 text-violet-700'
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                       : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
                 >
@@ -1438,9 +1471,9 @@ function PricingPanel({ plans: initPlans, gymId, onUpdate, content, onSaveCms, p
             </Field>
 
             {selectedPlan && (
-              <div className="rounded-lg bg-violet-50 border border-violet-100 p-3 text-xs text-violet-900">
+              <div className="rounded-lg bg-indigo-50 border border-indigo-100 p-3 text-xs text-indigo-900">
                 <div className="font-semibold">{selectedPlan.name}</div>
-                <div className="mt-0.5 text-violet-700">
+                <div className="mt-0.5 text-indigo-700">
                   ₹{Number(selectedPlan.price).toLocaleString('en-IN')} · {formatDurationDays(selectedPlan.duration_days)}
                 </div>
               </div>
@@ -1461,7 +1494,7 @@ function PricingPanel({ plans: initPlans, gymId, onUpdate, content, onSaveCms, p
                 type="checkbox"
                 checked={form.data.is_popular}
                 onChange={e => patch('is_popular', e.target.checked)}
-                className="w-4 h-4 rounded accent-violet-600"
+                className="w-4 h-4 rounded accent-indigo-600"
               />
               <span className="text-gray-700 font-medium">Mark as popular plan</span>
             </label>
@@ -1520,7 +1553,7 @@ function ProgramInlineForm({ mode, data, gymId, planName, imageCount, onSave, on
         <div className="flex gap-2 flex-wrap mb-2">
           {PROG_CATEGORIES.map(c => (
             <button key={c} type="button" onClick={() => setCategory(c)}
-              className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-colors cursor-pointer ${category === c ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-500 border-gray-200 hover:border-violet-300'}`}>
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-colors cursor-pointer ${category === c ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-300'}`}>
               {c}
             </button>
           ))}
@@ -1887,7 +1920,7 @@ function FAQPanel({ content, gymId, planName, onSave, setPreviewData }) {
             <div className="py-8 text-center border border-dashed border-gray-200 rounded-xl bg-gray-50/50 space-y-3">
               <p className="text-sm text-gray-400">No FAQ items yet.</p>
               <button type="button" onClick={loadDefaults}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors cursor-pointer">
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer">
                 Load Default FAQ Items
               </button>
             </div>
@@ -2020,7 +2053,7 @@ function ContactPanel({ gym, gymId, onSave }) {
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTiming() } }}
               placeholder="Time (e.g. 6 AM – 10 PM)" className={inputCls + ' flex-1 min-w-0'} />
             <button type="button" onClick={addTiming} disabled={!newDay.trim() || !newTime.trim()}
-              className="shrink-0 px-3 py-2 bg-violet-100 text-violet-700 font-semibold text-sm rounded-lg hover:bg-violet-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
+              className="shrink-0 px-3 py-2 bg-indigo-100 text-indigo-700 font-semibold text-sm rounded-lg hover:bg-indigo-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
               Add Timing
             </button>
           </div>
@@ -2075,7 +2108,7 @@ function ContactPanel({ gym, gymId, onSave }) {
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addLink())}
                 placeholder="https://…" className={inputCls + ' flex-1 min-w-0'} />
               <button type="button" onClick={addLink} disabled={!addPlatform || !addUrl.trim()}
-                className="shrink-0 px-3 py-2 bg-violet-100 text-violet-700 font-semibold text-sm rounded-lg hover:bg-violet-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                className="shrink-0 px-3 py-2 bg-indigo-100 text-indigo-700 font-semibold text-sm rounded-lg hover:bg-indigo-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 Add
               </button>
             </div>
@@ -2215,13 +2248,7 @@ export default function WebsitePage() {
     }).finally(() => setLoading(false))
   }, [gymId])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <WebsiteSkeleton />
 
   // Find active page/section defs for the breadcrumb
   const activePageDef = PAGES.find(p => p.sections.some(s => s.id === activeSection))
@@ -2285,13 +2312,13 @@ export default function WebsitePage() {
                   !accessible
                     ? 'text-gray-300 cursor-not-allowed'
                     : isActive
-                      ? 'text-violet-700 bg-violet-50'
+                      ? 'text-indigo-700 bg-indigo-50'
                       : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center gap-2">
                   {isActive && (
-                    <span className="w-1 h-3.5 rounded-full bg-violet-500 shrink-0" />
+                    <span className="w-1 h-3.5 rounded-full bg-indigo-500 shrink-0" />
                   )}
                   <span>{page.label}</span>
                 </div>
@@ -2309,7 +2336,7 @@ export default function WebsitePage() {
 
               {/* Section items */}
               {accessible && isExpanded && (
-                <ul className="mt-1 mb-1 ml-2 pl-2 border-l-2 border-violet-100 space-y-0.5">
+                <ul className="mt-1 mb-1 ml-2 pl-2 border-l-2 border-indigo-100 space-y-0.5">
                   {page.sections.map(sec => {
                     const secLocked = sec.minPlan && !canAccessPage(sec.minPlan, planName)
                     return (
@@ -2322,12 +2349,12 @@ export default function WebsitePage() {
                             secLocked
                               ? 'cursor-not-allowed opacity-50'
                               : activeSection === sec.id
-                                ? 'bg-violet-50 text-violet-700 cursor-pointer'
+                                ? 'bg-indigo-50 text-indigo-700 cursor-pointer'
                                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800 cursor-pointer'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-1">
-                            <span className={`block text-sm font-medium ${activeSection === sec.id ? 'text-violet-700' : ''}`}>{sec.label}</span>
+                            <span className={`block text-sm font-medium ${activeSection === sec.id ? 'text-indigo-700' : ''}`}>{sec.label}</span>
                             <div className="flex items-center gap-1 shrink-0">
                               {canAccess('section_visibility', planName) && (
                                 (TOGGLEABLE_SECTIONS.has(sec.id) && (content?.hidden_sections || []).includes(sec.id)) ||
@@ -2341,7 +2368,7 @@ export default function WebsitePage() {
                               {secLocked && <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded font-bold border border-amber-100">Pro</span>}
                             </div>
                           </div>
-                          <span className={`block text-xs mt-0.5 ${activeSection === sec.id ? 'text-violet-400' : 'text-gray-400'}`}>{sec.desc}</span>
+                          <span className={`block text-xs mt-0.5 ${activeSection === sec.id ? 'text-indigo-400' : 'text-gray-400'}`}>{sec.desc}</span>
                         </button>
                       </li>
                     )
@@ -2365,7 +2392,7 @@ export default function WebsitePage() {
             type="button"
             onClick={() => setSidebarCollapsed(c => !c)}
             title={sidebarCollapsed ? 'Show navigation' : 'Hide navigation'}
-            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-violet-600 hover:border-violet-300 hover:bg-violet-50 transition-colors cursor-pointer shrink-0"
+            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors cursor-pointer shrink-0"
           >
             {/* Panel layout icon */}
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -2378,7 +2405,7 @@ export default function WebsitePage() {
               <h1 className="text-xl font-bold text-gray-900">Website</h1>
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                 planName === 'Enterprise' ? 'bg-amber-50 text-amber-700' :
-                planName === 'Pro' ? 'bg-violet-50 text-violet-700' :
+                planName === 'Pro' ? 'bg-indigo-50 text-indigo-700' :
                 'bg-gray-100 text-gray-500'
               }`}>
                 {planName}
@@ -2389,7 +2416,7 @@ export default function WebsitePage() {
         </div>
         {gym?.slug && (
           <Link to={`/${gym.slug}`} target="_blank" rel="noopener noreferrer"
-            className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-100 rounded-lg hover:bg-violet-100 transition-colors">
+            className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
@@ -2405,7 +2432,7 @@ export default function WebsitePage() {
           <span className="flex items-center gap-2">
             <span className="text-gray-400 text-xs">{activePageDef?.label}</span>
             <span className="text-gray-300">›</span>
-            <span className="text-violet-600 font-semibold">{activeSectionDef?.label}</span>
+            <span className="text-indigo-600 font-semibold">{activeSectionDef?.label}</span>
           </span>
           <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${mobileNavOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />

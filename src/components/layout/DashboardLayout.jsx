@@ -9,7 +9,7 @@ import {
   Megaphone, Settings, UserCircle,
 } from 'lucide-react'
 
-const SIDEBAR_BG = '#0e1035'
+const SIDEBAR_BG = 'var(--shell-bg)'
 
 const MOBILE_NAV_SECTIONS = [
   {
@@ -60,7 +60,7 @@ export default function DashboardLayout() {
         {/* Sidebar + content row below the topbar */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 inset-0">
             <Outlet />
           </main>
         </div>
@@ -83,7 +83,7 @@ export default function DashboardLayout() {
               <div style={{
                 height: 64, padding: '0 20px',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
+                borderBottom: '1px solid var(--shell-border)', flexShrink: 0,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <img
@@ -97,7 +97,7 @@ export default function DashboardLayout() {
                 </div>
                 <button
                   onClick={() => setMobileNavOpen(false)}
-                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 4, display: 'flex' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--shell-muted)', cursor: 'pointer', padding: 4, display: 'flex' }}
                 >
                   <X size={20} />
                 </button>
@@ -109,7 +109,7 @@ export default function DashboardLayout() {
                   <div key={label}>
                     <p style={{
                       fontSize: 10, fontWeight: 700,
-                      color: 'rgba(255,255,255,0.3)',
+                      color: 'var(--shell-faint)',
                       letterSpacing: '0.1em', textTransform: 'uppercase',
                       paddingLeft: 12, marginBottom: 6,
                     }}>
@@ -125,7 +125,7 @@ export default function DashboardLayout() {
                           className={({ isActive }) =>
                             `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer
                             ${isActive
-                              ? 'bg-indigo-500/15 text-indigo-300 border-l-[3px] border-indigo-400 pl-[9px]'
+                              ? 'bg-violet-500/15 text-violet-300 border-l-[3px] border-violet-400 pl-[9px]'
                               : 'text-white/55 hover:text-white/90 hover:bg-white/5 border-l-[3px] border-transparent pl-[9px]'
                             }`
                           }

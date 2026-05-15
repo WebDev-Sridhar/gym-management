@@ -1,10 +1,39 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchAttendance, fetchAttendanceSummary, manualCheckin, fetchMembers, fetchGymDetails } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
 import Pagination from '../../components/ui/Pagination'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from 'recharts'
+import { Sk } from '../../components/ui/Skeleton'
+
+function AttendanceSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px]">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2"><Sk h={28} w={150} /><Sk h={14} w={180} /></div>
+        <div className="flex gap-3"><Sk h={38} w={110} r={10} /><Sk h={38} w={140} r={10} /></div>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <Sk h={18} w={200} /><Sk h={14} w="85%" /><Sk h={14} w="70%" />
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div className="flex items-center justify-between"><Sk h={18} w={110} /><Sk h={12} w={120} /></div>
+        <Sk h={140} r={8} />
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {Array(6).fill(0).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-gray-50">
+            <Sk h={36} w={36} r={99} />
+            <div className="flex-1 space-y-1.5"><Sk h={14} w="40%" /><Sk h={11} w="25%" /></div>
+            <Sk h={12} w={80} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // Supabase can return timestamptz without a 'Z' suffix. Without it, JS Date
 // parses the string as local time instead of UTC, showing times hours off.
@@ -97,15 +126,7 @@ export default function AttendancePage() {
     const key = d.toISOString().split('T')[0]
     last7Days.push({ date: key, label: d.toLocaleDateString('en-IN', { weekday: 'short' }), count: summary[key] || 0 })
   }
-  const maxCount = Math.max(...last7Days.map((d) => d.count), 1)
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <AttendanceSkeleton />
 
   const checkinUrl = `${window.location.origin}/checkin?gymId=${gymId}`
 
@@ -221,12 +242,12 @@ export default function AttendancePage() {
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             max={today}
-            className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
           {isToday && (
             <button
               onClick={() => setShowCheckin(!showCheckin)}
-              className="px-4 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer"
+              className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
             >
               {showCheckin ? 'Cancel' : '+ Mark Check-in'}
             </button>
@@ -256,13 +277,13 @@ export default function AttendancePage() {
           <div className="px-6 py-3 flex items-center gap-2 border-b border-gray-100 bg-gray-50/50">
             <button
               onClick={() => navigator.clipboard.writeText(checkinUrl)}
-              className="px-3 py-1.5 text-xs font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors cursor-pointer"
+              className="px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer"
             >
               Copy Link
             </button>
             <button
               onClick={downloadQR}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -339,7 +360,7 @@ export default function AttendancePage() {
                 },
               ].map(({ title, desc }, i) => (
                 <li key={i} className="flex gap-4">
-                  <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs shrink-0 mt-0.5">
+                  <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs shrink-0 mt-0.5">
                     {i + 1}
                   </div>
                   <div>
@@ -350,8 +371,8 @@ export default function AttendancePage() {
               ))}
             </ol>
 
-            <div className="mt-6 p-3 bg-violet-50 border border-violet-100 rounded-lg">
-              <p className="text-xs text-violet-700 font-medium">
+            <div className="mt-6 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+              <p className="text-xs text-indigo-700 font-medium">
                 You can also share the check-in link directly via WhatsApp — members bookmark it and tap to check in anytime.
               </p>
             </div>
@@ -382,7 +403,7 @@ export default function AttendancePage() {
             <button
               type="submit"
               disabled={!selectedMemberId || submitting}
-              className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
             >
               {submitting ? 'Marking...' : 'Check In'}
             </button>
@@ -395,19 +416,45 @@ export default function AttendancePage() {
 
       {/* 7-day attendance chart */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-4">Last 7 Days</h2>
-        <div className="flex items-end justify-between gap-2 h-32">
-          {last7Days.map((day) => (
-            <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-xs text-gray-500 font-medium">{day.count}</span>
-              <div
-                className={`w-full rounded-t-md transition-all ${day.date === selectedDate ? 'bg-violet-500' : 'bg-violet-200'}`}
-                style={{ height: `${Math.max((day.count / maxCount) * 100, 4)}%` }}
-              />
-              <span className={`text-xs ${day.date === selectedDate ? 'text-violet-600 font-semibold' : 'text-gray-400'}`}>{day.label}</span>
-            </div>
-          ))}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-900">Last 7 Days</h2>
+          <p className="text-xs text-gray-400">{last7Days.reduce((s, d) => s + d.count, 0)} total check-ins</p>
         </div>
+        <ResponsiveContainer width="100%" height={140}>
+          <BarChart data={last7Days} margin={{ top: 4, right: 0, left: -28, bottom: 0 }}
+            onClick={(e) => e?.activePayload?.[0] && setSelectedDate(e.activePayload[0].payload.date)}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+            <XAxis dataKey="label" tick={({ x, y, payload }) => {
+              const isSelected = last7Days.find(d => d.label === payload.value)?.date === selectedDate
+              return (
+                <text x={x} y={y + 12} textAnchor="middle" fontSize={11}
+                  fill={isSelected ? '#6366f1' : '#9ca3af'} fontWeight={isSelected ? 700 : 400}>
+                  {payload.value}
+                </text>
+              )
+            }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <Tooltip
+              cursor={{ fill: 'rgba(99,102,241,0.05)' }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null
+                const d = payload[0].payload
+                return (
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-xs">
+                    <p className="text-gray-500">{new Date(d.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}</p>
+                    <p className="font-semibold text-indigo-700 mt-0.5">{d.count} check-in{d.count !== 1 ? 's' : ''}</p>
+                  </div>
+                )
+              }}
+            />
+            <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40} style={{ cursor: 'pointer' }}>
+              {last7Days.map((day) => (
+                <Cell key={day.date} fill={day.date === selectedDate ? '#6366f1' : '#c4b5fd'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+        <p className="text-[10px] text-gray-400 text-center mt-1">Click a bar to view that day's check-ins</p>
       </div>
 
       {/* Search */}
@@ -417,7 +464,7 @@ export default function AttendancePage() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
           placeholder="Search check-ins..."
-          className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 w-full sm:w-64"
+          className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full sm:w-64"
         />
       )}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { fetchDashboardStats, fetchRecentActivity, fetchRevenueByMonth } from '../../services/membershipService'
@@ -6,6 +6,70 @@ import {
   Users, CheckCircle2, IndianRupee, Clock, UserPlus, BarChart3,
   CreditCard, ScanLine, TrendingUp,
 } from 'lucide-react'
+import { Sk } from '../../components/ui/Skeleton'
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px]">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2"><Sk h={28} w={160} /><Sk h={14} w={220} /></div>
+        <Sk h={36} w={130} r={10} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {Array(4).fill(0).map((_, i) => (
+          <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+            <Sk h={14} w="55%" /><Sk h={32} w="70%" /><Sk h={12} w="80%" />
+          </div>
+        ))}
+      </div>
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100"><Sk h={18} w={140} /></div>
+          <div className="divide-y divide-gray-50">
+            {Array(7).fill(0).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-6 py-3.5">
+                <Sk h={32} w={32} r={8} /><Sk h={14} w="65%" /><Sk h={12} w={48} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100"><Sk h={18} w={140} /></div>
+          <div className="px-6 py-5 space-y-4">
+            <Sk h={36} w="60%" /><Sk h={14} w="40%" />
+            <div className="space-y-3 mt-4">
+              {Array(3).fill(0).map((_, i) => (
+                <div key={i} className="space-y-1"><Sk h={12} w="80%" /><Sk h={6} r={99} /></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <Sk h={18} w={160} />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {Array(4).fill(0).map((_, i) => (
+              <div key={i} className="rounded-xl p-4 bg-gray-50 space-y-2">
+                <Sk h={20} w={20} /><Sk h={28} w="60%" /><Sk h={12} w="80%" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <Sk h={18} w={120} />
+          <div className="grid grid-cols-2 gap-3">
+            {Array(4).fill(0).map((_, i) => (
+              <div key={i} className="rounded-xl p-4 bg-gray-50 space-y-2 flex flex-col items-center">
+                <Sk h={20} w={20} /><Sk h={12} w="80%" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function timeAgo(dateStr) {
   if (!dateStr) return ''
@@ -29,7 +93,7 @@ function formatRevenue(amount) {
 const ACTIVITY_ICON = {
   payment: { bg: 'bg-green-100', color: 'text-green-600', Icon: IndianRupee },
   checkin: { bg: 'bg-blue-100',  color: 'text-blue-600',  Icon: ScanLine },
-  new:     { bg: 'bg-violet-100',color: 'text-violet-600',Icon: UserPlus },
+  new:     { bg: 'bg-indigo-100',color: 'text-indigo-600',Icon: UserPlus },
   expiry:  { bg: 'bg-amber-100', color: 'text-amber-600', Icon: Clock },
 }
 
@@ -59,7 +123,7 @@ function RevenueBarChart({ data }) {
               </span>
               <div className="w-full relative flex items-end justify-center" style={{ height: 80 }}>
                 <div
-                  className="w-full rounded-t-md bg-violet-500 group-hover:bg-violet-600 transition-colors"
+                  className="w-full rounded-t-md bg-indigo-500 group-hover:bg-indigo-600 transition-colors"
                   style={{ height: `${heightPct}%` }}
                 />
               </div>
@@ -121,11 +185,7 @@ export default function OwnerDashboard() {
     return () => window.removeEventListener('focus', onFocus)
   }, [gymId])
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
+  if (loading) return <DashboardSkeleton />
 
   const activePercent = stats?.totalMembers
     ? Math.round((stats.activeMembers / stats.totalMembers) * 100)
@@ -166,8 +226,8 @@ export default function OwnerDashboard() {
           value={stats?.totalMembers ?? '—'}
           sub={stats ? `${stats.activeMembers} active members` : undefined}
           Icon={Users}
-          iconBg="bg-violet-50"
-          iconColor="text-violet-600"
+          iconBg="bg-indigo-50"
+          iconColor="text-indigo-600"
         />
         <StatCard
           label="Active Members"
@@ -204,7 +264,7 @@ export default function OwnerDashboard() {
             <h2 className="text-base font-semibold text-gray-900">Recent Activity</h2>
             <button
               onClick={() => navigate('/owner-dashboard/checkin')}
-              className="text-xs font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+              className="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
             >
               View All
             </button>
@@ -265,7 +325,7 @@ export default function OwnerDashboard() {
           <h2 className="text-base font-semibold text-gray-900 mb-5">Membership Overview</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: 'Total',          value: stats?.totalMembers  ?? 0, color: 'text-violet-600', bg: 'bg-violet-50',  Icon: Users },
+              { label: 'Total',          value: stats?.totalMembers  ?? 0, color: 'text-indigo-600', bg: 'bg-indigo-50',  Icon: Users },
               { label: 'Active',         value: stats?.activeMembers ?? 0, color: 'text-green-600',  bg: 'bg-green-50',   Icon: CheckCircle2 },
               { label: 'Expiring Soon',  value: stats?.expiringSoon  ?? 0, color: 'text-amber-600',  bg: 'bg-amber-50',   Icon: Clock },
               { label: 'Today Check-ins',value: stats?.todayCheckins ?? 0, color: 'text-blue-600',   bg: 'bg-blue-50',    Icon: ScanLine },
@@ -284,7 +344,7 @@ export default function OwnerDashboard() {
           <h2 className="text-base font-semibold text-gray-900 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: 'Add Member',         Icon: UserPlus,  to: '/owner-dashboard/members',     color: 'text-violet-600', bg: 'bg-violet-50 hover:bg-violet-100' },
+              { label: 'Add Member',         Icon: UserPlus,  to: '/owner-dashboard/members',     color: 'text-indigo-600', bg: 'bg-indigo-50 hover:bg-indigo-100' },
               { label: 'Collect Payment',    Icon: CreditCard, to: '/owner-dashboard/payments',   color: 'text-blue-600',   bg: 'bg-blue-50 hover:bg-blue-100' },
               { label: 'Mark Attendance',    Icon: ScanLine,  to: '/owner-dashboard/checkin',     color: 'text-green-600',  bg: 'bg-green-50 hover:bg-green-100' },
               { label: 'View Analytics',     Icon: BarChart3, to: '/owner-dashboard/analytics',  color: 'text-amber-600', bg: 'bg-amber-50 hover:bg-amber-100' },

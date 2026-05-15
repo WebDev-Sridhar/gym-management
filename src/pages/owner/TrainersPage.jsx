@@ -1,8 +1,37 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchTrainerInvites, createTrainerInvite, deleteTrainerInvite } from '../../services/membershipService'
 import { fetchTrainers, updateTrainer, removeTrainer } from '../../services/trainerService'
 import { useDialog } from '../../components/ui/Dialog'
+import { Sk } from '../../components/ui/Skeleton'
+
+function TrainersSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px]">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2"><Sk h={28} w={130} /><Sk h={14} w={200} /></div>
+        <Sk h={38} w={120} r={10} />
+      </div>
+      <div>
+        <Sk h={13} w={120} r={4} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+          {Array(3).fill(0).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <Sk h={40} w={40} r={99} />
+                <div className="flex-1 space-y-1.5"><Sk h={14} w="60%" /><Sk h={11} w="75%" /></div>
+              </div>
+              <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                <Sk h={22} w={64} r={20} />
+                <div className="flex gap-3"><Sk h={12} w={28} /><Sk h={12} w={44} /></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function TrainersPage() {
   const dialog = useDialog()
@@ -106,11 +135,7 @@ export default function TrainersPage() {
     }
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
+  if (loading) return <TrainersSkeleton />
 
   return (
     <div className="space-y-6 max-w-[1200px]">
@@ -124,7 +149,7 @@ export default function TrainersPage() {
         </div>
         <button
           onClick={() => { setShowForm(!showForm); setError('') }}
-          className="px-4 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer"
+          className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
         >
           {showForm ? 'Cancel' : '+ Add Trainer'}
         </button>
@@ -140,13 +165,13 @@ export default function TrainersPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Name *</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)}
                   placeholder="Trainer name" autoFocus
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
                 <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                   placeholder="Phone number" maxLength={10}
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -154,13 +179,13 @@ export default function TrainersPage() {
                 </label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="trainer@email.com"
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                 <p className="text-xs text-gray-400 mt-1">The trainer signs up at your gym's login page with this email — their account is automatically set up.</p>
               </div>
             </div>
             {error && <p className="text-red-500 text-xs">{error}</p>}
             <button type="submit" disabled={submitting}
-              className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-50">
+              className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50">
               {submitting ? 'Adding...' : 'Send Invite'}
             </button>
           </form>
@@ -182,13 +207,13 @@ export default function TrainersPage() {
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
                       <input value={editName} onChange={e => setEditName(e.target.value)} autoFocus
-                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
                       <input value={editPhone} onChange={e => setEditPhone(e.target.value.replace(/\D/g, ''))}
                         maxLength={10} placeholder="Phone number"
-                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
@@ -198,7 +223,7 @@ export default function TrainersPage() {
                     {editError && <p className="text-red-500 text-xs">{editError}</p>}
                     <div className="flex gap-2 pt-1">
                       <button type="submit" disabled={editSaving}
-                        className="flex-1 py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 transition-colors cursor-pointer disabled:opacity-50">
+                        className="flex-1 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50">
                         {editSaving ? 'Saving…' : 'Save'}
                       </button>
                       <button type="button" onClick={() => setEditingTrainer(null)}
@@ -211,7 +236,7 @@ export default function TrainersPage() {
                   /* ── View mode ── */
                   <>
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-semibold text-sm shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-sm shrink-0">
                         {trainer.name?.charAt(0).toUpperCase() || '?'}
                       </div>
                       <div className="min-w-0">
@@ -229,7 +254,7 @@ export default function TrainersPage() {
                       </span>
                       <div className="flex items-center gap-2">
                         <button onClick={() => openEdit(trainer)}
-                          className="text-xs text-violet-500 hover:text-violet-700 font-medium cursor-pointer transition-colors">
+                          className="text-xs text-indigo-500 hover:text-indigo-700 font-medium cursor-pointer transition-colors">
                           Edit
                         </button>
                         <span className="text-gray-200">|</span>
@@ -290,7 +315,7 @@ export default function TrainersPage() {
           <h3 className="text-base font-semibold text-gray-900 mb-1">No trainers yet</h3>
           <p className="text-sm text-gray-500 mb-4">Add a trainer's email — they sign up at your gym's login page and are automatically activated.</p>
           <button onClick={() => setShowForm(true)}
-            className="px-5 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer">
+            className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer">
             + Add First Trainer
           </button>
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import {
   fetchGymCommSettings, updateGymCommSettings,
@@ -6,6 +6,40 @@ import {
 } from '../../services/notificationService'
 import { useDialog } from '../../components/ui/Dialog'
 import Pagination from '../../components/ui/Pagination'
+import { Sk } from '../../components/ui/Skeleton'
+
+function CommunicationSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px]">
+      <div className="space-y-2"><Sk h={28} w={180} /><Sk h={14} w={280} /></div>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <div className="space-y-1.5"><Sk h={16} w={100} /><Sk h={12} w={220} /></div>
+        {Array(3).fill(0).map((_, i) => (
+          <div key={i} className="flex items-center justify-between py-4 border-t border-gray-100">
+            <div className="space-y-1.5"><Sk h={14} w={160} /><Sk h={11} w={240} /></div>
+            <Sk h={24} w={44} r={99} />
+          </div>
+        ))}
+        <Sk h={38} w={120} r={10} />
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <Sk h={16} w={120} /><Sk h={12} w={260} />
+        <div className="flex gap-3"><Sk h={36} w={160} r={10} /><Sk h={36} w={120} r={10} /></div>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between">
+          <div className="space-y-1.5"><Sk h={16} w={140} /><Sk h={12} w={200} /></div>
+          <div className="flex gap-2"><Sk h={34} w={100} r={8} /><Sk h={34} w={100} r={8} /></div>
+        </div>
+        {Array(6).fill(0).map((_, i) => (
+          <div key={i} className="grid grid-cols-5 gap-4 px-5 py-3.5 border-b border-gray-50">
+            {Array(5).fill(0).map((_, j) => <Sk key={j} h={12} w="80%" />)}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const TYPE_LABEL = {
   payment_reminder:     'Payment reminder',
@@ -35,7 +69,7 @@ function Toggle({ value, onChange, disabled }) {
       disabled={disabled}
       onClick={() => onChange(!value)}
       className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors cursor-pointer ${
-        value ? 'bg-violet-600' : 'bg-gray-300'
+        value ? 'bg-indigo-600' : 'bg-gray-300'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform ${
@@ -130,13 +164,7 @@ export default function CommunicationPage() {
     }
   }
 
-  if (loading || !prefs) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading || !prefs) return <CommunicationSkeleton />
 
   return (
     <div className="space-y-6 max-w-[1200px]">
@@ -177,7 +205,7 @@ export default function CommunicationPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="mt-6 px-5 py-2.5 bg-violet-600 text-white font-medium text-sm rounded-lg hover:bg-violet-700 transition-colors cursor-pointer disabled:opacity-50"
+          className="mt-6 px-5 py-2.5 bg-indigo-600 text-white font-medium text-sm rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
@@ -218,7 +246,7 @@ export default function CommunicationPage() {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-violet-500"
+              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-indigo-500"
             >
               <option value="">All types</option>
               {Object.entries(TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -226,7 +254,7 @@ export default function CommunicationPage() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-violet-500"
+              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-indigo-500"
             >
               <option value="">All statuses</option>
               <option value="sent">Sent</option>
