@@ -7,7 +7,8 @@ import {
   Settings, LogOut, User, Gem, CheckCircle2, AlertCircle, Clock,
 } from 'lucide-react'
 
-const TOPBAR_BG = '#0e1035'
+const TOPBAR_BG = '#07050aff'
+// const TOPBAR_BG = '#0e1035'
 
 const NAV_LINKS = [
   { to: '/owner-dashboard/home',            label: 'Home',          Icon: Home },
@@ -159,7 +160,7 @@ export default function Topbar({ onMenuToggle }) {
                   fontWeight: 600,
                   textDecoration: 'none',
                   transition: 'all 0.15s',
-                  background: isActive ? '#6366f1' : 'transparent',
+                  background: isActive ? '#8B5CF6' : 'transparent',
                   color: isActive ? '#fff' : 'rgba(255,255,255,0.6)',
                 })}
               >

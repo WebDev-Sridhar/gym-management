@@ -5,7 +5,8 @@ import {
   BarChart2, Megaphone, MessageSquare, Settings, UserCircle, Gem,
 } from 'lucide-react'
 
-const SIDEBAR_BG = '#0e1035'
+const SIDEBAR_BG = '#07050aff'
+// const SIDEBAR_BG = '#0e1035'
 
 const sections = [
   {
@@ -54,7 +55,7 @@ function SidebarLink({ to, label, Icon, end }) {
       className={({ isActive }) =>
         `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer
         ${isActive
-          ? 'bg-indigo-500/15 text-indigo-300 border-l-[3px] border-indigo-400 pl-[9px]'
+          ? 'bg-violet-500/15 text-violet-300 border-l-[3px] border-violet-400 pl-[9px]'
           : 'text-white/55 hover:text-white/90 hover:bg-white/5 border-l-[3px] border-transparent pl-[9px]'
         }`
       }
