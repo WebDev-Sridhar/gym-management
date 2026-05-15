@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Zap, Salad, Moon, ChevronDown, Info, Loader2, Calendar } from 'lucide-react'
-import { useAuth } from '../../store/AuthContext'
-import { fetchMyMember, fetchMyActivePlans } from '../../services/memberService'
+import { Zap, Salad, Moon, Info, Calendar } from 'lucide-react'
+import { useMemberData } from '../../store/MemberDataContext'
+import WorkoutsSkeleton from '../../components/member/skeletons/WorkoutsSkeleton'
 
 // Day 1 = Monday (JS getDay: 0=Sun,1=Mon,...6=Sat → map to 1-7)
 function todayDayNumber() {
@@ -170,34 +170,14 @@ function WeeklyPlanView({ plan }) {
 }
 
 export default function MemberWorkoutsPage() {
-  const { gymId, profile } = useAuth()
-  const [plans, setPlans]       = useState([])
-  const [memberStatus, setMemberStatus] = useState(null)
-  const [loading, setLoading]   = useState(true)
+  const { member, plans, isLoading } = useMemberData()
 
-  useEffect(() => {
-    if (!gymId || !profile) { setLoading(false); return }
-    let dead = false
-    fetchMyMember({ gymId, phone: profile.phone, email: profile.email })
-      .then(async m => {
-        if (!dead && m) setMemberStatus(m.status)
-        return m ? fetchMyActivePlans(m.id) : []
-      })
-      .then(p => { if (!dead) setPlans(p) })
-      .catch(e => console.error(e))
-      .finally(() => { if (!dead) setLoading(false) })
-    return () => { dead = true }
-  }, [gymId, profile])
+  if (isLoading) return <WorkoutsSkeleton />
 
-  const workouts = plans.filter(p => p.plan_type === 'workout')
-  const diets    = plans.filter(p => p.plan_type === 'diet')
-
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-      <Loader2 size={36} color="#6366f1" style={{ animation: 'mspin .75s linear infinite' }} />
-      <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  )
+  const memberStatus = member?.status
+  const safePlans    = plans ?? []
+  const workouts     = safePlans.filter(p => p.plan_type === 'workout')
+  const diets        = safePlans.filter(p => p.plan_type === 'diet')
 
   const isLocked = memberStatus === 'inactive' || memberStatus === 'expired' || memberStatus === 'pending_payment'
 
@@ -225,7 +205,7 @@ export default function MemberWorkoutsPage() {
         </p>
       </motion.div>
 
-      {plans.length === 0 ? (
+      {safePlans.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 24px', textAlign: 'center', gap: '14px' }}>
           <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

@@ -156,6 +156,60 @@ html.lenis body {
 [data-gym-theme="light"] [data-force-white] .text-white\/15          { color: rgba(255,255,255,0.15) !important; }
 [data-gym-theme="light"] [data-force-white] .placeholder-white\/20::placeholder { color: rgba(255,255,255,0.20) !important; opacity: 1; }
 
+/* ─── Skeleton shimmer ─────────────────────────────────────────────────────── */
+@keyframes trainer-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 0%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 100%
+  );
+  background-size: 400px 100%;
+  animation: trainer-shimmer 1.4s ease-in-out infinite;
+  border-radius: 10px;
+}
+
+/* Screen shell — hide scrollbar on mobile for both trainer and member apps */
+.screen-shell {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+.screen-shell::-webkit-scrollbar { width: 3px; }
+.screen-shell::-webkit-scrollbar-track { background: transparent; }
+.screen-shell::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 9999px; }
+@media (max-width: 767px) {
+  .screen-shell { scrollbar-width: none; }
+  .screen-shell::-webkit-scrollbar { display: none; }
+}
+
+/* Trainer day-tab scrollbar — thin on desktop, hidden on mobile */
+.trainer-day-tabs {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(129,140,248,0.25) transparent;
+}
+.trainer-day-tabs::-webkit-scrollbar {
+  height: 2px;
+}
+.trainer-day-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+.trainer-day-tabs::-webkit-scrollbar-thumb {
+  background: rgba(129,140,248,0.25);
+  border-radius: 9999px;
+}
+@media (max-width: 767px) {
+  .trainer-day-tabs {
+    scrollbar-width: none;
+  }
+  .trainer-day-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 4px;

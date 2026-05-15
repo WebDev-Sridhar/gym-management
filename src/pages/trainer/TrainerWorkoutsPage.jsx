@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
+import { useTrainerData } from '../../store/TrainerDataContext'
 import {
-  fetchGymWorkoutTemplates, fetchGymDietTemplates, fetchAssignedMembers,
   assignPlanToMember, fetchMemberAssignedPlans, archiveMemberPlan,
 } from '../../services/trainerService'
+import WorkoutsSkeleton from '../../components/trainer/skeletons/WorkoutsSkeleton'
 import { EXERCISES } from '../../data/exercisesDb'
 import { MEALS } from '../../data/mealsDb'
 import { useDialog } from '../../components/ui/Dialog'
 import FormModal from '../../components/ui/FormModal'
+import { TriangleAlert, X, Plus, Search, Check, Clock, Loader2 } from 'lucide-react'
 
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+const inputCls = 'px-2 py-1.5 bg-white/5 border border-white/10 text-white rounded-lg text-xs outline-none focus:border-indigo-500/60 w-full placeholder:text-white/25'
 
 function AssignModal({ template, planType, members, gymId, onClose, onAssigned }) {
   const dialog = useDialog()
@@ -21,24 +25,23 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
     : { time: '', meal_name: '', protein: '', calories: '' }
   const emptyDay = () => ({ name: '', rest: false, [itemKey]: [] })
 
-  // Build initial days from template (already week-structured)
   function templateToDays(t) {
     const src = t.exercises ?? t.meals ?? []
     return src.map(d => ({ ...d, [itemKey]: (d[itemKey] || []).map(i => ({ ...i })) }))
   }
 
-  const [step, setStep]             = useState('pick-member')
+  const [step, setStep]               = useState('pick-member')
   const [memberSearch, setMemberSearch] = useState('')
-  const [selected, setSelected]     = useState(null)
+  const [selected, setSelected]       = useState(null)
   const [memberPlans, setMemberPlans] = useState([])
   const [loadingPlans, setLoadingPlans] = useState(false)
-  const [replaceId, setReplaceId]   = useState(null)
-  const [days, setDays]             = useState(templateToDays(template))
+  const [replaceId, setReplaceId]     = useState(null)
+  const [days, setDays]               = useState(templateToDays(template))
   const [customTitle, setCustomTitle] = useState(template.title)
   const [activeDayIdx, setActiveDayIdx] = useState(0)
-  const [daySearch, setDaySearch]   = useState('')
-  const [saving, setSaving]         = useState(false)
-  const [error, setError]           = useState('')
+  const [daySearch, setDaySearch]     = useState('')
+  const [saving, setSaving]           = useState(false)
+  const [error, setError]             = useState('')
 
   const templateDays = template.exercises ?? template.meals ?? []
   const filtered = members.filter(m =>
@@ -71,14 +74,13 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
     }
   }
 
-  // Day operations
-  const addDay        = () => setDays(d => [...d, emptyDay()])
-  const removeDay     = (di) => setDays(d => d.filter((_, i) => i !== di))
-  const updateDay     = (di, patch) => setDays(d => d.map((day, i) => i === di ? { ...day, ...patch } : day))
-  const addItem       = (di) => setDays(d => d.map((day, i) => i !== di ? day : { ...day, [itemKey]: [...(day[itemKey] || []), emptyItem()] }))
-  const removeItem    = (di, ii) => setDays(d => d.map((day, i) => i !== di ? day : { ...day, [itemKey]: (day[itemKey] || []).filter((_, j) => j !== ii) }))
-  const updateItem    = (di, ii, patch) => setDays(d => d.map((day, i) => i !== di ? day : { ...day, [itemKey]: (day[itemKey] || []).map((item, j) => j !== ii ? item : { ...item, ...patch }) }))
-  const addFromDb     = (item) => {
+  const addDay     = () => setDays(d => [...d, emptyDay()])
+  const removeDay  = (di) => setDays(d => d.filter((_, i) => i !== di))
+  const updateDay  = (di, patch) => setDays(d => d.map((day, i) => i === di ? { ...day, ...patch } : day))
+  const addItem    = (di) => setDays(d => d.map((day, i) => i !== di ? day : { ...day, [itemKey]: [...(day[itemKey] || []), emptyItem()] }))
+  const removeItem = (di, ii) => setDays(d => d.map((day, i) => i !== di ? day : { ...day, [itemKey]: (day[itemKey] || []).filter((_, j) => j !== ii) }))
+  const updateItem = (di, ii, patch) => setDays(d => d.map((day, i) => i !== di ? day : { ...day, [itemKey]: (day[itemKey] || []).map((item, j) => j !== ii ? item : { ...item, ...patch }) }))
+  const addFromDb  = (item) => {
     setDays(d => d.map((day, i) => i !== safeIdx ? day : { ...day, [itemKey]: [...(day[itemKey] || []), { ...item, sets: String(item.sets ?? ''), protein: String(item.protein ?? ''), calories: String(item.calories ?? '') }] }))
     setDaySearch('')
   }
@@ -90,27 +92,29 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
     ? db.filter(x => x[nameKey].toLowerCase().includes(daySearch.toLowerCase())).slice(0, 5)
     : []
 
-  const inputCls = 'px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-violet-500 w-full'
-
   return (
-    <FormModal title={`Assign — ${template.title}`} onClose={onClose} wide>
-      <div className="space-y-4">
+    <FormModal title={`Assign — ${template.title}`} onClose={onClose} wide dark>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* ── Step 1: Pick member ── */}
+        {/* ── Step 1: Pick member / conflict ── */}
         {(step === 'pick-member' || step === 'conflict') && (
           <>
             {/* Weekly preview mini-chart */}
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Weekly Plan Preview</p>
-              <div className="grid grid-cols-7 gap-1">
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 12 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Weekly Plan Preview</p>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(templateDays.length, 7)}, 1fr)`, gap: 4 }}>
                 {templateDays.map((d, i) => {
                   const count = (d[itemKey] || []).length
                   return (
-                    <div key={i} className={`rounded-lg p-1.5 text-center ${d.rest ? 'bg-white' : count > 0 ? 'bg-violet-50 border border-violet-100' : 'bg-white border border-dashed border-gray-200'}`}>
-                      <p className="text-[10px] font-bold text-gray-500">{DAY_ABBR[i] || `D${i+1}`}</p>
+                    <div key={i} style={{
+                      borderRadius: 10, padding: '6px 4px', textAlign: 'center',
+                      background: d.rest ? 'rgba(255,255,255,0.03)' : count > 0 ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.03)',
+                      border: d.rest ? '1px solid rgba(255,255,255,0.06)' : count > 0 ? '1px solid rgba(129,140,248,0.25)' : '1px dashed rgba(255,255,255,0.1)',
+                    }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.45)', margin: 0 }}>{DAY_ABBR[i] || `D${i+1}`}</p>
                       {d.rest
-                        ? <p className="text-[9px] text-gray-300 mt-0.5">Rest</p>
-                        : <p className="text-[10px] font-semibold text-violet-600 mt-0.5">{count}</p>}
+                        ? <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', margin: '2px 0 0' }}>Rest</p>
+                        : <p style={{ fontSize: 10, fontWeight: 700, color: '#818cf8', margin: '2px 0 0' }}>{count}</p>}
                     </div>
                   )
                 })}
@@ -119,26 +123,48 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
 
             {/* Member picker */}
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Assign to Member</label>
-              <input value={memberSearch}
-                onChange={e => { setMemberSearch(e.target.value); setSelected(null); setStep('pick-member') }}
-                placeholder="Search member…" autoFocus
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-violet-500 mb-2" />
-              <div className="max-h-40 overflow-y-auto space-y-1">
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                Assign to Member
+              </label>
+              <div style={{ position: 'relative', marginBottom: 8 }}>
+                <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.25)', pointerEvents: 'none' }} />
+                <input
+                  value={memberSearch}
+                  onChange={e => { setMemberSearch(e.target.value); setSelected(null); setStep('pick-member') }}
+                  placeholder="Search member…"
+                  autoFocus
+                  style={{
+                    width: '100%', paddingLeft: 30, paddingRight: 12, paddingTop: 10, paddingBottom: 10,
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 12, fontSize: 13, color: '#fff', outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {filtered.length === 0
-                  ? <p className="text-sm text-gray-400 text-center py-4">No members</p>
+                  ? <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>No members</p>
                   : filtered.map(m => (
-                    <button key={m.id} onClick={() => selectMember(m)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left cursor-pointer border transition-all ${selected?.id === m.id ? 'bg-violet-50 border-violet-200' : 'hover:bg-gray-50 border-transparent'}`}>
-                      <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold text-xs shrink-0">
+                    <button key={m.id} onClick={() => selectMember(m)} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                      borderRadius: 12, textAlign: 'left', cursor: 'pointer', border: 'none',
+                      background: selected?.id === m.id ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.04)',
+                      outline: selected?.id === m.id ? '1px solid rgba(129,140,248,0.3)' : '1px solid transparent',
+                      transition: 'all 0.15s',
+                    }}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 11, fontWeight: 800, color: '#fff',
+                      }}>
                         {m.name.charAt(0).toUpperCase()}
                       </div>
-                      <p className="text-sm font-medium text-gray-900 truncate flex-1">{m.name}</p>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{m.name}</p>
                       {loadingPlans && selected?.id === m.id && (
-                        <span className="w-3.5 h-3.5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                        <Loader2 size={14} style={{ color: '#818cf8', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
                       )}
                       {selected?.id === m.id && !loadingPlans && (
-                        <svg className="w-4 h-4 text-violet-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        <Check size={14} style={{ color: '#818cf8', flexShrink: 0 }} />
                       )}
                     </button>
                   ))}
@@ -149,23 +175,33 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
             {step === 'conflict' && selected && (() => {
               const conflict = memberPlans.find(p => p.plan_type === planType)
               return conflict ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-                  <div className="flex items-start gap-2">
-                    <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                    </svg>
+                <div style={{
+                  borderRadius: 14, border: '1px solid rgba(251,191,36,0.2)',
+                  background: 'rgba(251,191,36,0.08)', padding: 14,
+                  display: 'flex', flexDirection: 'column', gap: 12,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <TriangleAlert size={15} style={{ color: '#fbbf24', flexShrink: 0, marginTop: 1 }} />
                     <div>
-                      <p className="text-xs font-semibold text-amber-800">{selected.name} already has a {planType} plan</p>
-                      <p className="text-xs text-amber-600 mt-0.5">"{conflict.title}" is currently active</p>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', margin: 0 }}>
+                        {selected.name} already has a {planType} plan
+                      </p>
+                      <p style={{ fontSize: 12, color: 'rgba(251,191,36,0.65)', margin: '3px 0 0' }}>
+                        "{conflict.title}" is currently active
+                      </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => { setReplaceId(conflict.id); setStep('pick-member') }}
-                      className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors">
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => { setReplaceId(conflict.id); setStep('pick-member') }} style={{
+                      flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+                      background: 'rgba(251,191,36,0.2)', color: '#fbbf24', fontSize: 12, fontWeight: 700,
+                    }}>
                       Replace existing
                     </button>
-                    <button onClick={() => { setReplaceId(null); setStep('pick-member') }}
-                      className="flex-1 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors">
+                    <button onClick={() => { setReplaceId(null); setStep('pick-member') }} style={{
+                      flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+                      background: 'rgba(129,140,248,0.2)', color: '#818cf8', fontSize: 12, fontWeight: 700,
+                    }}>
                       Add alongside
                     </button>
                   </div>
@@ -173,16 +209,25 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
               ) : null
             })()}
 
-            {error && <p className="text-red-500 text-xs">{error}</p>}
+            {error && <p style={{ fontSize: 12, color: '#f87171', margin: 0 }}>{error}</p>}
 
             {step !== 'conflict' && (
-              <div className="flex gap-3 pt-2 border-t border-gray-100">
-                <button onClick={() => setStep('customize')} disabled={!selected || loadingPlans}
-                  className="flex-1 py-2.5 border border-violet-300 text-violet-700 text-sm font-semibold rounded-xl hover:bg-violet-50 disabled:opacity-40 cursor-pointer transition-colors">
+              <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                <button onClick={() => setStep('customize')} disabled={!selected || loadingPlans} style={{
+                  flex: 1, padding: '11px 0', border: '1px solid rgba(129,140,248,0.3)',
+                  borderRadius: 12, background: 'transparent', color: '#818cf8',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: (!selected || loadingPlans) ? 0.4 : 1,
+                  fontFamily: 'inherit',
+                }}>
                   Customize & Assign
                 </button>
-                <button onClick={doAssign} disabled={saving || !selected || loadingPlans}
-                  className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 cursor-pointer">
+                <button onClick={doAssign} disabled={saving || !selected || loadingPlans} style={{
+                  flex: 1, padding: '11px 0', border: 'none', borderRadius: 12,
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  opacity: (saving || !selected || loadingPlans) ? 0.5 : 1,
+                  fontFamily: 'inherit',
+                }}>
                   {saving ? 'Assigning…' : selected ? `Assign to ${selected.name}` : 'Select a member'}
                 </button>
               </div>
@@ -190,107 +235,132 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
           </>
         )}
 
-        {/* ── Step 2: Customize (day navigator) ── */}
+        {/* ── Step 2: Customize ── */}
         {step === 'customize' && (
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* Title */}
-            <input value={customTitle} onChange={e => setCustomTitle(e.target.value)}
-              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:border-violet-500" />
+            <input value={customTitle} onChange={e => setCustomTitle(e.target.value)} style={{
+              width: '100%', padding: '10px 14px', boxSizing: 'border-box',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 12, fontSize: 14, fontWeight: 600, color: '#fff',
+              outline: 'none', fontFamily: 'inherit',
+            }} />
 
             {/* Day tab bar */}
-            <div className="flex items-center gap-1">
-              <div className="flex gap-1 overflow-x-auto flex-1 pb-0.5">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="trainer-day-tabs" style={{ display: 'flex', gap: 4, overflowX: 'auto', flex: 1, paddingBottom: 2 }}>
                 {days.map((d, di) => (
-                  <button key={di} onClick={() => { setActiveDayIdx(di); setDaySearch('') }}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap ${
-                      di === safeIdx
-                        ? 'bg-violet-600 text-white'
-                        : d.rest
-                          ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-violet-50 hover:text-violet-700'
-                    }`}>
+                  <button key={di} onClick={() => { setActiveDayIdx(di); setDaySearch('') }} style={{
+                    flexShrink: 0, padding: '6px 12px', borderRadius: 10, border: 'none',
+                    fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                    background: di === safeIdx ? '#818cf8' : d.rest ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.07)',
+                    color: di === safeIdx ? '#fff' : d.rest ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.55)',
+                    fontFamily: 'inherit', transition: 'all 0.15s',
+                  }}>
                     {d.name?.trim() || DAY_ABBR[di] || `Day ${di + 1}`}
-                    {d.rest && <span className="ml-1 opacity-60">·rest</span>}
+                    {d.rest && <span style={{ marginLeft: 4, opacity: 0.6 }}>·rest</span>}
                   </button>
                 ))}
               </div>
-              <button onClick={() => { addDay(); setActiveDayIdx(days.length); setDaySearch('') }}
-                className="shrink-0 px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-violet-50 text-gray-500 hover:text-violet-600 cursor-pointer transition-colors" title="Add day">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+              <button onClick={() => { addDay(); setActiveDayIdx(days.length); setDaySearch('') }} style={{
+                flexShrink: 0, padding: '6px 10px', borderRadius: 10, border: 'none',
+                background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }} title="Add day">
+                <Plus size={14} />
               </button>
             </div>
 
             {/* Active day editor */}
             {activeDay && (
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, overflow: 'hidden' }}>
                 {/* Day meta row */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Day {safeIdx + 1}</span>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
+                  background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>Day {safeIdx + 1}</span>
                   <input
                     value={activeDay.name ?? ''}
                     onChange={e => updateDay(safeIdx, { name: e.target.value })}
                     placeholder={planType === 'workout' ? 'e.g. Push Day' : 'e.g. Monday'}
-                    className="flex-1 text-xs font-semibold text-gray-800 bg-transparent outline-none placeholder-gray-300 min-w-0"
+                    style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#f5f5f7', background: 'transparent', border: 'none', outline: 'none', minWidth: 0, fontFamily: 'inherit' }}
                   />
-                  <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer shrink-0">
-                    <input type="checkbox" checked={!!activeDay.rest} onChange={e => updateDay(safeIdx, { rest: e.target.checked })} className="accent-violet-600 w-3 h-3" />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.4)', cursor: 'pointer', flexShrink: 0 }}>
+                    <input type="checkbox" checked={!!activeDay.rest} onChange={e => updateDay(safeIdx, { rest: e.target.checked })} style={{ accentColor: '#818cf8', width: 11, height: 11 }} />
                     Rest day
                   </label>
                   <button onClick={() => { removeDay(safeIdx); setActiveDayIdx(Math.max(0, safeIdx - 1)) }}
-                    className="text-gray-300 hover:text-red-400 cursor-pointer shrink-0" title="Remove day">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', padding: 0, display: 'flex', flexShrink: 0 }} title="Remove day">
+                    <X size={14} />
                   </button>
                 </div>
 
                 {activeDay.rest ? (
-                  <p className="text-xs text-gray-400 text-center py-6">Rest day — no exercises scheduled</p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '24px 0', margin: 0 }}>Rest day — no activities scheduled</p>
                 ) : (
-                  <div className="px-3 py-2.5 space-y-1.5">
+                  <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {items.length > 0 && (
-                      <div className={`grid gap-1 px-1 ${planType === 'workout' ? 'grid-cols-[1fr_38px_52px_48px_20px]' : 'grid-cols-[56px_1fr_44px_48px_20px]'}`}>
+                      <div style={{ display: 'grid', gap: 4, paddingLeft: 2, gridTemplateColumns: planType === 'workout' ? '1fr 38px 52px 48px 20px' : '56px 1fr 44px 48px 20px' }}>
                         {(planType === 'workout' ? ['Exercise','Sets','Reps','Rest',''] : ['Time','Meal','Pro.','Cal','']).map(h => (
-                          <span key={h} className="text-[10px] font-semibold text-gray-400 uppercase">{h}</span>
+                          <span key={h} style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase' }}>{h}</span>
                         ))}
                       </div>
                     )}
 
                     {planType === 'workout'
                       ? items.map((r, ii) => (
-                          <div key={ii} className="grid grid-cols-[1fr_38px_52px_48px_20px] gap-1 items-center">
+                          <div key={ii} style={{ display: 'grid', gridTemplateColumns: '1fr 38px 52px 48px 20px', gap: 4, alignItems: 'center' }}>
                             <input value={r.name ?? ''} onChange={e => updateItem(safeIdx, ii, { name: e.target.value })} placeholder="Exercise" className={inputCls} />
-                            <input value={r.sets ?? ''} onChange={e => updateItem(safeIdx, ii, { sets: e.target.value })} placeholder="4"    type="number" className={inputCls} />
+                            <input value={r.sets ?? ''} onChange={e => updateItem(safeIdx, ii, { sets: e.target.value })} placeholder="4" type="number" className={inputCls} />
                             <input value={r.reps ?? ''} onChange={e => updateItem(safeIdx, ii, { reps: e.target.value })} placeholder="8-12" className={inputCls} />
-                            <input value={r.rest ?? ''} onChange={e => updateItem(safeIdx, ii, { rest: e.target.value })} placeholder="60s"  className={inputCls} />
-                            <button onClick={() => removeItem(safeIdx, ii)} className="text-gray-300 hover:text-red-400 cursor-pointer flex justify-center">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <input value={r.rest ?? ''} onChange={e => updateItem(safeIdx, ii, { rest: e.target.value })} placeholder="60s" className={inputCls} />
+                            <button onClick={() => removeItem(safeIdx, ii)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', padding: 0, display: 'flex', justifyContent: 'center' }}>
+                              <X size={13} />
                             </button>
                           </div>
                         ))
                       : items.map((r, ii) => (
-                          <div key={ii} className="grid grid-cols-[56px_1fr_44px_48px_20px] gap-1 items-center">
-                            <input value={r.time ?? ''}      onChange={e => updateItem(safeIdx, ii, { time: e.target.value })}      placeholder="8 AM" className={inputCls} />
+                          <div key={ii} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 44px 48px 20px', gap: 4, alignItems: 'center' }}>
+                            <input value={r.time ?? ''} onChange={e => updateItem(safeIdx, ii, { time: e.target.value })} placeholder="8 AM" className={inputCls} />
                             <input value={r.meal_name ?? ''} onChange={e => updateItem(safeIdx, ii, { meal_name: e.target.value })} placeholder="Meal" className={inputCls} />
-                            <input value={r.protein ?? ''}   onChange={e => updateItem(safeIdx, ii, { protein: e.target.value })}   placeholder="30g"  type="number" className={inputCls} />
-                            <input value={r.calories ?? ''}  onChange={e => updateItem(safeIdx, ii, { calories: e.target.value })}  placeholder="400"  type="number" className={inputCls} />
-                            <button onClick={() => removeItem(safeIdx, ii)} className="text-gray-300 hover:text-red-400 cursor-pointer flex justify-center">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <input value={r.protein ?? ''} onChange={e => updateItem(safeIdx, ii, { protein: e.target.value })} placeholder="30g" type="number" className={inputCls} />
+                            <input value={r.calories ?? ''} onChange={e => updateItem(safeIdx, ii, { calories: e.target.value })} placeholder="400" type="number" className={inputCls} />
+                            <button onClick={() => removeItem(safeIdx, ii)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', padding: 0, display: 'flex', justifyContent: 'center' }}>
+                              <X size={13} />
                             </button>
                           </div>
                         ))
                     }
 
                     {/* Per-day search */}
-                    <div className="relative mt-1">
-                      <input value={daySearch} onChange={e => setDaySearch(e.target.value)}
-                        placeholder={`Search ${planType === 'workout' ? 'exercises' : 'meals'} to add…`}
-                        className="w-full px-2.5 py-1.5 bg-violet-50 border border-violet-100 rounded-lg text-xs outline-none focus:border-violet-400" />
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ position: 'relative' }}>
+                        <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.25)', pointerEvents: 'none' }} />
+                        <input value={daySearch} onChange={e => setDaySearch(e.target.value)}
+                          placeholder={`Search ${planType === 'workout' ? 'exercises' : 'meals'} to add…`}
+                          style={{
+                            width: '100%', paddingLeft: 28, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
+                            background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)',
+                            borderRadius: 10, fontSize: 12, color: '#fff', outline: 'none',
+                            boxSizing: 'border-box', fontFamily: 'inherit',
+                          }} />
+                      </div>
                       {dbResults.length > 0 && (
-                        <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-md overflow-hidden">
+                        <div style={{
+                          marginTop: 2,
+                          background: '#1a1b2e', border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: 10, overflow: 'hidden',
+                        }}>
                           {dbResults.map((item, i) => (
-                            <button key={i} type="button" onMouseDown={() => addFromDb(item)}
-                              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-violet-50 text-left cursor-pointer border-b border-gray-50 last:border-0">
-                              <p className="text-xs font-medium text-gray-900 flex-1 truncate">{item[nameKey]}</p>
-                              <p className="text-[10px] text-gray-400 shrink-0">
+                            <button key={i} type="button" onMouseDown={() => addFromDb(item)} style={{
+                              width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '9px 12px', border: 'none', borderBottom: i < dbResults.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                              background: 'transparent', textAlign: 'left', cursor: 'pointer',
+                              fontFamily: 'inherit',
+                            }}>
+                              <p style={{ fontSize: 12, fontWeight: 600, color: '#f5f5f7', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{item[nameKey]}</p>
+                              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0, margin: 0 }}>
                                 {planType === 'workout' ? `${item.sets}×${item.reps}` : `${item.calories}kcal`}
                               </p>
                             </button>
@@ -298,9 +368,12 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
                         </div>
                       )}
                     </div>
-                    <button onClick={() => addItem(safeIdx)}
-                      className="text-[11px] text-violet-600 hover:text-violet-800 flex items-center gap-1 cursor-pointer font-medium">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+
+                    <button onClick={() => addItem(safeIdx)} style={{
+                      display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#818cf8',
+                      background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0, fontFamily: 'inherit',
+                    }}>
+                      <Plus size={12} />
                       Add {planType === 'workout' ? 'exercise' : 'meal'} manually
                     </button>
                   </div>
@@ -308,13 +381,21 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
               </div>
             )}
 
-            {error && <p className="text-red-500 text-xs">{error}</p>}
-            <div className="flex gap-3 pt-2 border-t border-gray-100">
-              <button onClick={doAssign} disabled={saving}
-                className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 cursor-pointer">
+            {error && <p style={{ fontSize: 12, color: '#f87171', margin: 0 }}>{error}</p>}
+
+            <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              <button onClick={doAssign} disabled={saving} style={{
+                flex: 1, padding: '11px 0', border: 'none', borderRadius: 12,
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.5 : 1, fontFamily: 'inherit',
+              }}>
                 {saving ? 'Assigning…' : replaceId ? `Replace & Assign to ${selected?.name}` : `Assign to ${selected?.name}`}
               </button>
-              <button onClick={() => setStep('pick-member')} className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 cursor-pointer">
+              <button onClick={() => setStep('pick-member')} style={{
+                padding: '11px 18px', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 12, background: 'transparent', color: 'rgba(255,255,255,0.5)',
+                fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
                 Back
               </button>
             </div>
@@ -327,106 +408,125 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
 
 // ─── View plan modal ──────────────────────────────────────────────────────────
 function ViewPlanModal({ template, planType, onClose }) {
-  const itemKey = planType === 'workout' ? 'exercises' : 'meals'
-  const days    = (template.exercises ?? template.meals) || []
+  const itemKey   = planType === 'workout' ? 'exercises' : 'meals'
+  const days      = (template.exercises ?? template.meals) || []
   const [activeIdx, setActiveIdx] = useState(0)
-  const safeIdx  = Math.min(activeIdx, Math.max(0, days.length - 1))
+  const safeIdx   = Math.min(activeIdx, Math.max(0, days.length - 1))
   const activeDay = days[safeIdx]
   const items     = activeDay?.[itemKey] || []
 
   return (
-    <FormModal title={template.title} onClose={onClose} wide>
-      <div className="space-y-3">
+    <FormModal title={template.title} onClose={onClose} wide dark>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* Summary bar */}
-        <div className="flex items-center gap-3 text-xs text-gray-500 bg-gray-50 rounded-xl px-4 py-2.5">
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${planType === 'workout' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '10px 14px',
+          fontSize: 12, color: 'rgba(255,255,255,0.4)',
+        }}>
+          <span style={{
+            padding: '3px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+            background: planType === 'workout' ? 'rgba(129,140,248,0.15)' : 'rgba(52,211,153,0.12)',
+            color: planType === 'workout' ? '#818cf8' : '#34d399',
+          }}>
             {planType === 'workout' ? 'Workout' : 'Diet'}
           </span>
           <span>{days.filter(d => !d.rest).length} training days</span>
-          <span>·</span>
+          <span style={{ opacity: 0.4 }}>·</span>
           <span>{days.reduce((s, d) => s + (d[itemKey] || []).length, 0)} {planType === 'workout' ? 'exercises' : 'meals'} total</span>
         </div>
 
         {/* Day tabs */}
-        <div className="flex gap-1 overflow-x-auto pb-0.5">
+        <div className="trainer-day-tabs" style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
           {days.map((d, i) => (
-            <button key={i} onClick={() => setActiveIdx(i)}
-              className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap ${
-                i === safeIdx
-                  ? 'bg-violet-600 text-white'
-                  : d.rest
-                    ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                    : 'bg-gray-100 text-gray-600 hover:bg-violet-50 hover:text-violet-700'
-              }`}>
+            <button key={i} onClick={() => setActiveIdx(i)} style={{
+              flexShrink: 0, padding: '6px 12px', borderRadius: 10, border: 'none',
+              fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+              background: i === safeIdx ? '#818cf8' : d.rest ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.07)',
+              color: i === safeIdx ? '#fff' : d.rest ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.55)',
+              fontFamily: 'inherit', transition: 'all 0.15s',
+            }}>
               {d.name?.trim() || DAY_ABBR[i] || `Day ${i + 1}`}
-              {d.rest && <span className="ml-1 opacity-60">·rest</span>}
+              {d.rest && <span style={{ marginLeft: 4, opacity: 0.6 }}>·rest</span>}
             </button>
           ))}
         </div>
 
         {/* Active day content */}
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, overflow: 'hidden' }}>
           {/* Day header */}
-          <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-100">
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
+            background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}>
             <div>
-              <p className="text-xs font-bold text-gray-800">
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>
                 Day {safeIdx + 1}{activeDay?.name ? ` — ${activeDay.name}` : ''}
               </p>
-              {activeDay?.rest && <p className="text-[11px] text-gray-400 mt-0.5">Rest day</p>}
+              {activeDay?.rest && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>Rest day</p>}
             </div>
             {!activeDay?.rest && items.length > 0 && (
-              <span className="ml-auto text-[11px] text-gray-400">{items.length} {planType === 'workout' ? 'exercise' : 'meal'}{items.length !== 1 ? 's' : ''}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+                {items.length} {planType === 'workout' ? 'exercise' : 'meal'}{items.length !== 1 ? 's' : ''}
+              </span>
             )}
           </div>
 
           {activeDay?.rest ? (
-            <div className="flex flex-col items-center justify-center py-10 text-gray-400 gap-2">
-              <svg className="w-8 h-8 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-xs">Rest day — no activities scheduled</p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', gap: 8, color: 'rgba(255,255,255,0.2)' }}>
+              <Clock size={32} strokeWidth={1.5} />
+              <p style={{ fontSize: 12, margin: 0 }}>Rest day — no activities scheduled</p>
             </div>
           ) : items.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-8">No items added for this day</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '32px 0', margin: 0 }}>No items added for this day</p>
           ) : planType === 'workout' ? (
-            <div className="divide-y divide-gray-50">
-              {/* Header */}
-              <div className="grid grid-cols-[1fr_44px_56px_52px] gap-2 px-4 py-2 bg-gray-50/50">
+            <div>
+              {/* Header row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 56px 52px', gap: 8, padding: '8px 16px', background: 'rgba(255,255,255,0.02)' }}>
                 {['Exercise', 'Sets', 'Reps', 'Rest'].map(h => (
-                  <span key={h} className="text-[10px] font-semibold text-gray-400 uppercase">{h}</span>
+                  <span key={h} style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase' }}>{h}</span>
                 ))}
               </div>
               {items.map((r, i) => (
-                <div key={i} className="grid grid-cols-[1fr_44px_56px_52px] gap-2 px-4 py-2.5 hover:bg-gray-50/50">
-                  <p className="text-sm font-medium text-gray-900 truncate">{r.name || '—'}</p>
-                  <p className="text-sm text-gray-600">{r.sets || '—'}</p>
-                  <p className="text-sm text-gray-600">{r.reps || '—'}</p>
-                  <p className="text-sm text-gray-600">{r.rest || '—'}</p>
+                <div key={i} style={{
+                  display: 'grid', gridTemplateColumns: '1fr 44px 56px 52px', gap: 8, padding: '10px 16px',
+                  borderTop: '1px solid rgba(255,255,255,0.04)',
+                }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{r.name || '—'}</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0 }}>{r.sets || '—'}</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0 }}>{r.reps || '—'}</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0 }}>{r.rest || '—'}</p>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
-              <div className="grid grid-cols-[60px_1fr_52px_56px] gap-2 px-4 py-2 bg-gray-50/50">
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 52px 56px', gap: 8, padding: '8px 16px', background: 'rgba(255,255,255,0.02)' }}>
                 {['Time', 'Meal', 'Protein', 'Calories'].map(h => (
-                  <span key={h} className="text-[10px] font-semibold text-gray-400 uppercase">{h}</span>
+                  <span key={h} style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase' }}>{h}</span>
                 ))}
               </div>
               {items.map((r, i) => (
-                <div key={i} className="grid grid-cols-[60px_1fr_52px_56px] gap-2 px-4 py-2.5 hover:bg-gray-50/50">
-                  <p className="text-sm text-gray-600">{r.time || '—'}</p>
-                  <p className="text-sm font-medium text-gray-900 truncate">{r.meal_name || '—'}</p>
-                  <p className="text-sm text-gray-600">{r.protein ? `${r.protein}g` : '—'}</p>
-                  <p className="text-sm text-gray-600">{r.calories ? `${r.calories} kcal` : '—'}</p>
+                <div key={i} style={{
+                  display: 'grid', gridTemplateColumns: '60px 1fr 52px 56px', gap: 8, padding: '10px 16px',
+                  borderTop: '1px solid rgba(255,255,255,0.04)',
+                }}>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0 }}>{r.time || '—'}</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{r.meal_name || '—'}</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0 }}>{r.protein ? `${r.protein}g` : '—'}</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0 }}>{r.calories ? `${r.calories} kcal` : '—'}</p>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <button onClick={onClose}
-          className="w-full py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
+        <button onClick={onClose} style={{
+          width: '100%', padding: '11px 0', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 12, background: 'transparent', color: 'rgba(255,255,255,0.5)',
+          fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+        }}>
           Close
         </button>
       </div>
@@ -435,34 +535,19 @@ function ViewPlanModal({ template, planType, onClose }) {
 }
 
 export default function TrainerWorkoutsPage() {
-  const { gymId, user } = useAuth()
+  const { gymId } = useAuth()
+  const { members, wTemplates, dTemplates, loadTemplates } = useTrainerData()
   const dialog = useDialog()
   const [tab, setTab]             = useState('workout')
-  const [wTemplates, setWT]       = useState([])
-  const [dTemplates, setDT]       = useState([])
-  const [members, setMembers]     = useState([])
-  const [loading, setLoading]     = useState(true)
   const [assigning, setAssigning] = useState(null)
   const [viewing, setViewing]     = useState(null)
 
-  useEffect(() => {
-    if (!gymId || !user) { setLoading(false); return }
-    let dead = false
-    Promise.all([fetchGymWorkoutTemplates(gymId), fetchGymDietTemplates(gymId), fetchAssignedMembers(gymId, user.id)])
-      .then(([w, d, m]) => { if (!dead) { setWT(w); setDT(d); setMembers(m) } })
-      .catch(err => console.error(err))
-      .finally(() => { if (!dead) setLoading(false) })
-    return () => { dead = true }
-  }, [gymId, user])
+  useEffect(() => { loadTemplates() }, [loadTemplates])
+
+  if (wTemplates === null || dTemplates === null || members === null) return <WorkoutsSkeleton />
 
   const templates = tab === 'workout' ? wTemplates : dTemplates
   const itemKey   = tab === 'workout' ? 'exercises' : 'meals'
-
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-      <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818cf8', animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  )
 
   return (
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -485,7 +570,7 @@ export default function TrainerWorkoutsPage() {
             fontSize: 13, fontWeight: 700,
             background: tab === v ? '#818cf8' : 'transparent',
             color: tab === v ? '#fff' : 'rgba(255,255,255,0.4)',
-            transition: 'all 0.15s',
+            transition: 'all 0.15s', fontFamily: 'inherit',
           }}>
             {l} <span style={{ fontWeight: 500, opacity: 0.7 }}>{count}</span>
           </button>
@@ -552,14 +637,14 @@ export default function TrainerWorkoutsPage() {
                   <button onClick={() => setViewing(t)} style={{
                     flex: 1, padding: '9px 0', border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: 12, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)',
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                   }}>
                     View
                   </button>
                   <button onClick={() => setAssigning(t)} style={{
                     flex: 1, padding: '9px 0', border: 'none',
                     borderRadius: 12, background: '#818cf8', color: '#fff',
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                   }}>
                     Assign
                   </button>

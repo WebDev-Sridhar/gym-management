@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { LogOut, CreditCard, ChevronRight, AlertTriangle, Clock, Loader2 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
-import { fetchMyMember, fetchMyAttendance } from '../../services/memberService'
-import { fetchMyPendingPayment } from '../../services/memberPaymentService'
+import { useMemberData } from '../../store/MemberDataContext'
+import ProfileSkeleton from '../../components/member/skeletons/ProfileSkeleton'
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 14 },
@@ -30,54 +30,33 @@ function StatBox({ value, label, accent }) {
 }
 
 export default function MemberProfilePage() {
-  const { gymId, profile, logout } = useAuth()
-  const [member, setMember]       = useState(null)
-  const [attendance, setAtt]      = useState([])
-  const [pending, setPending]     = useState(null)
-  const [loading, setLoading]     = useState(true)
+  const { profile, logout } = useAuth()
+  const { member, attendance, pending, isLoading } = useMemberData()
   const [loggingOut, setLoggingOut] = useState(false)
-
-  useEffect(() => {
-    if (!gymId || !profile) { setLoading(false); return }
-    let dead = false
-    fetchMyMember({ gymId, phone: profile.phone, email: profile.email })
-      .then(async m => {
-        if (dead) return
-        setMember(m)
-        if (m) {
-          const [att, pay] = await Promise.all([
-            fetchMyAttendance({ memberId: m.id, limit: 90 }),
-            fetchMyPendingPayment(m.id).catch(() => null),
-          ])
-          if (!dead) { setAtt(att); setPending(pay) }
-        }
-      })
-      .catch(e => console.error(e))
-      .finally(() => { if (!dead) setLoading(false) })
-    return () => { dead = true }
-  }, [gymId, profile])
 
   async function handleLogout() {
     setLoggingOut(true)
     try { await logout() } catch (e) { console.error(e); setLoggingOut(false) }
   }
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-      <Loader2 size={36} color="#6366f1" style={{ animation: 'mspin .75s linear infinite' }} />
-      <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  )
+  if (isLoading) return <ProfileSkeleton />
 
+  // Force UTC interpretation — Supabase timestamps may lack 'Z' suffix
+  function parseTS(ts) {
+    if (!ts) return new Date(NaN)
+    return new Date(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z')
+  }
+
+  const safeAtt = attendance ?? []
   const now = new Date()
-  const thisMonth = attendance.filter(a => { const d = new Date(a.check_in); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() }).length
-  const lastMonth = attendance.filter(a => { const d = new Date(a.check_in); const lm = new Date(now.getFullYear(), now.getMonth() - 1); return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear() }).length
+  const thisMonth = safeAtt.filter(a => { const d = parseTS(a.check_in); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() }).length
+  const lastMonth = safeAtt.filter(a => { const d = parseTS(a.check_in); const lm = new Date(now.getFullYear(), now.getMonth() - 1); return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear() }).length
 
   const streak = (() => {
     let n = 0
     for (let i = 0; i < 60; i++) {
       const d = new Date(); d.setDate(d.getDate() - i)
-      if (attendance.some(a => a.check_in.startsWith(d.toISOString().split('T')[0]))) n++
+      if (safeAtt.some(a => parseTS(a.check_in).toLocaleDateString('en-CA') === d.toLocaleDateString('en-CA'))) n++
       else if (i > 0) break
     }
     return n
@@ -110,7 +89,7 @@ export default function MemberProfilePage() {
       <motion.div {...fadeUp(0.06)} style={{ display: 'flex', gap: '8px' }}>
         <StatBox value={thisMonth} label="This Month" accent="#818cf8" />
         <StatBox value={lastMonth} label="Last Month" accent="rgba(255,255,255,0.6)" />
-        <StatBox value={streak > 0 ? streak : attendance.length} label={streak > 0 ? 'Day Streak' : 'Total Visits'} accent={streak > 1 ? '#f97316' : '#818cf8'} />
+        <StatBox value={streak > 0 ? streak : safeAtt.length} label={streak > 0 ? 'Day Streak' : 'Total Visits'} accent={streak > 1 ? '#f97316' : '#818cf8'} />
       </motion.div>
 
       {/* Pending payment */}

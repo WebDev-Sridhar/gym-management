@@ -1,7 +1,10 @@
 import { useAuth } from '../../store/AuthContext'
+import SettingsSkeleton from '../../components/trainer/skeletons/SettingsSkeleton'
 
 export default function TrainerSettingsPage() {
   const { profile, gymId, logout } = useAuth()
+
+  if (!profile) return <SettingsSkeleton />
 
   const fields = [
     { label: 'Name',   value: profile?.name  || '—' },

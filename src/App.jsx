@@ -26,14 +26,7 @@ import CommunicationPage from './pages/owner/CommunicationPage'
 import ProgramsPage from './pages/owner/ProgramsPage'
 import StarterWebsitePage from './pages/owner/StarterWebsitePage'
 import TrainerLayout from './components/layout/TrainerLayout'
-import TrainerDashboard from './pages/trainer/TrainerDashboard'
-import TrainerMembersPage from './pages/trainer/TrainerMembersPage'
-import TrainerWorkoutsPage from './pages/trainer/TrainerWorkoutsPage'
-import TrainerSettingsPage from './pages/trainer/TrainerSettingsPage'
 import MemberLayout from './components/layout/MemberLayout'
-import MemberApp from './pages/member/MemberApp'
-import MemberWorkoutsPage from './pages/member/MemberWorkoutsPage'
-import MemberProfilePage from './pages/member/MemberProfilePage'
 import CheckinPage from './pages/checkin/CheckinPage'
 import PayLandingPage from './pages/pay/PayLandingPage'
 import GymLayout from './components/gym/GymLayout'
@@ -138,28 +131,19 @@ export default function App() {
             <Route path="programs" element={<ProgramsPage />} />
           </Route>
 
-          {/* Trainer dashboard — protected, trainer only */}
-          <Route path="/trainer-dashboard" element={
+          {/* Trainer dashboard — keep-alive layout handles all sub-routes internally */}
+          <Route path="/trainer-dashboard/*" element={
             <ProtectedRoute allowedRoles={['trainer']}>
               <TrainerLayout />
             </ProtectedRoute>
-          }>
-            <Route index element={<TrainerDashboard />} />
-            <Route path="members" element={<TrainerMembersPage />} />
-            <Route path="workouts" element={<TrainerWorkoutsPage />} />
-            <Route path="settings" element={<TrainerSettingsPage />} />
-          </Route>
+          } />
 
-          {/* Member app — mobile-first layout with bottom nav */}
-          <Route path="/member-app" element={
+          {/* Member app — keep-alive layout handles all sub-routes internally */}
+          <Route path="/member-app/*" element={
             <ProtectedRoute allowedRoles={['member']}>
               <MemberLayout />
             </ProtectedRoute>
-          }>
-            <Route index element={<MemberApp />} />
-            <Route path="workouts" element={<MemberWorkoutsPage />} />
-            <Route path="profile" element={<MemberProfilePage />} />
-          </Route>
+          } />
           {/* Public gym pages — must be LAST (dynamic :gymSlug param) */}
           <Route path="/:gymSlug" element={<GymLayout />}>
             <Route index element={<GymHome />} />

@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom'
  *   children — form content (including any save/cancel buttons)
  *   wide     — use max-w-2xl instead of max-w-lg (default false)
  */
-export default function FormModal({ title, onClose, children, wide = false }) {
+export default function FormModal({ title, onClose, children, wide = false, dark = false }) {
   const backdropRef = useRef(null)
 
   useEffect(() => {
@@ -30,27 +30,44 @@ export default function FormModal({ title, onClose, children, wide = false }) {
     if (e.target === backdropRef.current) onClose()
   }
 
+  const d = dark
+
   return createPortal(
     <div
       ref={backdropRef}
       onMouseDown={handleBackdrop}
       className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
-      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}
+      style={{ background: d ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)' }}
     >
       <div
-        className={`relative w-full bg-white rounded-2xl shadow-2xl flex flex-col ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
-        style={{ maxHeight: 'calc(100vh - 3rem)' }}
+        className={`relative w-full rounded-2xl shadow-2xl flex flex-col ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
+        style={{
+          maxHeight: 'calc(100vh - 3rem)',
+          background: d ? '#0f1020' : '#ffffff',
+          border: d ? '1px solid rgba(255,255,255,0.08)' : 'none',
+          fontFamily: d ? "'Plus Jakarta Sans', sans-serif" : undefined,
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">{title}</h3>
+        <div
+          className="flex items-center justify-between px-6 py-4 shrink-0"
+          style={{ borderBottom: d ? '1px solid rgba(255,255,255,0.06)' : '1px solid #f3f4f6' }}
+        >
+          <h3 style={{
+            fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+            color: d ? 'rgba(255,255,255,0.6)' : '#111827',
+          }}>{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer -mr-1 p-1 rounded-lg hover:bg-gray-100"
             aria-label="Close"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 8,
+              color: d ? 'rgba(255,255,255,0.35)' : '#9ca3af',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

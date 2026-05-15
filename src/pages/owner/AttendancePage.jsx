@@ -6,6 +6,13 @@ import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
 import Pagination from '../../components/ui/Pagination'
 
+// Supabase can return timestamptz without a 'Z' suffix. Without it, JS Date
+// parses the string as local time instead of UTC, showing times hours off.
+function parseTS(ts) {
+  if (!ts) return new Date(NaN)
+  return new Date(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z')
+}
+
 export default function AttendancePage() {
   const dialog = useDialog()
   const { gymId } = useAuth()
@@ -453,7 +460,7 @@ export default function AttendancePage() {
                     </td>
                     <td className="px-5 py-4">
                       <p className="text-sm text-gray-700">
-                        {new Date(checkin.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                        {parseTS(checkin.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                       </p>
                     </td>
                   </tr>

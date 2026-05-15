@@ -1,14 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../store/AuthContext'
+import { useTrainerData } from '../../store/TrainerDataContext'
 import { useDialog } from '../../components/ui/Dialog'
 import FormModal from '../../components/ui/FormModal'
 import {
-  fetchAssignedMembers, fetchMemberAttendance, fetchMemberAssignedPlans,
-  fetchGymWorkoutTemplates, fetchGymDietTemplates,
+  fetchMemberAttendance, fetchMemberAssignedPlans,
   assignPlanToMember, archiveMemberPlan,
 } from '../../services/trainerService'
+import MembersSkeleton from '../../components/trainer/skeletons/MembersSkeleton'
 import { EXERCISES } from '../../data/exercisesDb'
 import { MEALS } from '../../data/mealsDb'
+import {
+  TriangleAlert, X, Plus, Search, Check, ChevronDown, ChevronUp,
+  Dumbbell, Salad, Loader2, CircleCheck,
+} from 'lucide-react'
 
 // ─── Plan customise + assign modal ───────────────────────────────────────────
 function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, onClose, onAssigned }) {
@@ -17,7 +22,6 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
   const initialStep = editingPlan ? 'edit' : existingActive.length > 0 ? 'overview' : 'pick'
 
   const [tab, setTab]               = useState(initialTab)
-  const [templates, setTemplates]   = useState([])
   const [days, setDays]             = useState([])   // [{name, rest, exercises/meals:[]}]
   const [title, setTitle]           = useState('')
   const [step, setStep]             = useState(initialStep)
@@ -51,11 +55,15 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
     setDays(toDays(editingPlan.data, editingPlan.plan_type))
   }, [editingPlan])
 
+  const { wTemplates, dTemplates, loadTemplates } = useTrainerData()
+
   useEffect(() => {
     if (step !== 'pick' && step !== 'edit') return
-    const fn = tab === 'workout' ? fetchGymWorkoutTemplates : fetchGymDietTemplates
-    fn(gymId).then(setTemplates).catch(() => setError('Failed to load templates'))
-  }, [tab, gymId, step])
+    loadTemplates()
+  }, [step, loadTemplates])
+
+  // Derive templates from context (null while loading → empty list)
+  const templates = tab === 'workout' ? (wTemplates ?? []) : (dTemplates ?? [])
 
   function pickTemplate(t) {
     setTitle(t.title)
@@ -77,7 +85,7 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
     setDaySearch('')
   }
 
-  const inputCls = 'px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-violet-500 w-full'
+  const inputCls = 'px-2 py-1.5 bg-white/5 border border-white/10 text-white rounded-lg text-xs outline-none focus:border-indigo-500/60 w-full placeholder:text-white/25'
 
   async function handleSave() {
     if (!title.trim()) { setError('Title is required'); return }
@@ -96,48 +104,46 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
   }
 
   return (
-    <FormModal title={editingPlan ? `Edit Plan — ${member.name}` : `Assign Plan — ${member.name}`} onClose={onClose} wide>
+    <FormModal title={editingPlan ? `Edit Plan — ${member.name}` : `Assign Plan — ${member.name}`} onClose={onClose} wide dark>
 
-      {/* ── Overview: show existing plans before creating ── */}
+      {/* ── Overview ── */}
       {step === 'overview' && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-xs font-semibold text-amber-800 mb-3 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-              {member.name} already has these active plans
+          <div style={{ borderRadius: 14, border: '1px solid rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.07)', padding: '14px 16px' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <TriangleAlert size={13} style={{ flexShrink: 0 }} />
+              {member.name} already has active plans
             </p>
-            <div className="space-y-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {existingActive.map(p => (
-                <div key={p.id} className="flex items-center gap-3 bg-white rounded-lg px-3 py-2.5 border border-amber-100">
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${p.plan_type === 'workout' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                    {p.plan_type === 'workout' ? 'Workout' : 'Diet'}
-                  </span>
-                  <p className="text-xs font-medium text-gray-900 flex-1 truncate">{p.title}</p>
-                  <button
-                    onClick={() => { setReplaceIds([p.id]); setTab(p.plan_type); setStep('pick') }}
-                    className="text-xs font-semibold text-amber-700 hover:text-amber-900 cursor-pointer shrink-0 border border-amber-200 rounded-lg px-2 py-1 hover:bg-amber-100 transition-colors"
-                  >
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: p.plan_type === 'workout' ? 'rgba(129,140,248,0.15)' : 'rgba(52,211,153,0.12)', color: p.plan_type === 'workout' ? '#818cf8' : '#34d399' }}>
+                    {p.plan_type === 'workout' ? <Dumbbell size={14} strokeWidth={2} /> : <Salad size={14} strokeWidth={2} />}
+                  </div>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#f5f5f7', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
+                  <button onClick={() => { setReplaceIds([p.id]); setTab(p.plan_type); setStep('pick') }}
+                    style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', flexShrink: 0 }}>
                     Replace
                   </button>
                 </div>
               ))}
             </div>
           </div>
-          <button
-            onClick={() => { setReplaceIds([]); setStep('pick') }}
-            className="w-full py-2.5 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 cursor-pointer transition-colors"
-          >
-            + Add New Plan
+          <button onClick={() => { setReplaceIds([]); setStep('pick') }}
+            style={{ width: '100%', padding: '11px', background: '#818cf8', border: 'none', borderRadius: 14, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Plus size={15} /> Add New Plan
           </button>
         </div>
       )}
 
-      {/* Type tabs — hidden when editing an existing plan (type is fixed) */}
+      {/* Type tabs */}
       {(step === 'pick' || step === 'edit') && !editingPlan && (
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-4">
+        <div style={{ display: 'flex', gap: 4, padding: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 12, marginBottom: 4 }}>
           {[['workout', 'Workout'], ['diet', 'Diet']].map(([v, l]) => (
             <button key={v} onClick={() => { setTab(v); setStep('pick'); setRows([]); setTitle('') }}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${tab === v ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{l}</button>
+              style={{ flex: 1, padding: '7px 0', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, transition: 'all 0.15s', background: tab === v ? '#818cf8' : 'transparent', color: tab === v ? '#fff' : 'rgba(255,255,255,0.38)' }}>
+              {l}
+            </button>
           ))}
         </div>
       )}
@@ -145,27 +151,27 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
       {/* Template picker */}
       {step === 'pick' && (
         <div className="space-y-3">
-          <p className="text-xs text-gray-500 font-medium">Select a template to start from:</p>
+          <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Select a template</p>
           {templates.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">No {tab} templates in this gym yet.</p>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '24px 0' }}>No {tab} templates in this gym yet.</p>
           ) : (
             <div className="space-y-2 max-h-72 overflow-y-auto">
               {templates.map(t => (
                 <button key={t.id} onClick={() => pickTemplate(t)}
-                  className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-violet-50 border border-transparent hover:border-violet-200 rounded-xl text-left transition-all cursor-pointer">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{t.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {tab === 'workout' ? `${t.exercises?.length ?? 0} exercises` : `${t.meals?.length ?? 0} meals`}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#f5f5f7', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', margin: '2px 0 0' }}>
+                      {tab === 'workout' ? `${t.exercises?.length ?? 0} days` : `${t.meals?.length ?? 0} days`}
                     </p>
                   </div>
-                  <span className="text-xs text-violet-600 font-medium shrink-0">Customise →</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', flexShrink: 0 }}>Use →</span>
                 </button>
               ))}
             </div>
           )}
           <button onClick={() => { setTitle(''); setRows([]); setStep('edit') }}
-            className="text-xs text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
+            style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             + Start from scratch
           </button>
         </div>
@@ -184,108 +190,97 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
             {/* Plan title */}
             <input value={title} onChange={e => setTitle(e.target.value)}
               placeholder={tab === 'workout' ? 'Plan title e.g. Push/Pull/Legs' : 'Plan title e.g. High Protein Diet'}
-              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:border-violet-500 transition-all" />
+              style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 13, fontWeight: 600, color: '#f5f5f7', outline: 'none', boxSizing: 'border-box' }} />
 
             {/* Day tab bar */}
-            <div className="flex items-center gap-1">
-              <div className="flex gap-1 overflow-x-auto flex-1 pb-0.5 no-scrollbar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="trainer-day-tabs" style={{ display: 'flex', gap: 4, overflowX: 'auto', flex: 1, paddingBottom: 2 }}>
                 {days.map((d, di) => (
                   <button key={di} onClick={() => { setActiveDayIdx(di); setDaySearch('') }}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap ${
-                      di === safeIdx
-                        ? 'bg-violet-600 text-white'
-                        : d.rest
-                          ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-violet-50 hover:text-violet-700'
-                    }`}>
+                    style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', transition: 'all 0.15s',
+                      background: di === safeIdx ? '#818cf8' : d.rest ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.07)',
+                      color: di === safeIdx ? '#fff' : d.rest ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.55)',
+                    }}>
                     {d.name?.trim() || `Day ${di + 1}`}
-                    {d.rest && <span className="ml-1 opacity-60">·rest</span>}
+                    {d.rest && <span style={{ opacity: 0.5, marginLeft: 3 }}>·rest</span>}
                   </button>
                 ))}
               </div>
               <button onClick={() => { addDay(); setActiveDayIdx(days.length); setDaySearch('') }}
-                className="shrink-0 px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-violet-50 text-gray-500 hover:text-violet-600 cursor-pointer transition-colors"
+                style={{ flexShrink: 0, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
                 title="Add day">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+                <Plus size={14} />
               </button>
             </div>
 
             {/* Active day editor */}
             {activeDay && (
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, overflow: 'hidden' }}>
                 {/* Day meta row */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">
-                    Day {safeIdx + 1}
-                  </span>
-                  <input
-                    value={activeDay.name ?? ''}
-                    onChange={e => updateDay(safeIdx, { name: e.target.value })}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>Day {safeIdx + 1}</span>
+                  <input value={activeDay.name ?? ''} onChange={e => updateDay(safeIdx, { name: e.target.value })}
                     placeholder={tab === 'workout' ? 'e.g. Push Day' : 'e.g. Monday'}
-                    className="flex-1 text-xs font-semibold text-gray-800 bg-transparent outline-none placeholder-gray-300 min-w-0"
-                  />
-                  <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer shrink-0">
-                    <input type="checkbox" checked={!!activeDay.rest} onChange={e => updateDay(safeIdx, { rest: e.target.checked })} className="accent-violet-600 w-3 h-3" />
-                    Rest day
+                    style={{ flex: 1, fontSize: 12, fontWeight: 700, color: '#f5f5f7', background: 'transparent', border: 'none', outline: 'none', minWidth: 0 }} />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.38)', cursor: 'pointer', flexShrink: 0, fontWeight: 600 }}>
+                    <input type="checkbox" checked={!!activeDay.rest} onChange={e => updateDay(safeIdx, { rest: e.target.checked })} style={{ accentColor: '#818cf8', width: 12, height: 12 }} />
+                    Rest
                   </label>
                   <button onClick={() => { removeDay(safeIdx); setActiveDayIdx(Math.max(0, safeIdx - 1)) }}
-                    title="Remove this day" className="text-gray-300 hover:text-red-400 cursor-pointer shrink-0">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', flexShrink: 0, padding: 2 }} title="Remove day">
+                    <X size={14} />
                   </button>
                 </div>
 
                 {activeDay.rest ? (
-                  <p className="text-xs text-gray-400 text-center py-6">Rest day — no exercises scheduled</p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', textAlign: 'center', padding: '24px 0' }}>Rest day — no exercises scheduled</p>
                 ) : (
-                  <div className="px-3 py-2.5 space-y-1.5">
-                    {/* Column headers */}
+                  <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {items.length > 0 && (
-                      <div className={`grid gap-1 px-1 ${tab === 'workout' ? 'grid-cols-[1fr_38px_52px_48px_20px]' : 'grid-cols-[56px_1fr_44px_48px_20px]'}`}>
+                      <div style={{ display: 'grid', gap: 4, paddingLeft: 4, gridTemplateColumns: tab === 'workout' ? '1fr 38px 52px 48px 20px' : '56px 1fr 44px 48px 20px' }}>
                         {(tab === 'workout' ? ['Exercise','Sets','Reps','Rest',''] : ['Time','Meal','Pro.','Cal','']).map(h => (
-                          <span key={h} className="text-[10px] font-semibold text-gray-400 uppercase">{h}</span>
+                          <span key={h} style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
                         ))}
                       </div>
                     )}
-
-                    {/* Item rows */}
                     {tab === 'workout'
                       ? items.map((r, ii) => (
-                          <div key={ii} className="grid grid-cols-[1fr_38px_52px_48px_20px] gap-1 items-center">
+                          <div key={ii} style={{ display: 'grid', gridTemplateColumns: '1fr 38px 52px 48px 20px', gap: 4, alignItems: 'center' }}>
                             <input value={r.name ?? ''} onChange={e => updateItem(safeIdx, ii, { name: e.target.value })} placeholder="Exercise" className={inputCls} />
-                            <input value={r.sets ?? ''} onChange={e => updateItem(safeIdx, ii, { sets: e.target.value })} placeholder="4"    type="number" className={inputCls} />
+                            <input value={r.sets ?? ''} onChange={e => updateItem(safeIdx, ii, { sets: e.target.value })} placeholder="4" type="number" className={inputCls} />
                             <input value={r.reps ?? ''} onChange={e => updateItem(safeIdx, ii, { reps: e.target.value })} placeholder="8-12" className={inputCls} />
-                            <input value={r.rest ?? ''} onChange={e => updateItem(safeIdx, ii, { rest: e.target.value })} placeholder="60s"  className={inputCls} />
-                            <button onClick={() => removeItem(safeIdx, ii)} className="text-gray-300 hover:text-red-400 cursor-pointer flex justify-center">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <input value={r.rest ?? ''} onChange={e => updateItem(safeIdx, ii, { rest: e.target.value })} placeholder="60s" className={inputCls} />
+                            <button onClick={() => removeItem(safeIdx, ii)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', display: 'flex', justifyContent: 'center', padding: 0 }}>
+                              <X size={13} />
                             </button>
                           </div>
                         ))
                       : items.map((r, ii) => (
-                          <div key={ii} className="grid grid-cols-[56px_1fr_44px_48px_20px] gap-1 items-center">
-                            <input value={r.time ?? ''}      onChange={e => updateItem(safeIdx, ii, { time: e.target.value })}      placeholder="8 AM" className={inputCls} />
+                          <div key={ii} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 44px 48px 20px', gap: 4, alignItems: 'center' }}>
+                            <input value={r.time ?? ''} onChange={e => updateItem(safeIdx, ii, { time: e.target.value })} placeholder="8 AM" className={inputCls} />
                             <input value={r.meal_name ?? ''} onChange={e => updateItem(safeIdx, ii, { meal_name: e.target.value })} placeholder="Meal" className={inputCls} />
-                            <input value={r.protein ?? ''}   onChange={e => updateItem(safeIdx, ii, { protein: e.target.value })}   placeholder="30g"  type="number" className={inputCls} />
-                            <input value={r.calories ?? ''}  onChange={e => updateItem(safeIdx, ii, { calories: e.target.value })}  placeholder="400"  type="number" className={inputCls} />
-                            <button onClick={() => removeItem(safeIdx, ii)} className="text-gray-300 hover:text-red-400 cursor-pointer flex justify-center">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <input value={r.protein ?? ''} onChange={e => updateItem(safeIdx, ii, { protein: e.target.value })} placeholder="30g" type="number" className={inputCls} />
+                            <input value={r.calories ?? ''} onChange={e => updateItem(safeIdx, ii, { calories: e.target.value })} placeholder="400" type="number" className={inputCls} />
+                            <button onClick={() => removeItem(safeIdx, ii)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', display: 'flex', justifyContent: 'center', padding: 0 }}>
+                              <X size={13} />
                             </button>
                           </div>
                         ))
                     }
-
-                    {/* Search */}
-                    <div className="relative mt-1">
-                      <input value={daySearch}
-                        onChange={e => setDaySearch(e.target.value)}
-                        placeholder={`Search ${tab === 'workout' ? 'exercises' : 'meals'} to add…`}
-                        className="w-full px-2.5 py-1.5 bg-violet-50 border border-violet-100 rounded-lg text-xs outline-none focus:border-violet-400" />
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(129,140,248,0.07)', border: '1px solid rgba(129,140,248,0.15)', borderRadius: 10 }}>
+                        <Search size={13} style={{ color: 'rgba(129,140,248,0.6)', flexShrink: 0 }} />
+                        <input value={daySearch} onChange={e => setDaySearch(e.target.value)}
+                          placeholder={`Search ${tab === 'workout' ? 'exercises' : 'meals'}…`}
+                          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 12, color: '#f5f5f7' }} />
+                      </div>
                       {dbResults.length > 0 && (
-                        <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-md overflow-hidden">
+                        <div style={{ marginTop: 4, background: '#1a1b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
                           {dbResults.map((item, i) => (
                             <button key={i} type="button" onMouseDown={() => addFromDb(item)}
-                              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-violet-50 text-left cursor-pointer border-b border-gray-50 last:border-0">
-                              <p className="text-xs font-medium text-gray-900 flex-1 truncate">{item[nameKey]}</p>
-                              <p className="text-[10px] text-gray-400 shrink-0">
+                              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: 'none', border: 'none', borderBottom: i < dbResults.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', textAlign: 'left', cursor: 'pointer' }}>
+                              <p style={{ fontSize: 12, fontWeight: 600, color: '#f5f5f7', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{item[nameKey]}</p>
+                              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0, margin: 0 }}>
                                 {tab === 'workout' ? `${item.sets}×${item.reps}` : `${item.calories}kcal`}
                               </p>
                             </button>
@@ -294,25 +289,24 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
                       )}
                     </div>
                     <button onClick={() => addItem(safeIdx)}
-                      className="text-[11px] text-violet-600 hover:text-violet-800 flex items-center gap-1 cursor-pointer font-medium">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-                      Add {tab === 'workout' ? 'exercise' : 'meal'} manually
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      <Plus size={12} /> Add {tab === 'workout' ? 'exercise' : 'meal'}
                     </button>
                   </div>
                 )}
               </div>
             )}
 
-            {error && <p className="text-red-500 text-xs">{error}</p>}
+            {error && <p style={{ fontSize: 11, color: '#f87171', margin: 0 }}>{error}</p>}
 
-            <div className="flex gap-3 pt-2 border-t border-gray-100">
+            <div style={{ display: 'flex', gap: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <button onClick={handleSave} disabled={saving}
-                className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 cursor-pointer transition-all">
-                {saving ? 'Saving...' : editingPlan ? 'Save Changes' : replaceIds.length > 0 ? 'Replace & Assign' : 'Assign to ' + member.name}
+                style={{ flex: 1, padding: '11px 0', background: 'linear-gradient(135deg, #818cf8, #6366f1)', border: 'none', borderRadius: 12, color: '#fff', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+                {saving ? 'Saving…' : editingPlan ? 'Save Changes' : replaceIds.length > 0 ? 'Replace & Assign' : `Assign to ${member.name}`}
               </button>
               {!editingPlan && (
                 <button onClick={() => setStep(existingActive.length > 0 ? 'overview' : 'pick')}
-                  className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 cursor-pointer">
+                  style={{ padding: '11px 16px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                   Back
                 </button>
               )}
@@ -325,7 +319,7 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
 }
 
 // ─── Member detail drawer ─────────────────────────────────────────────────────
-function MemberDetailPanel({ member, gymId, onClose }) {
+function MemberDetailPanel({ member, gymId, onClose, onPlanAssigned }) {
   const dialog = useDialog()
   const [tab, setTab]           = useState('plans')
   const [plans, setPlans]       = useState([])
@@ -360,12 +354,6 @@ function MemberDetailPanel({ member, gymId, onClose }) {
     const now = new Date()
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }).length
-
-  const stColor = (st) => {
-    if (st === 'active') return { color: '#34d399', bg: 'rgba(52,211,153,0.12)' }
-    if (st === 'expired') return { color: '#f87171', bg: 'rgba(248,113,113,0.12)' }
-    return { color: 'rgba(255,255,255,0.3)', bg: 'rgba(255,255,255,0.06)' }
-  }
 
   return (
     <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, overflow: 'hidden' }}>
@@ -413,7 +401,7 @@ function MemberDetailPanel({ member, gymId, onClose }) {
       <div style={{ padding: '12px', maxHeight: 280, overflowY: 'auto' }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
-            <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818cf8', animation: 'spin 0.8s linear infinite' }} />
+            <Loader2 size={22} style={{ color: '#818cf8', animation: 'spin 0.8s linear infinite' }} />
           </div>
         ) : tab === 'plans' ? (
           activePlans.length === 0 ? (
@@ -422,15 +410,15 @@ function MemberDetailPanel({ member, gymId, onClose }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {activePlans.map(p => (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 14 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: p.plan_type === 'workout' ? 'rgba(129,140,248,0.15)' : 'rgba(52,211,153,0.12)', color: p.plan_type === 'workout' ? '#818cf8' : '#34d399' }}>
+                    {p.plan_type === 'workout' ? <Dumbbell size={16} strokeWidth={2} /> : <Salad size={16} strokeWidth={2} />}
+                  </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 700, color: '#f5f5f7', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
                     <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', margin: '2px 0 0' }}>
-                      {p.plan_type === 'workout' ? 'Workout' : 'Diet'} · {Array.isArray(p.data) ? p.data.length : 0} days
+                      {Array.isArray(p.data) ? p.data.length : 0} days
                     </p>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 20, flexShrink: 0, background: p.plan_type === 'workout' ? 'rgba(129,140,248,0.15)' : 'rgba(52,211,153,0.12)', color: p.plan_type === 'workout' ? '#818cf8' : '#34d399' }}>
-                    {p.plan_type === 'workout' ? 'Workout' : 'Diet'}
-                  </span>
                   <button onClick={() => { setEditingPlan(p); setAssigning(true) }} style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
                   <button onClick={() => handleArchive(p)} style={{ fontSize: 11, fontWeight: 700, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>Archive</button>
                 </div>
@@ -463,7 +451,7 @@ function MemberDetailPanel({ member, gymId, onClose }) {
         <AssignPlanModal
           member={member} gymId={gymId} activePlans={activePlans} editingPlan={editingPlan}
           onClose={() => { setAssigning(false); setEditingPlan(null) }}
-          onAssigned={() => { setAssigning(false); setEditingPlan(null); loadData() }}
+          onAssigned={() => { setAssigning(false); setEditingPlan(null); loadData(); onPlanAssigned?.() }}
         />
       )}
     </div>
@@ -472,22 +460,13 @@ function MemberDetailPanel({ member, gymId, onClose }) {
 
 // ─── TrainerMembersPage ───────────────────────────────────────────────────────
 export default function TrainerMembersPage() {
-  const { gymId, user } = useAuth()
-  const [members, setMembers]         = useState([])
-  const [loading, setLoading]         = useState(true)
+  const { gymId } = useAuth()
+  const { members, refreshMembers } = useTrainerData()
   const [search, setSearch]           = useState('')
   const [filter, setFilter]           = useState('all')
   const [selectedMember, setSelectedMember] = useState(null)
 
-  useEffect(() => {
-    if (!gymId || !user) { setLoading(false); return }
-    let cancelled = false
-    fetchAssignedMembers(gymId, user.id)
-      .then(m => { if (!cancelled) setMembers(m) })
-      .catch(err => console.error(err))
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [gymId, user])
+  if (members === null) return <MembersSkeleton />
 
   function getStatus(m) {
     if (!m.plan_id) return 'inactive'
@@ -509,12 +488,6 @@ export default function TrainerMembersPage() {
     if (st === 'expired') return { color: '#f87171', bg: 'rgba(248,113,113,0.12)' }
     return { color: 'rgba(255,255,255,0.3)', bg: 'rgba(255,255,255,0.06)' }
   }
-
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-      <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818cf8', animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  )
 
   return (
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -605,7 +578,7 @@ export default function TrainerMembersPage() {
                     </svg>
                   </div>
                 </div>
-                {isSelected && <MemberDetailPanel member={m} gymId={gymId} onClose={() => setSelectedMember(null)} />}
+                {isSelected && <MemberDetailPanel member={m} gymId={gymId} onClose={() => setSelectedMember(null)} onPlanAssigned={refreshMembers} />}
               </div>
             )
           })}

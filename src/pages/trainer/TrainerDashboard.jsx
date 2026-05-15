@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
-import { fetchTrainerStats, fetchAssignedMembers } from '../../services/trainerService'
+import { useTrainerData } from '../../store/TrainerDataContext'
+import { Users, CircleCheck, ClipboardList, Zap } from 'lucide-react'
+import DashboardSkeleton from '../../components/trainer/skeletons/DashboardSkeleton'
 
 function greeting() {
   const h = new Date().getHours()
@@ -25,45 +26,18 @@ function memberStatus(m) {
 }
 
 export default function TrainerDashboard() {
-  const { gymId, user, profile } = useAuth()
-  const [stats, setStats]     = useState({ totalMembers: 0, activeToday: 0, plansAssigned: 0 })
-  const [members, setMembers] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { profile } = useAuth()
+  const { stats, members } = useTrainerData()
 
-  useEffect(() => {
-    if (!gymId || !user) { setLoading(false); return }
-    let cancelled = false
-    Promise.all([fetchTrainerStats(gymId, user.id), fetchAssignedMembers(gymId, user.id)])
-      .then(([s, m]) => { if (!cancelled) { setStats(s); setMembers(m.slice(0, 6)) } })
-      .catch(err => console.error('Trainer dashboard:', err))
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [gymId, user])
+  if (stats === null || members === null) return <DashboardSkeleton />
 
+  const displayMembers = members.slice(0, 6)
   const firstName = profile?.name?.split(' ')[0] || 'Trainer'
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-      <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818cf8', animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  )
-
   const statCards = [
-    { label: 'Members', value: stats.totalMembers, accent: '#818cf8', glow: 'rgba(129,140,248,0.15)', icon: (
-      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-      </svg>
-    )},
-    { label: 'Active Today', value: stats.activeToday, accent: '#34d399', glow: 'rgba(52,211,153,0.15)', icon: (
-      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
-    )},
-    { label: 'Active Plans', value: stats.plansAssigned, accent: '#60a5fa', glow: 'rgba(96,165,250,0.15)', icon: (
-      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-      </svg>
-    )},
+    { label: 'Members',     value: stats.totalMembers,  accent: '#818cf8', glow: 'rgba(129,140,248,0.15)', icon: <Users size={20} strokeWidth={1.8} /> },
+    { label: 'Active Today', value: stats.activeToday,  accent: '#34d399', glow: 'rgba(52,211,153,0.15)',  icon: <CircleCheck size={20} strokeWidth={1.8} /> },
+    { label: 'Active Plans', value: stats.plansAssigned, accent: '#60a5fa', glow: 'rgba(96,165,250,0.15)', icon: <ClipboardList size={20} strokeWidth={1.8} /> },
   ]
 
   return (
@@ -132,9 +106,7 @@ export default function TrainerDashboard() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#818cf8',
             }}>
-              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
+              <Users size={20} strokeWidth={1.8} />
             </div>
             <div>
               <p style={{ fontSize: 14, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>My Members</p>
@@ -157,9 +129,7 @@ export default function TrainerDashboard() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#34d399',
             }}>
-              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-              </svg>
+              <Zap size={20} strokeWidth={1.8} />
             </div>
             <div>
               <p style={{ fontSize: 14, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>Assign Plans</p>
@@ -187,7 +157,7 @@ export default function TrainerDashboard() {
           }}>See all →</Link>
         </div>
 
-        {members.length === 0 ? (
+        {displayMembers.length === 0 ? (
           <div style={{ padding: '40px 16px', textAlign: 'center' }}>
             <div style={{
               width: 48, height: 48, borderRadius: 16,
@@ -196,16 +166,14 @@ export default function TrainerDashboard() {
               margin: '0 auto 12px',
               color: 'rgba(255,255,255,0.2)',
             }}>
-              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
+              <Users size={22} strokeWidth={1.5} />
             </div>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>No members assigned yet</p>
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', margin: '4px 0 0' }}>Ask your gym owner to assign members</p>
           </div>
         ) : (
           <div>
-            {members.map((m, idx) => {
+            {displayMembers.map((m, idx) => {
               const st = memberStatus(m)
               const lastSeen = m.last_checkin
                 ? new Date(m.last_checkin).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
@@ -214,7 +182,7 @@ export default function TrainerDashboard() {
                 <div key={m.id} style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 16px',
-                  borderBottom: idx < members.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  borderBottom: idx < displayMembers.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                 }}>
                   <div style={{
                     width: 38, height: 38, borderRadius: '50%', shrink: 0,

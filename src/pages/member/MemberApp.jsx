@@ -8,10 +8,18 @@ import {
   AlertCircle, ClipboardList, CheckCircle2, Loader2, X,
 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
-import { fetchMyMember, selfCheckIn, fetchMyAttendance, fetchMyActivePlans } from '../../services/memberService'
-import { fetchMyPendingPayment } from '../../services/memberPaymentService'
+import { selfCheckIn } from '../../services/memberService'
 import { createPublicOrder, openPublicCheckout } from '../../services/publicCheckoutService'
 import { supabaseData, supabaseAnon } from '../../services/supabaseClient'
+import { useMemberData } from '../../store/MemberDataContext'
+import HomeSkeleton from '../../components/member/skeletons/HomeSkeleton'
+
+// Supabase timestamptz can arrive without 'Z', causing JS to parse as local time.
+// Always force UTC interpretation so displayed times are correct.
+function parseTS(ts) {
+  if (!ts) return new Date(NaN)
+  return new Date(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z')
+}
 
 function daysLeft(d) {
   if (!d) return null
@@ -26,9 +34,9 @@ function greeting() {
 }
 
 function StreakDot({ date, attendance }) {
-  const ds = new Date(date).toISOString().split('T')[0]
-  const hit = attendance.some(a => a.check_in.startsWith(ds))
-  const today = ds === new Date().toISOString().split('T')[0]
+  const ds = new Date(date).toLocaleDateString('en-CA') // local YYYY-MM-DD
+  const hit = attendance.some(a => parseTS(a.check_in).toLocaleDateString('en-CA') === ds)
+  const today = ds === new Date().toLocaleDateString('en-CA')
   return (
     <div style={{
       width: '10px', height: '10px', borderRadius: '3px',
@@ -234,18 +242,12 @@ function RenewModal({ member, gymSlug, gymName, plans, onClose, onSuccess }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function MemberApp() {
-  const { gymId, profile } = useAuth()
-  const [member, setMember]             = useState(null)
-  const [attendance, setAtt]            = useState([])
-  const [plans, setPlans]               = useState([])
-  const [pending, setPending]           = useState(null)
-  const [loading, setLoading]           = useState(true)
-  const [loadError, setLoadError]       = useState('')
+  const { gymId } = useAuth()
+  const { member, attendance, plans, pending, isLoading, loadError, setMember, setPending, addAttendance } = useMemberData()
   const [checkingIn, setCheckingIn]     = useState(false)
-  const [checkedToday, setCheckedToday] = useState(false)
   const [justChecked, setJustChecked]   = useState(false)
 
-  // Gym + renewal state
+  // Gym + renewal state (local — only used by this screen's renewal modal)
   const [gymSlug, setGymSlug]           = useState(null)
   const [razorpayEnabled, setRazorpayEnabled] = useState(false)
   const [gymName, setGymName]           = useState('')
@@ -253,47 +255,35 @@ export default function MemberApp() {
   const [showRenewModal, setShowRenewModal] = useState(false)
   const [renewSuccess, setRenewSuccess] = useState(false)
 
-  useEffect(() => {
-    if (!gymId || !profile) { setLoading(false); return }
-    let dead = false
+  // Derived — no separate state needed
+  const localToday = new Date().toLocaleDateString('en-CA')
+  const checkedToday = (attendance ?? []).some(a =>
+    parseTS(a.check_in).toLocaleDateString('en-CA') === localToday
+  )
 
-    // Fetch gym info (slug, razorpay_enabled) and pricing plans in parallel
+  useEffect(() => {
+    if (!gymId) return
+    let dead = false
     supabaseData.from('gyms').select('slug, razorpay_enabled, name').eq('id', gymId).single()
       .then(({ data }) => { if (!dead && data) { setGymSlug(data.slug); setRazorpayEnabled(data.razorpay_enabled ?? false); setGymName(data.name || '') } })
       .catch(() => {})
     supabaseAnon.from('plans').select('id, name, price, duration_days').eq('gym_id', gymId).order('price')
       .then(({ data }) => { if (!dead && data) setGymPlans(data) })
       .catch(() => {})
-
-    fetchMyMember({ gymId, phone: profile.phone, email: profile.email })
-      .then(async m => {
-        if (dead) return
-        setMember(m)
-        if (m) {
-          const [att, pl, pay] = await Promise.all([
-            fetchMyAttendance({ memberId: m.id, limit: 90 }),
-            fetchMyActivePlans(m.id),
-            fetchMyPendingPayment(m.id).catch(() => null),
-          ])
-          if (!dead) {
-            setAtt(att); setPlans(pl); setPending(pay)
-            setCheckedToday(att.some(a => a.check_in.startsWith(new Date().toISOString().split('T')[0])))
-          }
-        }
-      })
-      .catch(e => { console.error(e); setLoadError(e.message || 'Failed to load') })
-      .finally(() => { if (!dead) setLoading(false) })
     return () => { dead = true }
-  }, [gymId, profile])
+  }, [gymId])
 
   async function doCheckIn() {
     if (!member || checkedToday || checkingIn) return
     setCheckingIn(true)
     try {
-      await selfCheckIn({ gymId, memberId: member.id })
-      setCheckedToday(true); setJustChecked(true)
-      setAtt(p => [{ check_in: new Date().toISOString() }, ...p])
-      setTimeout(() => setJustChecked(false), 4000)
+      const result = await selfCheckIn({ gymId })
+      if (result?.success) {
+        addAttendance({ check_in: result.checked_in_at || new Date().toISOString() })
+        setJustChecked(true)
+        setTimeout(() => setJustChecked(false), 4000)
+      }
+      // cooldown → member already checked in via QR; checkedToday auto-updates from attendance
     } catch (e) { console.error(e) }
     finally { setCheckingIn(false) }
   }
@@ -308,13 +298,7 @@ export default function MemberApp() {
     setTimeout(() => setRenewSuccess(false), 5000)
   }
 
-  if (loading) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '70vh', gap: '16px' }}>
-      <Loader2 size={36} color="#6366f1" style={{ animation: 'mspin .75s linear infinite' }} />
-      <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '13px', fontWeight: 500 }}>Loading your profile…</p>
-      <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  )
+  if (isLoading) return <HomeSkeleton />
 
   if (!member) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '70vh', padding: '32px 24px', textAlign: 'center', gap: '14px' }}>
@@ -339,14 +323,14 @@ export default function MemberApp() {
     let n = 0
     for (let i = 0; i < 60; i++) {
       const d = new Date(); d.setDate(d.getDate() - i)
-      if (attendance.some(a => a.check_in.startsWith(d.toISOString().split('T')[0]))) n++
+      if (attendance.some(a => parseTS(a.check_in).toLocaleDateString('en-CA') === d.toLocaleDateString('en-CA'))) n++
       else if (i > 0) break
     }
     return n
   })()
 
   const monthCheckins = attendance.filter(a => {
-    const d = new Date(a.check_in), n = new Date()
+    const d = parseTS(a.check_in), n = new Date()
     return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear()
   }).length
 
@@ -583,10 +567,10 @@ export default function MemberApp() {
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <Check size={14} color="#818cf8" strokeWidth={2.5} style={{ flexShrink: 0 }} />
                   <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '13px', flex: 1 }}>
-                    {new Date(a.check_in).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
+                    {parseTS(a.check_in).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
                   </p>
                   <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px' }}>
-                    {new Date(a.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    {parseTS(a.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
               ))}

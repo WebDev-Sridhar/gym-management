@@ -23,16 +23,15 @@ export async function fetchMyMember({ gymId, phone, email }) {
 }
 
 // ─── Self check-in ────────────────────────────────────────────────────────────
+// Uses the same perform_checkin RPC as the QR path so both channels share
+// the same 1-hour cooldown logic enforced at the database level.
 
-export async function selfCheckIn({ gymId, memberId }) {
-  const now = new Date().toISOString()
-  const { data, error } = await supabase
-    .from('attendance')
-    .insert({ gym_id: gymId, member_id: memberId, check_in: now })
-    .select('*')
-    .single()
+export async function selfCheckIn({ gymId }) {
+  const { data, error } = await supabase.rpc('perform_checkin', {
+    p_gym_id: gymId,
+  })
   if (error) throw error
-  return data
+  return data  // { success, error?, last_checkin?, next_allowed?, checked_in_at? }
 }
 
 // ─── Attendance history ───────────────────────────────────────────────────────
