@@ -4,8 +4,8 @@ export default function MembersSkeleton() {
 
       {/* Page heading */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div className="skeleton-shimmer" style={{ height: 22, width: 120 }} />
-        <div className="skeleton-shimmer" style={{ height: 13, width: 200 }} />
+        <div className="skeleton-shimmer-dark" style={{ height: 22, width: 120 }} />
+        <div className="skeleton-shimmer-dark" style={{ height: 13, width: 200 }} />
       </div>
 
       {/* Search bar */}
@@ -15,14 +15,14 @@ export default function MembersSkeleton() {
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 14, padding: '10px 14px',
       }}>
-        <div className="skeleton-shimmer" style={{ width: 15, height: 15, borderRadius: 4, flexShrink: 0 }} />
-        <div className="skeleton-shimmer" style={{ flex: 1, height: 14 }} />
+        <div className="skeleton-shimmer-dark" style={{ width: 15, height: 15, borderRadius: 4, flexShrink: 0 }} />
+        <div className="skeleton-shimmer-dark" style={{ flex: 1, height: 14 }} />
       </div>
 
       {/* Filter pills */}
       <div style={{ display: 'flex', gap: 6 }}>
         {[80, 70, 80, 80].map((w, i) => (
-          <div key={i} className="skeleton-shimmer" style={{ height: 30, width: w, borderRadius: 20 }} />
+          <div key={i} className="skeleton-shimmer-dark" style={{ height: 30, width: w, borderRadius: 20 }} />
         ))}
       </div>
 
@@ -36,12 +36,12 @@ export default function MembersSkeleton() {
             border: '1px solid rgba(255,255,255,0.07)',
             borderRadius: 18,
           }}>
-            <div className="skeleton-shimmer" style={{ width: 42, height: 42, borderRadius: '50%', flexShrink: 0 }} />
+            <div className="skeleton-shimmer-dark" style={{ width: 42, height: 42, borderRadius: '50%', flexShrink: 0 }} />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div className="skeleton-shimmer" style={{ height: 14, width: '50%' }} />
-              <div className="skeleton-shimmer" style={{ height: 11, width: '70%' }} />
+              <div className="skeleton-shimmer-dark" style={{ height: 14, width: '50%' }} />
+              <div className="skeleton-shimmer-dark" style={{ height: 11, width: '70%' }} />
             </div>
-            <div className="skeleton-shimmer" style={{ height: 24, width: 60, borderRadius: 20 }} />
+            <div className="skeleton-shimmer-dark" style={{ height: 24, width: 60, borderRadius: 20 }} />
           </div>
         ))}
       </div>

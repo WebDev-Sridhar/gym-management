@@ -8,7 +8,7 @@ import { useDialog } from './Dialog'
 function PlanTypeBadge({ type }) {
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-      type === 'workout' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'
+      type === 'workout' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'
     }`}>
       {type === 'workout' ? 'Workout' : 'Diet'}
     </span>
@@ -74,7 +74,7 @@ function AssignFromDrawer({ member, gymId, onClose, onAssigned }) {
                 key={val}
                 onClick={() => { setPlanType(val); setSelected(null) }}
                 className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  planType === val ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  planType === val ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 {label}
@@ -85,7 +85,7 @@ function AssignFromDrawer({ member, gymId, onClose, onAssigned }) {
           {/* Template list */}
           <div className="space-y-1.5 max-h-64 overflow-y-auto -mx-1 px-1">
             {loading ? (
-              <div className="flex justify-center py-6"><div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>
+              <div className="flex justify-center py-6"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
             ) : templates.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-6">No {planType} templates yet. Create some in Programs.</p>
             ) : templates.map(t => (
@@ -93,7 +93,7 @@ function AssignFromDrawer({ member, gymId, onClose, onAssigned }) {
                 key={t.id}
                 onClick={() => setSelected(t)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer border ${
-                  selected?.id === t.id ? 'bg-violet-50 border-violet-200' : 'hover:bg-gray-50 border-transparent'
+                  selected?.id === t.id ? 'bg-indigo-50 border-indigo-200' : 'hover:bg-gray-50 border-transparent'
                 }`}
               >
                 <div className="min-w-0 flex-1">
@@ -104,7 +104,7 @@ function AssignFromDrawer({ member, gymId, onClose, onAssigned }) {
                   </p>
                 </div>
                 {selected?.id === t.id && (
-                  <svg className="w-4 h-4 text-violet-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  <svg className="w-4 h-4 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                 )}
               </button>
             ))}
@@ -116,7 +116,7 @@ function AssignFromDrawer({ member, gymId, onClose, onAssigned }) {
             <button
               onClick={handleAssign}
               disabled={!selected || saving}
-              className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
+              className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
             >
               {saving ? 'Assigning...' : selected ? `Assign "${selected.title}"` : 'Select a template'}
             </button>
@@ -208,7 +208,7 @@ export default function MemberDrawer({ member, onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm shrink-0">
+            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm shrink-0">
               {member.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
@@ -228,12 +228,12 @@ export default function MemberDrawer({ member, onClose }) {
               key={val}
               onClick={() => setActiveTab(val)}
               className={`flex-1 py-3 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
-                activeTab === val ? 'text-violet-700 border-violet-600' : 'text-gray-500 border-transparent hover:text-gray-700'
+                activeTab === val ? 'text-indigo-700 border-indigo-600' : 'text-gray-500 border-transparent hover:text-gray-700'
               }`}
             >
               {label}
               {val === 'plans' && plans.length > 0 && (
-                <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold">{plans.length}</span>
+                <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">{plans.length}</span>
               )}
             </button>
           ))}
@@ -263,7 +263,7 @@ export default function MemberDrawer({ member, onClose }) {
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Programs</p>
                 <button
                   onClick={() => setShowAssign(true)}
-                  className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors cursor-pointer"
+                  className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                   Assign Plan
@@ -271,7 +271,7 @@ export default function MemberDrawer({ member, onClose }) {
               </div>
 
               {plansLoading ? (
-                <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>
+                <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
               ) : plans.length === 0 ? (
                 <div className="text-center py-10">
                   <p className="text-sm text-gray-500">No active plans</p>

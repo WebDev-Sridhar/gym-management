@@ -151,7 +151,7 @@ export default function ImageUploader({
   }
 
   const inputCls =
-    'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors'
+    'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors'
 
   return (
     <div className="space-y-3">
@@ -164,7 +164,7 @@ export default function ImageUploader({
           {imageList.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {imageList.map((url, i) => (
-                <div key={i} className={`relative rounded-xl overflow-hidden border-2 transition-all ${url === currentUrl ? 'border-violet-500' : 'border-transparent'}`}
+                <div key={i} className={`relative rounded-xl overflow-hidden border-2 transition-all ${url === currentUrl ? 'border-indigo-500' : 'border-transparent'}`}
                   style={{ aspectRatio: '4/3' }}>
                   <img src={url} alt="" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none' }} />
 
@@ -179,7 +179,7 @@ export default function ImageUploader({
                   {/* Use — always visible, top-left, only when not selected */}
                   {selectMode && url !== currentUrl && (
                     <button type="button" onClick={() => onChange(url)}
-                      className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-black/50 hover:bg-violet-500 flex items-center justify-center transition-colors cursor-pointer">
+                      className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-black/50 hover:bg-indigo-500 flex items-center justify-center transition-colors cursor-pointer">
                       <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
@@ -189,7 +189,7 @@ export default function ImageUploader({
                   {/* Active badge — click to deselect */}
                   {url === currentUrl && (
                     <button type="button" onClick={() => onChange('')}
-                      className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-violet-500 hover:bg-violet-600 flex items-center justify-center transition-colors cursor-pointer"
+                      className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-indigo-500 hover:bg-indigo-600 flex items-center justify-center transition-colors cursor-pointer"
                       title="Deselect">
                       <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -212,9 +212,9 @@ export default function ImageUploader({
           <div className="flex items-center gap-3 flex-wrap">
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading || atLimit} />
             <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading || atLimit}
-              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors cursor-pointer ${atLimit ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-200 hover:border-violet-400 hover:text-violet-700'}`}>
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors cursor-pointer ${atLimit ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-400 hover:text-indigo-700'}`}>
               {uploading ? (
-                <><span className="w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />Uploading…</>
+                <><span className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />Uploading…</>
               ) : (
                 <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Upload Image</>
               )}
@@ -227,7 +227,7 @@ export default function ImageUploader({
             <input type="url" value={localUrl} onChange={e => setLocalUrl(e.target.value)}
               placeholder="https://images.unsplash.com/photo-…" className={inputCls + ' flex-1'} />
             <button type="button" onClick={addUrlToList} disabled={!localUrl.trim() || atLimit}
-              className="px-3 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-40 cursor-pointer transition-colors shrink-0">
+              className="px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-40 cursor-pointer transition-colors shrink-0">
               Add
             </button>
           </div>
@@ -266,9 +266,9 @@ export default function ImageUploader({
             {/* Replacing an existing image is always allowed even when at limit */}
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading || (atLimit && !currentUrl)} />
             <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading || (atLimit && !currentUrl)}
-              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors cursor-pointer ${(atLimit && !currentUrl) ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-200 hover:border-violet-400 hover:text-violet-700'}`}>
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors cursor-pointer ${(atLimit && !currentUrl) ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-400 hover:text-indigo-700'}`}>
               {uploading ? (
-                <><span className="w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />Uploading…</>
+                <><span className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />Uploading…</>
               ) : (
                 <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>{currentUrl ? 'Replace Image' : 'Upload Image'}</>
               )}
@@ -283,7 +283,7 @@ export default function ImageUploader({
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), commitUrl())}
                 placeholder="https://images.unsplash.com/photo-…" className={inputCls + ' flex-1'} />
               <button type="button" onClick={commitUrl} disabled={!inputUrl.trim()}
-                className="px-3 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-40 cursor-pointer transition-colors shrink-0">
+                className="px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-40 cursor-pointer transition-colors shrink-0">
                 Add
               </button>
             </div>

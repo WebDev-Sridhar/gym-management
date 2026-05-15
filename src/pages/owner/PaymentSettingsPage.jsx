@@ -80,10 +80,10 @@ export default function PaymentSettingsPage() {
         upi_id: paymentMode === 'upi' ? upiId.trim() : gym?.upi_id,
       })
       setGym(updated)
-      setSuccess('Payment mode saved')
+      setSuccess('Payment mode saved!')
       setTimeout(() => setSuccess(''), 2500)
     } catch (err) {
-      setError(err.message || 'Failed to save')
+      setError(err.message || 'Failed to save!')
     } finally {
       setSavingMode(false)
     }
@@ -192,6 +192,8 @@ export default function PaymentSettingsPage() {
         >
           {savingMode ? 'Saving...' : 'Save mode'}
         </button>
+        <p className="text-sm text-green-500 mt-2">{success}</p>
+        <p className="text-sm text-red-500 mt-2">{error}</p>
       </div>
 
       {/* Razorpay keys card */}

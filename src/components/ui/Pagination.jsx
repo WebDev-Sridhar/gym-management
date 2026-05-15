@@ -33,7 +33,7 @@ export default function Pagination({ page, totalPages, total, pageSize, onPageCh
               key={item}
               onClick={() => onPageChange(item)}
               className={`min-w-[28px] h-7 px-1 text-xs font-medium rounded-lg cursor-pointer transition-colors ${
-                page === item ? 'bg-violet-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                page === item ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               {item}

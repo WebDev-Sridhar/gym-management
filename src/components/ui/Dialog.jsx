@@ -51,7 +51,7 @@ function DialogModal({ type, title, message, onConfirm, onCancel }) {
             className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-colors cursor-pointer ${
               type === 'confirm'
                 ? 'flex-1 bg-red-500 hover:bg-red-600'
-                : 'px-8 bg-violet-600 hover:bg-violet-700'
+                : 'px-8 bg-indigo-600 hover:bg-indigo-700'
             }`}
           >
             {type === 'confirm' ? 'Confirm' : 'OK'}

@@ -94,7 +94,7 @@ export default function Topbar({ onMenuToggle }) {
       setEnquiries(prev => prev.map(e => e.id === msg.id ? { ...e, read: true } : e))
     }
     setPanelOpen(false)
-    navigate('/owner-dashboard/communication')
+    navigate('/owner-dashboard/messages')
   }
 
   const visible  = enquiries.filter(e => !e.read)
@@ -354,7 +354,7 @@ export default function Topbar({ onMenuToggle }) {
             {/* Panel header */}
             <div className="h-16 px-5 flex items-center justify-between border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2.5">
-                <Bell size={18} className="text-violet-600" strokeWidth={2} />
+                <Bell size={18} className="text-indigo-600" strokeWidth={2} />
                 <span className="font-semibold text-gray-900 text-sm">Notifications</span>
                 {unread > 0 && (
                   <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded-full">
@@ -384,8 +384,8 @@ export default function Topbar({ onMenuToggle }) {
                 <div className="divide-y divide-gray-50">
                   {visible.map(msg => (
                     <button key={msg.id} onClick={() => handleEnquiryClick(msg)}
-                      className="w-full text-left px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer flex gap-3 bg-violet-50/50">
-                      <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold text-sm shrink-0 mt-0.5">
+                      className="w-full text-left px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer flex gap-3 bg-indigo-50/50">
+                      <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm shrink-0 mt-0.5">
                         {msg.name?.charAt(0).toUpperCase() || '?'}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -396,7 +396,7 @@ export default function Topbar({ onMenuToggle }) {
                         <p className="text-xs text-gray-500 truncate mt-0.5">{msg.email}</p>
                         <p className="text-xs text-gray-400 truncate mt-1">{msg.message}</p>
                       </div>
-                      <div className="w-2 h-2 rounded-full bg-violet-500 mt-2 shrink-0" />
+                      <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -413,7 +413,7 @@ export default function Topbar({ onMenuToggle }) {
               )}
               <button
                 onClick={() => { setPanelOpen(false); navigate('/owner-dashboard/communication') }}
-                className="w-full py-2.5 text-sm font-semibold text-violet-700 bg-violet-50 rounded-lg hover:bg-violet-100 transition-colors cursor-pointer"
+                className="w-full py-2.5 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer"
               >
                 View all in Communication →
               </button>

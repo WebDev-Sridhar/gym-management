@@ -58,7 +58,8 @@ export default function AttendancePage() {
   const PAGE_SIZE = 10
   const [gymName, setGymName] = useState('')
   const [gymLogo, setGymLogo] = useState('')
-  const [bannerOpen, setBannerOpen] = useState(true)
+  const [bannerOpen, setBannerOpen] = useState(false)
+  const [copiedCheckinUrl, setCopiedCheckinUrl] = useState(false)
   const qrRef = useRef(null)
 
   useEffect(() => {
@@ -100,6 +101,12 @@ export default function AttendancePage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+    function copyCheckinUrl() {
+    navigator.clipboard.writeText(checkinUrl)
+    setCopiedCheckinUrl(true)
+    setTimeout(() => setCopiedCheckinUrl(false), 1500)
   }
 
   const today = new Date().toISOString().split('T')[0]
@@ -254,6 +261,37 @@ export default function AttendancePage() {
           )}
         </div>
       </div>
+            {/* Manual check-in form */}
+      {showCheckin && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Manual Check-in</h2>
+          <form onSubmit={handleManualCheckin} className="flex items-end gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Member</label>
+              <CustomSelect
+                value={selectedMemberId}
+                onChange={setSelectedMemberId}
+                placeholder="Choose a member..."
+                options={availableMembers.map((m) => ({
+                  value: m.id,
+                  label: m.name,
+                  hint: m.phone || undefined,
+                }))}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!selectedMemberId || submitting}
+              className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
+            >
+              {submitting ? 'Marking...' : 'Check In'}
+            </button>
+          </form>
+          {availableMembers.length === 0 && (
+            <p className="text-xs text-gray-400 mt-3">All active members have already checked in today.</p>
+          )}
+        </div>
+      )}
 
       {/* QR Code banner card */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -276,10 +314,10 @@ export default function AttendancePage() {
           {/* Action buttons */}
           <div className="px-6 py-3 flex items-center gap-2 border-b border-gray-100 bg-gray-50/50">
             <button
-              onClick={() => navigator.clipboard.writeText(checkinUrl)}
+              onClick={copyCheckinUrl}
               className="px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer"
             >
-              Copy Link
+              {copiedCheckinUrl ? 'Copied!' : 'Copy Link'}
             </button>
             <button
               onClick={downloadQR}
@@ -382,37 +420,7 @@ export default function AttendancePage() {
         )}
       </div>
 
-      {/* Manual check-in form */}
-      {showCheckin && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Manual Check-in</h2>
-          <form onSubmit={handleManualCheckin} className="flex items-end gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Member</label>
-              <CustomSelect
-                value={selectedMemberId}
-                onChange={setSelectedMemberId}
-                placeholder="Choose a member..."
-                options={availableMembers.map((m) => ({
-                  value: m.id,
-                  label: m.name,
-                  hint: m.phone || undefined,
-                }))}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={!selectedMemberId || submitting}
-              className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
-            >
-              {submitting ? 'Marking...' : 'Check In'}
-            </button>
-          </form>
-          {availableMembers.length === 0 && (
-            <p className="text-xs text-gray-400 mt-3">All active members have already checked in today.</p>
-          )}
-        </div>
-      )}
+
 
       {/* 7-day attendance chart */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

@@ -101,7 +101,7 @@ export default function HomePage() {
               <Sparkles className="w-3.5 h-3.5" />
               Gymmobius Owner Workspace
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 leading-tight">
+            <h1 className="text-3xl font-bold text-gray-900 leading-tight">
               Welcome back,{' '}
               <span className="text-indigo-600">{gymName}</span>
             </h1>
@@ -112,7 +112,7 @@ export default function HomePage() {
           </div>
           <div className="flex flex-wrap gap-3 shrink-0">
             <Link
-              to="/owner-dashboard/members"
+              to="/owner-dashboard"
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm"
             >
               Open Dashboard

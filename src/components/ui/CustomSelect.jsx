@@ -103,7 +103,7 @@ export default function CustomSelect({
         disabled={disabled}
         onClick={toggleDropdown}
         className={`w-full flex items-center justify-between gap-2 ${px} ${py} ${textSz} bg-gray-50 border rounded-lg text-left transition-colors outline-none
-          ${open ? 'border-violet-500 ring-1 ring-violet-500 bg-white' : 'border-gray-200 hover:border-gray-300'}
+          ${open ? 'border-indigo-500 ring-1 ring-indigo-500 bg-white' : 'border-gray-200 hover:border-gray-300'}
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
       >
@@ -143,12 +143,12 @@ export default function CustomSelect({
                       setOpen(false)
                     }}
                     className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors text-sm
-                      ${isSelected ? 'bg-violet-50' : 'hover:bg-gray-50'}
+                      ${isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50'}
                       ${opt.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
                     `}
                   >
                     <span className="flex-1 min-w-0 truncate">
-                      <span className={isSelected ? 'font-medium text-violet-900' : 'text-gray-800'}>
+                      <span className={isSelected ? 'font-medium text-indigo-900' : 'text-gray-800'}>
                         {opt.label}
                       </span>
                       {opt.hint && (
@@ -156,7 +156,7 @@ export default function CustomSelect({
                       )}
                     </span>
                     {isSelected && (
-                      <svg className="w-4 h-4 text-violet-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-indigo-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     )}

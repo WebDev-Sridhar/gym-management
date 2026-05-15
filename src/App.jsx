@@ -51,6 +51,7 @@ import PrivacyPage from './pages/landing/PrivacyPage'
 import TermsPage from './pages/landing/TermsPage'
 import SecurityPage from './pages/landing/SecurityPage'
 import RefundPolicyPage from './pages/landing/RefundPolicyPage'
+import ScrollToTop from './ScrollToTop'
 
 
 function WebsitePageRouter() {
@@ -65,6 +66,7 @@ function WebsitePageRouter() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <DialogProvider>
       <AuthProvider>
         <Routes>

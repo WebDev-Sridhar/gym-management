@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import EmailRequiredGuard from '../auth/EmailRequiredGuard'
 import {
   X, Home, LayoutDashboard, CreditCard, Globe,
   Users, UserCheck, QrCode, ClipboardList, BarChart2,
-  Megaphone, Settings, UserCircle,
+  Megaphone, Settings, UserCircle,Gem
 } from 'lucide-react'
+import { useAuth } from '../../store/AuthContext'
 
 const SIDEBAR_BG = 'var(--shell-bg)'
 
@@ -49,6 +50,10 @@ const MOBILE_NAV_SECTIONS = [
 
 export default function DashboardLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+    const navigate = useNavigate()
+  const { subscription, gymName } = useAuth()
+
+  const planName = subscription?.plan_name || 'Starter'
 
   return (
     <EmailRequiredGuard>
@@ -125,7 +130,7 @@ export default function DashboardLayout() {
                           className={({ isActive }) =>
                             `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer
                             ${isActive
-                              ? 'bg-violet-500/15 text-violet-300 border-l-[3px] border-violet-400 pl-[9px]'
+                              ? 'bg-indigo-500/15 text-indigo-300 border-l-[3px] border-indigo-400 pl-[9px]'
                               : 'text-white/55 hover:text-white/90 hover:bg-white/5 border-l-[3px] border-transparent pl-[9px]'
                             }`
                           }
@@ -134,10 +139,37 @@ export default function DashboardLayout() {
                           <span>{lbl}</span>
                         </NavLink>
                       ))}
+                      
                     </div>
+                    
                   </div>
                 ))}
               </nav>
+               {/* Premium card */}
+                  <div style={{ padding: '12px 16px', borderTop: '1px solid var(--shell-border)', flexShrink: 0 }}>
+                    <div style={{
+                      background: 'var(--p-tint)',
+                      border: '1px solid var(--p-glow)',
+                      borderRadius: 14,
+                      padding: '14px 16px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <Gem size={16} color="var(--p-pale)" strokeWidth={2} />
+                        <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>{gymName || 'My Gym'}</span>
+                      </div>
+                      <p style={{ color: 'var(--shell-muted)', fontSize: 11, marginBottom: 12 }}>{planName} Plan</p>
+                      <button
+                        onClick={() => navigate('/billing')}
+                        style={{
+                          width: '100%', padding: '8px 0', border: '1px solid var(--p-glow)',
+                          borderRadius: 8, background: 'transparent', color: 'var(--p-pale)',
+                          fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                      >
+                        Manage Subscription
+                      </button>
+                    </div>
+                  </div>
             </aside>
           </div>
         )}

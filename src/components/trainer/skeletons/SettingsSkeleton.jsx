@@ -4,10 +4,10 @@ export default function SettingsSkeleton() {
 
       {/* Avatar + identity */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 8, gap: 12 }}>
-        <div className="skeleton-shimmer" style={{ width: 72, height: 72, borderRadius: '50%' }} />
+        <div className="skeleton-shimmer-dark" style={{ width: 72, height: 72, borderRadius: '50%' }} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <div className="skeleton-shimmer" style={{ height: 20, width: 140 }} />
-          <div className="skeleton-shimmer" style={{ height: 22, width: 70, borderRadius: 20 }} />
+          <div className="skeleton-shimmer-dark" style={{ height: 20, width: 140 }} />
+          <div className="skeleton-shimmer-dark" style={{ height: 22, width: 70, borderRadius: 20 }} />
         </div>
       </div>
 
@@ -23,14 +23,14 @@ export default function SettingsSkeleton() {
             padding: '14px 18px',
             borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.05)' : 'none',
           }}>
-            <div className="skeleton-shimmer" style={{ height: 13, width: 50 }} />
-            <div className="skeleton-shimmer" style={{ height: 13, width: 120 }} />
+            <div className="skeleton-shimmer-dark" style={{ height: 13, width: 50 }} />
+            <div className="skeleton-shimmer-dark" style={{ height: 13, width: 120 }} />
           </div>
         ))}
       </div>
 
       {/* Sign out button */}
-      <div className="skeleton-shimmer" style={{ height: 48, borderRadius: 16 }} />
+      <div className="skeleton-shimmer-dark" style={{ height: 48, borderRadius: 16 }} />
     </div>
   )
 }

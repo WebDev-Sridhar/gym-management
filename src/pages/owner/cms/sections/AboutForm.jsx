@@ -6,7 +6,7 @@ import FeatureGate from '../components/FeatureGate'
 import { useDialog } from '../../../../components/ui/Dialog'
 
 const inputCls =
-  'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors'
+  'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors'
 
 function Field({ label, hint, children, required }) {
   return (
@@ -32,7 +32,7 @@ function SubSectionDivider({ title, description }) {
 function SaveBtn({ saving, label = 'Save Changes', onClick }) {
   return (
     <button type="button" onClick={onClick} disabled={saving}
-      className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-60">
+      className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-60">
       {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />}
       {saving ? 'Saving…' : label}
     </button>
@@ -193,7 +193,7 @@ export default function AboutForm({ content, gymId, planName, onSave, setPreview
           <div className="space-y-2">
             {pointTitles.map((title, i) => (
               <div key={i} className="flex items-center gap-3">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white bg-violet-600">{i + 1}</span>
+                <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white bg-indigo-600">{i + 1}</span>
                 <input
                   type="text"
                   value={title}

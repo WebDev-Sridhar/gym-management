@@ -225,7 +225,7 @@ export default function BillingPage() {
 
             <button
               onClick={handleGoToDashboard}
-              className="w-full mt-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors text-sm cursor-pointer"
+              className="w-full mt-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
             >
               Go to Dashboard
             </button>

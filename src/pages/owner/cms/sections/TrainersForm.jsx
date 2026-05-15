@@ -10,7 +10,7 @@ import { useDialog } from '../../../../components/ui/Dialog'
 import FormModal from '../../../../components/ui/FormModal'
 
 const inputCls =
-  'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors'
+  'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors'
 
 function Field({ label, hint, children }) {
   return (
@@ -31,7 +31,7 @@ function ItemRow({ title, subtitle, onEdit, onDelete, deleting }) {
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <button type="button" onClick={onEdit}
-          className="px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors cursor-pointer">
+          className="px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer">
           Edit
         </button>
         <button type="button" onClick={onDelete} disabled={deleting}
@@ -115,7 +115,7 @@ function TrainerInlineForm({ data, gymId, planName, imageCount, onSave, onCancel
           Cancel
         </button>
         <button type="button" onClick={handleSave} disabled={saving || img.uploading}
-          className="inline-flex items-center gap-2 px-5 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-60">
+          className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-60">
           {(saving || img.uploading) && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />}
           {saving ? 'Saving…' : img.uploading ? 'Uploading…' : 'Save'}
         </button>
@@ -199,7 +199,7 @@ export default function TrainersForm({ trainers: initTrainers, gymId, planName, 
           <p className="text-sm text-gray-400 mt-0.5">Coach profiles shown on your public website.</p>
         </div>
         <button type="button" onClick={openAdd}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 cursor-pointer transition-colors shrink-0">
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 cursor-pointer transition-colors shrink-0">
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
@@ -224,7 +224,7 @@ export default function TrainersForm({ trainers: initTrainers, gymId, planName, 
           </Field>
           <div className="flex items-center gap-3">
             <button type="button" onClick={saveHeader} disabled={headerSaving}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm cursor-pointer disabled:opacity-60">
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-60">
               {headerSaving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />}
               {headerSaving ? 'Saving…' : 'Save Changes'}
             </button>
