@@ -1,13 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { fetchContactMessages, markMessageRead, markAllMessagesRead } from '../../services/contactService'
+import {
+  Home, ChevronDown, Bell, LayoutDashboard, CreditCard, Globe, Menu,
+  Settings, LogOut, User, Gem, CheckCircle2, AlertCircle, Clock,
+} from 'lucide-react'
 
+const TOPBAR_BG = '#0e1035'
 
-const routeTitles = {
-  '/owner-dashboard': 'Dashboard',
-  '/trainer-dashboard': 'Trainer Dashboard',
-}
+const NAV_LINKS = [
+  { to: '/owner-dashboard/home',            label: 'Home',          Icon: Home },
+  { to: '/owner-dashboard',                  label: 'Dashboard',     Icon: LayoutDashboard, end: true },
+  { to: '/owner-dashboard/payment-settings', label: 'Payment Setup', Icon: CreditCard },
+  { to: '/owner-dashboard/website',          label: 'Website',       Icon:Globe },
+]
 
 function timeAgo(iso) {
   if (!iso) return ''
@@ -21,20 +28,22 @@ function timeAgo(iso) {
   return `${Math.floor(h / 24)}d ago`
 }
 
-export default function Topbar({ title }) {
-  const location  = useLocation()
+function statusConfig(status) {
+  if (status === 'active')  return { label: 'Active',  Icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50',  border: 'border-green-200' }
+  if (status === 'pending') return { label: 'Pending', Icon: Clock,        color: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200' }
+  return                           { label: 'Inactive',Icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50',    border: 'border-red-200' }
+}
+
+export default function Topbar({ onMenuToggle }) {
   const navigate  = useNavigate()
-  const { gymId, role, profile } = useAuth()
+  const { gymId, role, profile, subscription, gymName, logout } = useAuth()
   const isOwner   = role === 'owner'
 
-  const [enquiries, setEnquiries]   = useState([])
-  const [panelOpen, setPanelOpen]   = useState(false)
-  const panelRef = useRef(null)
-
-  const pageTitle = title || routeTitles[location.pathname] || (() => {
-    const seg = location.pathname.split('/').pop()
-    return seg ? seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, ' ') : 'Dashboard'
-  })()
+  const [enquiries, setEnquiries]     = useState([])
+  const [panelOpen, setPanelOpen]     = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const panelRef   = useRef(null)
+  const profileRef = useRef(null)
 
   const loadEnquiries = useCallback(async () => {
     if (!gymId || !isOwner) return
@@ -46,14 +55,12 @@ export default function Topbar({ title }) {
 
   useEffect(() => { loadEnquiries() }, [loadEnquiries])
 
-  // Poll every 60 s for new enquiries
   useEffect(() => {
     if (!isOwner) return
     const id = setInterval(loadEnquiries, 60000)
     return () => clearInterval(id)
   }, [loadEnquiries, isOwner])
 
-  // Close panel on outside click
   useEffect(() => {
     if (!panelOpen) return
     function onDown(e) {
@@ -63,9 +70,24 @@ export default function Topbar({ title }) {
     return () => document.removeEventListener('mousedown', onDown)
   }, [panelOpen])
 
+  useEffect(() => {
+    if (!profileOpen) return
+    function onDown(e) {
+      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [profileOpen])
+
+  async function handleLogout() {
+    setProfileOpen(false)
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
   async function handleClearAll() {
     await markAllMessagesRead(gymId).catch(() => {})
-    setEnquiries([])
+    setEnquiries(prev => prev.map(e => ({ ...e, read: true })))
   }
 
   async function handleEnquiryClick(msg) {
@@ -77,48 +99,244 @@ export default function Topbar({ title }) {
     navigate('/owner-dashboard/communication')
   }
 
-  const unread = enquiries.filter(e => !e.read).length
+  const visible  = enquiries.filter(e => !e.read)
+  const unread   = visible.length
   const initials = profile?.name
     ? profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : '?'
 
   return (
     <>
-      <header className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0 z-30 relative">
-        <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold text-gray-900">{pageTitle}</h1>
+      <header style={{
+        height: 64,
+        background: TOPBAR_BG,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 24px',
+        flexShrink: 0,
+        zIndex: 30,
+        position: 'relative',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+
+        {/* Left — Hamburger (mobile) + Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 160 }}>
+          <button
+            className="flex md:hidden"
+            onClick={onMenuToggle}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', padding: '4px 6px', alignItems: 'center', borderRadius: 8 }}
+          >
+            <Menu size={22} strokeWidth={2} />
+          </button>
+          <img src="/logo.png" alt="Logo" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'contain' }}
+            onError={e => { e.target.style.display = 'none' }} />
+          <span className="hidden sm:block" style={{ color: '#fff', fontWeight: 700, fontSize: 18, letterSpacing: '-0.4px' }}>Gymmobius</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 w-56">
-            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input type="text" placeholder="Search…"
-              className="bg-transparent text-sm text-gray-600 placeholder-gray-400 outline-none w-full" />
-          </div>
+        {/* Center — Nav pills (hidden on mobile, shown md+) */}
+        <div className="hidden md:flex">
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            background: 'rgba(255,255,255,0.07)',
+            borderRadius: 12,
+            padding: '4px',
+          }}>
+            {NAV_LINKS.map(({ to, label, Icon, end }) => (
+              <NavLink
+                key={label}
+                to={to}
+                end={end}
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '7px 16px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s',
+                  background: isActive ? '#6366f1' : 'transparent',
+                  color: isActive ? '#fff' : 'rgba(255,255,255,0.6)',
+                })}
+              >
+                {Icon && <Icon size={14} strokeWidth={2} />}
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
 
-          {/* Notification bell — owners only */}
+        {/* Right — Bell + User */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 160, justifyContent: 'flex-end' }}>
+
+          {/* Bell */}
           {isOwner && (
             <button
               onClick={() => setPanelOpen(v => !v)}
-              className="relative p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'rgba(255,255,255,0.7)', display: 'flex' }}
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
+              <Bell size={20} strokeWidth={1.8} />
               {unread > 0 && (
-                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  minWidth: 16, height: 16, padding: '0 4px',
+                  background: '#ef4444', color: '#fff', fontSize: 9, fontWeight: 700,
+                  borderRadius: 99, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
                   {unread > 9 ? '9+' : unread}
                 </span>
               )}
             </button>
           )}
 
-          {/* Avatar */}
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">{initials}</span>
+          {/* User — profile dropdown trigger */}
+          <div ref={profileRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setProfileOpen(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0,
+              }}>
+                {initials}
+              </div>
+              <div className="hidden sm:block" style={{ lineHeight: 1.2, textAlign: 'left' }}>
+                <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, margin: 0 }}>{profile?.name?.split(' ')[0] || 'Owner'}</p>
+                <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, margin: 0, textTransform: 'capitalize' }}>{profile?.role || 'Owner'}</p>
+              </div>
+              <ChevronDown
+                className="hidden sm:block"
+                size={14} color="rgba(255,255,255,0.4)" strokeWidth={2}
+                style={{ transition: 'transform 0.2s', transform: profileOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              />
+            </button>
+
+            {/* Profile dropdown */}
+            {profileOpen && (() => {
+              const sub = subscription
+              const sc  = statusConfig(sub?.status || 'inactive')
+              const { Icon: StatusIcon } = sc
+              const expiresAt = sub?.expires_at ? new Date(sub.expires_at) : null
+              const daysLeft  = expiresAt ? Math.ceil((expiresAt - new Date()) / 86400000) : null
+
+              return (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 14px)', right: -20,
+                  width: 280, background: '#fff', borderRadius: 16,
+                  boxShadow: '0 8px 40px rgba(0,0,0,0.18)', border: '1px solid #e5e7eb',
+                  overflow: 'hidden', zIndex: 100,
+                }}>
+                  {/* Account header */}
+                  <div style={{ padding: '18px 18px 14px', background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', borderBottom: '1px solid #e5e7eb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 16, fontWeight: 800, color: '#fff',
+                        boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
+                      }}>
+                        {initials}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ fontWeight: 700, fontSize: 14, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {profile?.name || 'Owner'}
+                        </p>
+                        <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {profile?.email || profile?.phone || '—'}
+                        </p>
+                        <div className='flex gap-1 items-center'>
+                               <span style={{
+                          display: 'inline-block', marginTop: 5,
+                          fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                          padding: '2px 8px', borderRadius: 20,
+                          background: 'rgba(99,102,241,0.12)', color: '#6366f1',
+                        }}>
+                          {profile?.role || 'Owner'}
+                        </span>
+                        {gymName && (
+                          <p style={{ fontSize: 11, color: '#6366f1', margin: '3px 0 0', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {gymName}
+                          </p>
+                        )}
+                   
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Plan & status */}
+                  {sub && (
+                    <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Gem size={14} color="#6366f1" strokeWidth={2} />
+                          <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{sub.plan_name || 'Plan'}</span>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${sc.color} ${sc.bg} ${sc.border}`}>
+                          <StatusIcon size={10} strokeWidth={2.5} />
+                          {sc.label}
+                        </span>
+                      </div>
+                      {daysLeft !== null && (
+                        <p style={{ fontSize: 11, color: daysLeft <= 7 ? '#d97706' : '#9ca3af', margin: 0 }}>
+                          {daysLeft > 0
+                            ? `Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
+                            : 'Subscription expired'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div style={{ padding: '6px 8px' }}>
+                    {[
+                      { Icon: User,     label: 'Account Settings',     action: () => { setProfileOpen(false); navigate('/owner-dashboard/settings') } },
+                      { Icon: Gem,      label: 'Manage Subscription',  action: () => { setProfileOpen(false); navigate('/billing') } },
+                      { Icon: Settings, label: 'General Settings',     action: () => { setProfileOpen(false); navigate('/owner-dashboard/settings') } },
+                    ].map(({ Icon: ItemIcon, label, action }) => (
+                      <button key={label} onClick={action} style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '9px 10px', borderRadius: 10, border: 'none', background: 'none',
+                        cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                        color: '#374151', fontSize: 13, fontWeight: 500,
+                        transition: 'background 0.12s',
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        <ItemIcon size={15} strokeWidth={1.9} color="#9ca3af" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Logout */}
+                  <div style={{ padding: '6px 8px 10px', borderTop: '1px solid #f3f4f6' }}>
+                    <button onClick={handleLogout} style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '9px 10px', borderRadius: 10, border: 'none', background: 'none',
+                      cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                      color: '#ef4444', fontSize: 13, fontWeight: 600,
+                      transition: 'background 0.12s',
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      <LogOut size={15} strokeWidth={2} color="#ef4444" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </div>
       </header>
@@ -126,12 +344,10 @@ export default function Topbar({ title }) {
       {/* Notification panel */}
       {isOwner && (
         <>
-          {/* Backdrop */}
           {panelOpen && (
             <div className="fixed inset-0 bg-black/10 z-40" onClick={() => setPanelOpen(false)} />
           )}
 
-          {/* Slide-in panel */}
           <div
             ref={panelRef}
             className="fixed top-0 right-0 h-full w-80 bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-in-out"
@@ -140,9 +356,7 @@ export default function Topbar({ title }) {
             {/* Panel header */}
             <div className="h-16 px-5 flex items-center justify-between border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2.5">
-                <svg className="w-5 h-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
+                <Bell size={18} className="text-violet-600" strokeWidth={2} />
                 <span className="font-semibold text-gray-900 text-sm">Notifications</span>
                 {unread > 0 && (
                   <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded-full">
@@ -150,64 +364,41 @@ export default function Topbar({ title }) {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1">
-                {enquiries.length > 0 && (
-                  <button onClick={handleClearAll}
-                    className="px-2.5 py-1 text-[11px] font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
-                    Clear all
-                  </button>
-                )}
-                <button onClick={() => setPanelOpen(false)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Section label */}
-            <div className="px-5 py-2.5 bg-gray-50 border-b border-gray-100">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Website Enquiries</p>
+              <button onClick={() => setPanelOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
 
             {/* List */}
             <div className="flex-1 overflow-y-auto">
-              {enquiries.length === 0 ? (
+              {visible.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
                   <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                    </svg>
+                    <Bell size={22} className="text-gray-400" strokeWidth={1.5} />
                   </div>
-                  <p className="text-sm text-gray-500">No enquiries yet</p>
-                  <p className="text-xs text-gray-400">Messages from your website contact form will appear here.</p>
+                  <p className="text-sm text-gray-500">All caught up</p>
+                  <p className="text-xs text-gray-400">No new notifications.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-50">
-                  {enquiries.map(msg => (
-                    <button
-                      key={msg.id}
-                      onClick={() => handleEnquiryClick(msg)}
-                      className={`w-full text-left px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer flex gap-3 ${!msg.read ? 'bg-violet-50/50' : ''}`}
-                    >
-                      {/* Avatar */}
+                  {visible.map(msg => (
+                    <button key={msg.id} onClick={() => handleEnquiryClick(msg)}
+                      className="w-full text-left px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer flex gap-3 bg-violet-50/50">
                       <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold text-sm shrink-0 mt-0.5">
                         {msg.name?.charAt(0).toUpperCase() || '?'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <p className={`text-sm truncate ${!msg.read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
-                            {msg.name}
-                          </p>
+                          <p className="text-sm truncate font-semibold text-gray-900">{msg.name}</p>
                           <span className="text-[10px] text-gray-400 shrink-0">{timeAgo(msg.created_at)}</span>
                         </div>
                         <p className="text-xs text-gray-500 truncate mt-0.5">{msg.email}</p>
-                        <p className="text-xs text-gray-400 truncate mt-1 line-clamp-2">{msg.message}</p>
+                        <p className="text-xs text-gray-400 truncate mt-1">{msg.message}</p>
                       </div>
-                      {!msg.read && (
-                        <div className="w-2 h-2 rounded-full bg-violet-500 mt-2 shrink-0" />
-                      )}
+                      <div className="w-2 h-2 rounded-full bg-violet-500 mt-2 shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -215,7 +406,13 @@ export default function Topbar({ title }) {
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-3 border-t border-gray-100 shrink-0">
+            <div className="px-5 py-3 border-t border-gray-100 shrink-0 flex flex-col gap-2">
+              {visible.length > 0 && (
+                <button onClick={handleClearAll}
+                  className="w-full py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer">
+                  Clear all
+                </button>
+              )}
               <button
                 onClick={() => { setPanelOpen(false); navigate('/owner-dashboard/communication') }}
                 className="w-full py-2.5 text-sm font-semibold text-violet-700 bg-violet-50 rounded-lg hover:bg-violet-100 transition-colors cursor-pointer"

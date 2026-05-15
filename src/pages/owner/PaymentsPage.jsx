@@ -117,7 +117,7 @@ export default function PaymentsPage() {
   async function handleSendReminder(paymentId) {
     setReminderBusyId(paymentId)
     try {
-      const result = await sendPaymentReminder({ paymentId })
+      await sendPaymentReminder({ paymentId })
       const [updated, reminders] = await Promise.all([
         fetchPayments(gymId),
         fetchLastReminders(gymId).catch(() => new Map()),
@@ -186,12 +186,12 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1200px]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Payments</h1>
-          <p className="text-sm text-gray-500 mt-1">{'₹'}{totalCollected.toLocaleString('en-IN')} collected from {counts.paid} payment{counts.paid !== 1 ? 's' : ''}</p>
+          <h1 className="text-2xl font-bold text-gray-900">Payments</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{'₹'}{totalCollected.toLocaleString('en-IN')} collected from {counts.paid} payment{counts.paid !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => { setShowCollect(!showCollect); resetCollect() }}

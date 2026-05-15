@@ -1,256 +1,129 @@
-import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
+import {
+  LayoutDashboard, Users, UserCheck, QrCode, ClipboardList, CreditCard,
+  BarChart2, Megaphone, MessageSquare, Settings, UserCircle, Gem,
+} from 'lucide-react'
 
-const iconMap = {
-  dashboard: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" />
-    </svg>
-  ),
-  members: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  ),
-  plans: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-    </svg>
-  ),
-  payments: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-    </svg>
-  ),
-  analytics: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-  ),
-  trainers: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  checkin: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-    </svg>
-  ),
-  website: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-    </svg>
-  ),
-  settings: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  ),
-  workouts: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-    </svg>
-  ),
-  programs: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-    </svg>
-  ),
-  message: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-    </svg>
-  ),
-  profile: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    </svg>
-  ),
-}
+const SIDEBAR_BG = '#0e1035'
 
-function SidebarLink({ to, icon, label }) {
+const sections = [
+  {
+    label: 'OVERVIEW',
+    links: [
+      { to: '/owner-dashboard', label: 'Dashboard', Icon: LayoutDashboard, end: true },
+    ],
+  },
+  {
+    label: 'MEMBERS',
+    links: [
+      { to: '/owner-dashboard/members',  label: 'Members',  Icon: Users },
+      { to: '/owner-dashboard/trainers', label: 'Trainers', Icon: UserCheck },
+      { to: '/owner-dashboard/checkin',  label: 'Check-in', Icon: QrCode },
+    ],
+  },
+  {
+    label: 'MANAGE',
+    links: [
+      { to: '/owner-dashboard/plans',     label: 'Plans',     Icon: ClipboardList },
+      { to: '/owner-dashboard/payments',  label: 'Payments',  Icon: CreditCard },
+      { to: '/owner-dashboard/analytics', label: 'Analytics', Icon: BarChart2 },
+    ],
+  },
+  {
+    label: 'COMMUNICATION',
+    links: [
+      { to: '/owner-dashboard/communication', label: 'Announcements', Icon: Megaphone },
+      { to: '/owner-dashboard/messages',      label: 'Messages',      Icon: MessageSquare },
+    ],
+  },
+  {
+    label: 'SETTINGS',
+    links: [
+      { to: '/owner-dashboard/settings', label: 'General Settings', Icon: Settings },
+      { to: '/owner-dashboard/settings', label: 'Profile',          Icon: UserCircle },
+    ],
+  },
+]
+
+function SidebarLink({ to, label, Icon, end }) {
   return (
     <NavLink
       to={to}
-      end={to.split('/').length === 2}
+      end={end}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
+        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer
         ${isActive
-          ? 'bg-violet-50 text-violet-700'
-          : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+          ? 'bg-indigo-500/15 text-indigo-300 border-l-[3px] border-indigo-400 pl-[9px]'
+          : 'text-white/55 hover:text-white/90 hover:bg-white/5 border-l-[3px] border-transparent pl-[9px]'
         }`
       }
     >
-      <span className="shrink-0">{iconMap[icon]}</span>
+      <Icon size={17} strokeWidth={1.9} />
       <span>{label}</span>
     </NavLink>
   )
 }
 
-export default function Sidebar({ links = [], gymName = 'Gymmobius' }) {
-  const [collapsed, setCollapsed] = useState(false)
-  const [popupOpen, setPopupOpen] = useState(false)
-  const popupRef = useRef(null)
+export default function Sidebar() {
   const navigate = useNavigate()
-  const { logout, profile } = useAuth()
+  const { subscription, gymName } = useAuth()
 
-  // Close popup when clicking outside
-  useEffect(() => {
-    if (!popupOpen) return
-    function handleClick(e) {
-      if (popupRef.current && !popupRef.current.contains(e.target)) {
-        setPopupOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [popupOpen])
-
-  const handleLogout = async () => {
-    setPopupOpen(false)
-    await logout()
-    navigate('/login', { replace: true })
-  }
-
-  const handleSettings = () => {
-    setPopupOpen(false)
-    navigate('/owner-dashboard/settings')
-  }
-
-  const initials = profile?.name
-    ? profile.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    : '?'
+  const planName = subscription?.plan_name || 'Starter'
 
   return (
-    <>
-      <aside
-        className={`
-          fixed top-0 left-0 bottom-0 z-40
-          w-64 bg-white border-r border-gray-200
-          flex flex-col
-          transition-transform duration-300 ease-in-out
-          lg:translate-x-0 lg:static lg:z-auto
-          ${collapsed ? '-translate-x-full' : 'translate-x-0'}
-        `}
-      >
-        {/* Logo */}
-        <div className="h-16 px-5 flex items-center justify-between border-b border-gray-100 shrink-0">
-          <button className="flex items-center gap-2">
-            <div className="w-12 h-auto flex items-center justify-center">
-              <img src="/logo.png" alt="Logo" className="w-full h-auto" />
+    <aside
+      className="hidden lg:flex"
+      style={{
+        width: 240,
+        height: '100%',
+        background: SIDEBAR_BG,
+        flexDirection: 'column',
+        flexShrink: 0,
+        borderRight: '1px solid rgba(255,255,255,0.06)',
+      }}
+    >
+      {/* Nav sections */}
+      <nav style={{ flex: 1, padding: '16px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {sections.map(({ label, links }) => (
+          <div key={label}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em', textTransform: 'uppercase', paddingLeft: 12, marginBottom: 6 }}>
+              {label}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {links.map(link => (
+                <SidebarLink key={link.label} {...link} />
+              ))}
             </div>
-            <span className="font-bold text-gray-900 text-lg tracking-tight">{gymName}</span>
-          </button>
+          </div>
+        ))}
+      </nav>
+
+      {/* Premium card */}
+      <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <div style={{
+          background: 'rgba(99,102,241,0.1)',
+          border: '1px solid rgba(99,102,241,0.2)',
+          borderRadius: 14,
+          padding: '14px 16px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <Gem size={16} color="#a5b4fc" strokeWidth={2} />
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>{gymName || 'My Gym'}</span>
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginBottom: 12 }}>{planName} Plan</p>
           <button
-            onClick={() => setCollapsed(true)}
-            className="lg:hidden p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
+            onClick={() => navigate('/billing')}
+            style={{
+              width: '100%', padding: '8px 0', border: '1px solid rgba(99,102,241,0.4)',
+              borderRadius: 8, background: 'transparent', color: '#a5b4fc',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+            }}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            Manage Subscription
           </button>
         </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {links.map((link) => (
-            <SidebarLink key={link.to} {...link} />
-          ))}
-        </nav>
-
-        {/* Profile button — opens popup */}
-        <div className="px-3 py-3 border-t border-gray-100 shrink-0 relative" ref={popupRef}>
-          <button
-            onClick={() => setPopupOpen((v) => !v)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer group"
-          >
-            <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold text-xs shrink-0">
-              {initials}
-            </div>
-            <div className="flex-1 text-left min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{profile?.name || 'Account'}</p>
-              <p className="text-xs text-gray-500 capitalize truncate">{profile?.role || ''}</p>
-            </div>
-            <svg
-              className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${popupOpen ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-            </svg>
-          </button>
-
-          {/* Popup */}
-          {popupOpen && (
-            <div className="absolute bottom-full left-3 right-3 mb-2 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden z-50">
-              {/* Profile header */}
-              <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-semibold text-gray-900 truncate">{profile?.name || 'Account'}</p>
-                <p className="text-xs text-gray-400 truncate">{profile?.email || profile?.phone || ''}</p>
-              </div>
-
-              {/* Actions */}
-              <div className="py-1">
-                <button
-                  onClick={handleSettings}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer text-left"
-                >
-                  <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Settings
-                </button>
-
-                <a
-                  href="/billing"
-                  onClick={() => setPopupOpen(false)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-                >
-                  <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
-                  Subscription
-                </a>
-              </div>
-
-              <div className="border-t border-gray-100 py-1">
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer text-left"
-                >
-                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  Log out
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </aside>
-
-      {/* Mobile toggle button */}
-      {collapsed && (
-        <button
-          onClick={() => setCollapsed(false)}
-          className="fixed top-4 left-4 z-50 lg:hidden p-2 bg-white rounded-lg shadow-md border border-gray-200 cursor-pointer"
-        >
-          <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-      )}
-
-      {/* Mobile backdrop */}
-      {!collapsed && (
-        <div
-          onClick={() => setCollapsed(true)}
-          className="fixed inset-0 bg-black/20 z-30 lg:hidden"
-        />
-      )}
-    </>
+      </div>
+    </aside>
   )
 }

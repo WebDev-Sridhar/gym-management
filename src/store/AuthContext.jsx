@@ -158,6 +158,7 @@ export function AuthProvider({ children }) {
     isOnboarded: profile?.onboarding_step === 'subscribed',
     role: profile?.role ?? null,
     gymId: profile?.gym_id ?? null,
+    gymName: profile?.gym_name ?? null,
     hasActiveSubscription: !!subscription && new Date(subscription.expires_at) > new Date(),
   }
 

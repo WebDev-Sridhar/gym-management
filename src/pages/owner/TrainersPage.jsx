@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { fetchTrainerInvites, createTrainerInvite, deleteTrainerInvite } from '../../services/membershipService'
-import { fetchTrainers } from '../../services/trainerService'
+import { fetchTrainers, updateTrainer, removeTrainer } from '../../services/trainerService'
 import { useDialog } from '../../components/ui/Dialog'
 
 export default function TrainersPage() {
@@ -18,6 +18,46 @@ export default function TrainersPage() {
   const [name, setName]   = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+
+  // Edit active trainer
+  const [editingTrainer, setEditingTrainer] = useState(null) // { id, name, phone, email }
+  const [editName, setEditName]   = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
+
+  function openEdit(trainer) {
+    setEditingTrainer(trainer)
+    setEditName(trainer.name || '')
+    setEditPhone(trainer.phone || '')
+    setEditError('')
+  }
+
+  async function handleSaveEdit(e) {
+    e.preventDefault()
+    if (!editName.trim()) { setEditError('Name is required'); return }
+    setEditSaving(true); setEditError('')
+    try {
+      const updated = await updateTrainer(editingTrainer.id, { name: editName.trim(), phone: editPhone.trim() })
+      const merged = updated ?? { ...editingTrainer, name: editName.trim(), phone: editPhone.trim() || null }
+      setTrainers(prev => prev.map(t => t.id === merged.id ? merged : t))
+      setEditingTrainer(null)
+    } catch (err) {
+      setEditError(err.message || 'Failed to save')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function handleRemove(trainer) {
+    if (!await dialog.confirm(`Remove ${trainer.name} as a trainer? They will lose access to the trainer dashboard.`)) return
+    try {
+      await removeTrainer(trainer.id)
+      setTrainers(prev => prev.filter(t => t.id !== trainer.id))
+    } catch (err) {
+      dialog.alert(err.message || 'Failed to remove trainer')
+    }
+  }
 
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
@@ -73,12 +113,12 @@ export default function TrainersPage() {
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1200px]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Trainers</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900">Trainers</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
             {trainers.length} active · {invites.length} pending invite{invites.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -134,21 +174,73 @@ export default function TrainersPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {trainers.map(trainer => (
               <div key={trainer.id} className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-semibold text-sm shrink-0">
-                    {trainer.name?.charAt(0).toUpperCase() || '?'}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-sm truncate">{trainer.name}</h3>
-                    <p className="text-xs text-gray-400 truncate">{trainer.email || trainer.phone || 'No contact'}</p>
-                  </div>
-                </div>
-                <div className="mt-auto pt-3 border-t border-gray-50">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    Active
-                  </span>
-                </div>
+
+                {editingTrainer?.id === trainer.id ? (
+                  /* ── Inline edit form ── */
+                  <form onSubmit={handleSaveEdit} className="flex flex-col gap-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Edit Trainer</p>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
+                      <input value={editName} onChange={e => setEditName(e.target.value)} autoFocus
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+                      <input value={editPhone} onChange={e => setEditPhone(e.target.value.replace(/\D/g, ''))}
+                        maxLength={10} placeholder="Phone number"
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                      <p className="text-sm text-gray-400 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 truncate">{trainer.email}</p>
+                      <p className="text-[10px] text-gray-400 mt-1">Email is the login — cannot be changed here</p>
+                    </div>
+                    {editError && <p className="text-red-500 text-xs">{editError}</p>}
+                    <div className="flex gap-2 pt-1">
+                      <button type="submit" disabled={editSaving}
+                        className="flex-1 py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 transition-colors cursor-pointer disabled:opacity-50">
+                        {editSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button type="button" onClick={() => setEditingTrainer(null)}
+                        className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  /* ── View mode ── */
+                  <>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-semibold text-sm shrink-0">
+                        {trainer.name?.charAt(0).toUpperCase() || '?'}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-sm truncate">{trainer.name}</h3>
+                        <p className="text-xs text-gray-400 truncate">{trainer.email || trainer.phone || 'No contact'}</p>
+                        {trainer.phone && trainer.email && (
+                          <p className="text-xs text-gray-400 truncate">{trainer.phone}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        Active
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => openEdit(trainer)}
+                          className="text-xs text-violet-500 hover:text-violet-700 font-medium cursor-pointer transition-colors">
+                          Edit
+                        </button>
+                        <span className="text-gray-200">|</span>
+                        <button onClick={() => handleRemove(trainer)}
+                          className="text-xs text-red-400 hover:text-red-600 font-medium cursor-pointer transition-colors">
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>

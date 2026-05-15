@@ -206,12 +206,12 @@ export default function AttendancePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1200px]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Attendance</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
             {checkins.length} check-in{checkins.length !== 1 ? 's' : ''} {isToday ? 'today' : `on ${new Date(selectedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
           </p>
         </div>

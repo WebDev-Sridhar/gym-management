@@ -200,6 +200,23 @@ export async function fetchDashboardStats(gymId) {
   }
 }
 
+export async function fetchRevenueByMonth(gymId) {
+  const sixMonthsAgo = new Date()
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+  const { data } = await supabase
+    .from('payments')
+    .select('amount, payment_date')
+    .eq('gym_id', gymId)
+    .eq('status', 'paid')
+    .gte('payment_date', sixMonthsAgo.toISOString())
+  const byMonth = {}
+  for (const p of data || []) {
+    const month = p.payment_date?.substring(0, 7)
+    if (month) byMonth[month] = (byMonth[month] || 0) + Number(p.amount || 0)
+  }
+  return byMonth
+}
+
 export async function fetchRecentActivity(gymId) {
   const [recentMembers, recentPayments, recentCheckins] = await Promise.all([
     supabase.from('members').select('id, name, created_at').eq('gym_id', gymId).is('deleted_at', null).order('created_at', { ascending: false }).limit(5),

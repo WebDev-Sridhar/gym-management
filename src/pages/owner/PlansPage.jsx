@@ -155,12 +155,12 @@ export default function PlansPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1200px]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Membership Plans</h1>
-          <p className="text-sm text-gray-500 mt-1">{plans.length} plan{plans.length !== 1 ? 's' : ''} created</p>
+          <h1 className="text-2xl font-bold text-gray-900">Membership Plans</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{plans.length} plan{plans.length !== 1 ? 's' : ''} created</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -220,9 +220,10 @@ export default function PlansPage() {
                   >
                     Edit
                   </button>
+                  <span className="text-gray-200">|</span>
                   <button
                     onClick={() => handleDelete(plan)}
-                    className="text-xs text-red-500 hover:text-red-700 transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer transition-colors"
                   >
                     Delete
                   </button>

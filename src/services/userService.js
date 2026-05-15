@@ -7,14 +7,14 @@ import { supabaseData as supabase } from './supabaseClient'
 export async function fetchUserProfile(authId) {
   const { data, error } = await supabase
     .from('users')
-    .select('*, gym:gym_id(onboarding_step)')
+    .select('*, gym:gym_id(name, onboarding_step)')
     .eq('id', authId)
     .maybeSingle()
 
   if (error) throw error
   if (data) {
-    // Flatten onboarding_step from the joined gym row into the profile
     data.onboarding_step = data.gym?.onboarding_step ?? null
+    data.gym_name = data.gym?.name ?? null
     delete data.gym
   }
   return data

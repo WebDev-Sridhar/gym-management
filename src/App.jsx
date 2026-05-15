@@ -13,6 +13,7 @@ import OnboardingPage from './pages/auth/OnboardingPage'
 import BillingPage from './pages/auth/BillingPage'
 import AuthCallbackPage from './pages/auth/AuthCallbackPage'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
+import HomePage from './pages/owner/HomePage'
 import PlansPage from './pages/owner/PlansPage'
 import MembersPage from './pages/owner/MembersPage'
 import PaymentsPage from './pages/owner/PaymentsPage'
@@ -23,6 +24,7 @@ import SettingsPage from './pages/owner/SettingsPage'
 import WebsitePage from './pages/owner/WebsitePage'
 import PaymentSettingsPage from './pages/owner/PaymentSettingsPage'
 import CommunicationPage from './pages/owner/CommunicationPage'
+import MessagesPage from './pages/owner/MessagesPage'
 import ProgramsPage from './pages/owner/ProgramsPage'
 import StarterWebsitePage from './pages/owner/StarterWebsitePage'
 import TrainerLayout from './components/layout/TrainerLayout'
@@ -57,19 +59,6 @@ function WebsitePageRouter() {
   return planName === 'Starter' ? <StarterWebsitePage /> : <WebsitePage />
 }
 
-const ownerLinks = [
-  { to: '/owner-dashboard', icon: 'dashboard', label: 'Dashboard' },
-  { to: '/owner-dashboard/members', icon: 'members', label: 'Members' },
-  { to: '/owner-dashboard/plans', icon: 'plans', label: 'Plans' },
-  { to: '/owner-dashboard/payments', icon: 'payments', label: 'Payments' },
-  { to: '/owner-dashboard/payment-settings', icon: 'settings', label: 'Payment Setup' },
-  { to: '/owner-dashboard/communication', icon: 'message', label: 'Communication' },
-  { to: '/owner-dashboard/programs', icon: 'programs', label: 'Programs' },
-  { to: '/owner-dashboard/trainers', icon: 'trainers', label: 'Trainers' },
-  { to: '/owner-dashboard/analytics', icon: 'analytics', label: 'Analytics' },
-  { to: '/owner-dashboard/checkin', icon: 'checkin', label: 'Check-in' },
-  { to: '/owner-dashboard/website', icon: 'website', label: 'Website' },
-]
 
 
 
@@ -114,10 +103,11 @@ export default function App() {
           {/* Owner dashboard — protected, owner only, subscription required */}
           <Route path="/owner-dashboard" element={
             <ProtectedRoute allowedRoles={['owner']}>
-              <DashboardLayout sidebarLinks={ownerLinks} />
+              <DashboardLayout />
             </ProtectedRoute>
           }>
             <Route index element={<OwnerDashboard />} />
+            <Route path="home" element={<HomePage />} />
             <Route path="plans" element={<PlansPage />} />
             <Route path="members" element={<MembersPage />} />
             <Route path="payments" element={<PaymentsPage />} />
@@ -128,6 +118,7 @@ export default function App() {
             <Route path="website" element={<WebsitePageRouter />} />
             <Route path="payment-settings" element={<PaymentSettingsPage />} />
             <Route path="communication" element={<CommunicationPage />} />
+            <Route path="messages" element={<MessagesPage />} />
             <Route path="programs" element={<ProgramsPage />} />
           </Route>
 

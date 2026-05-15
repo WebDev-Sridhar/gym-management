@@ -78,25 +78,46 @@ export default function AnalyticsPage() {
   const totalBreakdown = statusBreakdown.active + statusBreakdown.expired + statusBreakdown.inactive
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1200px]">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Analytics</h1>
-        <p className="text-sm text-gray-500 mt-1">Overview of your gym's performance</p>
+        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Overview of your gym's performance</p>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-gray-500 mb-1">Total Members</p>
-          <p className="text-2xl font-bold text-gray-900">{totalMembers}</p>
+        <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start justify-between">
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Total Members</p>
+            <p className="text-3xl font-bold text-gray-900 tracking-tight">{totalMembers}</p>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-gray-500 mb-1">Total Revenue</p>
-          <p className="text-2xl font-bold text-gray-900">{'\u20B9'}{totalRevenue.toLocaleString('en-IN')}</p>
+        <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start justify-between">
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Total Revenue</p>
+            <p className="text-3xl font-bold text-gray-900 tracking-tight">{'\u20B9'}{totalRevenue.toLocaleString('en-IN')}</p>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-gray-500 mb-1">Active Rate</p>
-          <p className="text-2xl font-bold text-gray-900">{totalBreakdown > 0 ? Math.round((statusBreakdown.active / totalBreakdown) * 100) : 0}%</p>
+        <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start justify-between">
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Active Rate</p>
+            <p className="text-3xl font-bold text-gray-900 tracking-tight">{totalBreakdown > 0 ? Math.round((statusBreakdown.active / totalBreakdown) * 100) : 0}%</p>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
         </div>
       </div>
 

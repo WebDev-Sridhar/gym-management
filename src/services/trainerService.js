@@ -130,6 +130,25 @@ export async function fetchTrainers(gymId) {
   return data || []
 }
 
+export async function updateTrainer(id, { name, phone }) {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ name, phone: phone || null })
+    .eq('id', id)
+    .select('id, name, phone, email')
+  if (error) throw error
+  return data?.[0] ?? null
+}
+
+export async function removeTrainer(id) {
+  // Disassociate from gym without deleting the auth account
+  const { error } = await supabase
+    .from('users')
+    .update({ gym_id: null, role: null })
+    .eq('id', id)
+  if (error) throw error
+}
+
 export async function assignTrainerToMember({ memberId, trainerId }) {
   const { data, error } = await supabase
     .from('members')
