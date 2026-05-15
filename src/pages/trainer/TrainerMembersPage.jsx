@@ -319,6 +319,11 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
 }
 
 // ─── Member detail drawer ─────────────────────────────────────────────────────
+function parseTS(ts) {
+  if (!ts) return new Date(NaN)
+  return new Date(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + 'Z')
+}
+
 function MemberDetailPanel({ member, gymId, onClose, onPlanAssigned }) {
   const dialog = useDialog()
   const [tab, setTab]           = useState('plans')
@@ -350,7 +355,7 @@ function MemberDetailPanel({ member, gymId, onClose, onPlanAssigned }) {
   const archivedPlans = plans.filter(p => p.status === 'archived')
 
   const thisMonth = attendance.filter(a => {
-    const d = new Date(a.check_in)
+    const d = parseTS(a.check_in)
     const now = new Date()
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }).length
@@ -435,10 +440,10 @@ function MemberDetailPanel({ member, gymId, onClose, onPlanAssigned }) {
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 12 }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', flexShrink: 0 }} />
                   <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: 0, fontWeight: 600 }}>
-                    {new Date(a.check_in).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {parseTS(a.check_in).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                   </p>
                   <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', margin: '0 0 0 auto' }}>
-                    {new Date(a.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    {parseTS(a.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
               ))}

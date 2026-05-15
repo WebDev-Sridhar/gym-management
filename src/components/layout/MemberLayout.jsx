@@ -187,8 +187,8 @@ export default function MemberLayout() {
                       <motion.span
                         layoutId="nav-dot"
                         style={{
-                          position: 'absolute', bottom: 6,
-                          width: 4, height: 4, borderRadius: '50%',
+                          position: 'absolute', top: 0,
+                          width: 20, height: 3, borderRadius: 99,
                           background: '#818cf8',
                         }}
                       />
