@@ -3,10 +3,17 @@ import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { createGym, createUserProfile, updateGymOnboardingStep } from '../../services/userService'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
+import { LogOut } from 'lucide-react'
 
 export default function CreateGymPage() {
-  const { user, profile, isAuthenticated, loading, refreshProfile } = useAuth()
+  const { user, profile, isAuthenticated, loading, refreshProfile, logout } = useAuth()
   const navigate = useNavigate()
+
+  const accountEmail = profile?.email || user?.email || ''
+  async function handleSignOut() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
 
   const [ownerName, setOwnerName] = useState('')
   const [phone, setPhone] = useState('')
@@ -108,9 +115,21 @@ export default function CreateGymPage() {
       <div className="w-full lg:w-[35%] flex flex-col items-center justify-center px-8 sm:px-12 py-12 overflow-y-auto">
         <div className="w-full max-w-sm">
 
-          <Link to="/signup" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-8 transition-colors">
-            ← Back
-          </Link>
+          <div className="flex items-center justify-between mb-8">
+            <Link to="/signup" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
+              ← Back
+            </Link>
+            {isAuthenticated && (
+              <button
+                type="button"
+                onClick={handleSignOut}
+                title={accountEmail ? `Signed in as ${accountEmail}` : 'Sign out'}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-900 transition-colors cursor-pointer"
+              >
+                <LogOut size={12} /> Sign out
+              </button>
+            )}
+          </div>
 
           <OnboardingProgress currentStep={2} />
 

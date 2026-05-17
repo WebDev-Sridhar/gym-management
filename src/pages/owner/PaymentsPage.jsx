@@ -1,16 +1,16 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../store/AuthContext'
-import { fetchPayments, markPaymentPaid } from '../../services/paymentService'
+import { fetchPayments } from '../../services/paymentService'
 import { fetchMembers, fetchPlans, fetchGymDetails } from '../../services/membershipService'
-import { sendPaymentReminder, fetchLastReminders } from '../../services/reminderService'
-import { useDialog } from '../../components/ui/Dialog'
+
 import CustomSelect from '../../components/ui/CustomSelect'
 import Pagination from '../../components/ui/Pagination'
 import { Sk } from '../../components/ui/Skeleton'
+import MemberDrawer from '../../components/ui/MemberDrawer'
 
 function PaymentsSkeleton() {
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div className="flex items-center justify-between">
         <div className="space-y-2"><Sk h={28} w={140} /><Sk h={14} w={200} /></div>
         <Sk h={38} w={140} r={10} />
@@ -37,7 +37,6 @@ function PaymentsSkeleton() {
 }
 
 export default function PaymentsPage() {
-  const dialog = useDialog()
   const { gymId } = useAuth()
   const [payments, setPayments] = useState([])
   const [members, setMembers] = useState([])
@@ -55,13 +54,10 @@ export default function PaymentsPage() {
   const [generatedLink, setGeneratedLink] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  const [markingId, setMarkingId] = useState(null)
-  const [paymentMethod, setPaymentMethod] = useState('cash')
   const [filter, setFilter] = useState('all')
-  const [lastReminders, setLastReminders] = useState(new Map())
-  const [reminderBusyId, setReminderBusyId] = useState(null)
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 10
+  const [drawerMember, setDrawerMember] = useState(null)
 
   const memberInputRef = useRef(null)
   const dropdownRef = useRef(null)
@@ -75,11 +71,10 @@ export default function PaymentsPage() {
       fetchMembers(gymId),
       fetchPlans(gymId),
       fetchGymDetails(gymId),
-      fetchLastReminders(gymId).catch(() => new Map()),
     ])
-      .then(([pay, mem, pln, g, reminders]) => {
+      .then(([pay, mem, pln, g]) => {
         if (cancelled) return
-        setPayments(pay); setMembers(mem); setPlans(pln); setGym(g); setLastReminders(reminders)
+        setPayments(pay); setMembers(mem); setPlans(pln); setGym(g)
       })
       .catch((err) => console.error('Failed to load payments data:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -143,46 +138,6 @@ export default function PaymentsPage() {
     }
   }
 
-  async function handleSendReminder(paymentId) {
-    setReminderBusyId(paymentId)
-    try {
-      await sendPaymentReminder({ paymentId })
-      const [updated, reminders] = await Promise.all([
-        fetchPayments(gymId),
-        fetchLastReminders(gymId).catch(() => new Map()),
-      ])
-      setPayments(updated)
-      setLastReminders(reminders)
-      dialog.alert('Reminder sent')
-    } catch (err) {
-      dialog.alert(err.message || 'Failed to send reminder')
-    } finally {
-      setReminderBusyId(null)
-    }
-  }
-
-  function formatRelative(iso) {
-    if (!iso) return null
-    const ms = Date.now() - new Date(iso).getTime()
-    const mins = Math.floor(ms / 60000)
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins}m ago`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs}h ago`
-    const days = Math.floor(hrs / 24)
-    return `${days}d ago`
-  }
-
-  async function handleMarkPaid(paymentId) {
-    try {
-      const updated = await markPaymentPaid({ paymentId, paymentMethod })
-      setPayments((prev) => prev.map((p) => p.id === paymentId ? updated : p))
-      setMarkingId(null)
-      setPaymentMethod('cash')
-    } catch (err) {
-      dialog.alert(err.message || 'Failed to mark as paid')
-    }
-  }
 
   const filteredPayments = payments.filter((p) => filter === 'all' || p.status === filter)
   const totalPages = Math.max(1, Math.ceil(filteredPayments.length / PAGE_SIZE))
@@ -209,7 +164,7 @@ export default function PaymentsPage() {
   if (loading) return <PaymentsSkeleton />
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -469,12 +424,13 @@ export default function PaymentsPage() {
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Amount</th>
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Date</th>
-                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {pagedPayments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={payment.id}
+                    onClick={() => { const m = members.find(m => m.id === payment.member_id); if (m) setDrawerMember(m) }}
+                    className="hover:bg-gray-50/60 transition-colors cursor-pointer">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-sm shrink-0">{payment.member?.name?.charAt(0).toUpperCase() || '?'}</div>
@@ -503,80 +459,6 @@ export default function PaymentsPage() {
                     <td className="px-5 py-4">
                       <p className="text-sm text-gray-700">{new Date(payment.payment_date || payment.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     </td>
-                    <td className="px-5 py-4 text-right">
-                      {markingId === payment.id ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <CustomSelect
-                            value={paymentMethod}
-                            onChange={setPaymentMethod}
-                            compact
-                            className="w-36"
-                            options={[
-                              { value: 'cash', label: 'Cash' },
-                              { value: 'upi', label: 'UPI' },
-                              { value: 'bank_transfer', label: 'Bank Transfer' },
-                              { value: 'card', label: 'Card' },
-                            ]}
-                          />
-                          <button onClick={() => handleMarkPaid(payment.id)} className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 cursor-pointer">Confirm</button>
-                          <button onClick={() => setMarkingId(null)} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
-                        </div>
-                      ) : payment.status === 'verification_pending' ? (
-                        <div className="flex items-center justify-end gap-3">
-                          <button
-                            onClick={() => setMarkingId(payment.id)}
-                            className="text-xs text-amber-700 hover:text-amber-900 font-semibold cursor-pointer"
-                          >
-                            Verify &amp; Confirm
-                          </button>
-                        </div>
-                      ) : payment.status === 'pending' ? (
-                        <div className="flex flex-col items-end gap-1">
-                          <div className="flex items-center justify-end gap-3">
-                            {(() => {
-                              const lastSent = lastReminders.get(payment.id)?.last_sent_at
-                              const sentRecently = lastSent && (Date.now() - new Date(lastSent).getTime()) < 24 * 60 * 60 * 1000
-                              const isDisabled = reminderBusyId === payment.id || !payment.member?.phone || sentRecently
-                              return (
-                                <button
-                                  onClick={() => handleSendReminder(payment.id)}
-                                  disabled={isDisabled}
-                                  title={
-                                    !payment.member?.phone ? 'Member has no phone number'
-                                    : sentRecently ? 'Already sent today — 1 reminder per day'
-                                    : 'Send reminder'
-                                  }
-                                  className="text-xs text-emerald-600 hover:text-emerald-800 font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                  {reminderBusyId === payment.id ? 'Sending...' : 'Send Reminder'}
-                                </button>
-                              )
-                            })()}
-                            <button onClick={() => setMarkingId(payment.id)} className="text-xs text-green-600 hover:text-green-800 font-medium cursor-pointer">Mark Paid</button>
-                            {(payment.razorpay_link_url || payment.pay_token) && (
-                              <button
-                                onClick={() => {
-                                  const link = payment.razorpay_link_url || `${window.location.origin}/pay/${payment.pay_token}`
-                                  navigator.clipboard.writeText(link)
-                                }}
-                                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
-                              >
-                                Copy Link
-                              </button>
-                            )}
-                          </div>
-                          {lastReminders.get(payment.id)?.last_sent_at && (
-                            <span className="text-[11px] text-gray-400">
-                              Last reminder: {formatRelative(lastReminders.get(payment.id).last_sent_at)}
-                            </span>
-                          )}
-                        </div>
-                      ) : payment.razorpay_payment_id ? (
-                        <span className="text-xs text-gray-400">{payment.razorpay_payment_id.slice(0, 14)}...</span>
-                      ) : (
-                        <span className="text-xs text-gray-300">{'—'}</span>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -585,6 +467,19 @@ export default function PaymentsPage() {
 
           <Pagination page={safePage} totalPages={totalPages} total={filteredPayments.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </div>
+      )}
+
+      {drawerMember && (
+        <MemberDrawer
+          member={drawerMember}
+          gymId={gymId}
+          plans={plans}
+          trainers={[]}
+          defaultTab="Payments"
+          onClose={() => setDrawerMember(null)}
+          onUpdated={updated => setDrawerMember(updated)}
+          onDeleted={() => setDrawerMember(null)}
+        />
       )}
     </div>
   )

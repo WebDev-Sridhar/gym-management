@@ -187,6 +187,25 @@ export async function updateGymOnboardingStep(gymId, step) {
 }
 
 /**
+ * Update editable fields on the owner's user profile row.
+ */
+export async function updateUserProfile({ authId, name, phone }) {
+  const updates = {}
+  if (name  !== undefined) updates.name  = name
+  if (phone !== undefined) updates.phone = phone
+
+  const { data, error } = await supabase
+    .from('users')
+    .update(updates)
+    .eq('id', authId)
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
  * Fetch gym details by id.
  */
 export async function fetchGym(gymId) {

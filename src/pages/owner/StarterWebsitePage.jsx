@@ -4,7 +4,7 @@ import { Sk } from '../../components/ui/Skeleton'
 
 function StarterWebsiteSkeleton() {
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div className="flex items-center justify-between">
         <div className="space-y-2"><Sk h={28} w={200} /><Sk h={14} w={280} /></div>
         <Sk h={36} w={110} r={10} />

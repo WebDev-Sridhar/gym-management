@@ -3,6 +3,7 @@ import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { createSubscriptionOrder, openSubscriptionCheckout } from '../../services/subscriptionService'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
+import OnboardingAccountBar from '../../components/auth/OnboardingAccountBar'
 
 const PLANS = [
   {
@@ -239,7 +240,8 @@ export default function BillingPage() {
   const isExpired = subscription && subscription.status === 'expired'
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-12">
+    <div className="min-h-screen bg-gray-50 px-4 py-8">
+      <OnboardingAccountBar />
       <div className="max-w-4xl mx-auto">
         {!isExpired && <OnboardingProgress currentStep={3} />}
 

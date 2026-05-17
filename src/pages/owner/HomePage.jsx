@@ -91,7 +91,7 @@ export default function HomePage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
 
       {/* ───────── HERO ───────── */}
       <div className="bg-white rounded-xl border border-gray-200 p-8">

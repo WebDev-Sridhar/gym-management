@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import MemberDrawer from '../../components/ui/MemberDrawer'
 import { useAuth } from '../../store/AuthContext'
 import {
   fetchRevenueAnalytics,
@@ -240,6 +241,7 @@ export default function AnalyticsPage() {
   const { gymId } = useAuth()
 
   const [range,      setRange]      = useState(30)
+  const [drawerMember, setDrawerMember] = useState(null)
   const [revenue,    setRevenue]    = useState(null)
   const [membership, setMembership] = useState(null)
   const [attend,     setAttend]     = useState(null)
@@ -360,7 +362,7 @@ export default function AnalyticsPage() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 max-w-[1400px]">
+    <div className="space-y-6 max-w-[1400px] mx-auto">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -686,7 +688,7 @@ export default function AnalyticsPage() {
                         <td className="px-5 py-3 text-right">
                           {m.riskLevel !== 'low' && (
                             <button
-                              onClick={() => navigate('/owner-dashboard/members')}
+                              onClick={() => setDrawerMember(m)}
                               className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors"
                             >
                               <Eye size={12} />
@@ -786,6 +788,17 @@ export default function AnalyticsPage() {
             </div>
           )}
         </>
+      )}
+
+      {drawerMember && (
+        <MemberDrawer
+          member={drawerMember}
+          gymId={gymId}
+          defaultTab="Info"
+          onClose={() => setDrawerMember(null)}
+          onUpdated={updated => setDrawerMember(updated)}
+          onDeleted={() => setDrawerMember(null)}
+        />
       )}
     </div>
   )

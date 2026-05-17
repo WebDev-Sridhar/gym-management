@@ -7,7 +7,7 @@ import { Sk } from '../../components/ui/Skeleton'
 
 function TrainersSkeleton() {
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div className="flex items-center justify-between">
         <div className="space-y-2"><Sk h={28} w={130} /><Sk h={14} w={200} /></div>
         <Sk h={38} w={120} r={10} />
@@ -138,7 +138,7 @@ export default function TrainersPage() {
   if (loading) return <TrainersSkeleton />
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

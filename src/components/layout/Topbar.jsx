@@ -4,7 +4,7 @@ import { useAuth } from '../../store/AuthContext'
 import { fetchContactMessages, markMessageRead, markAllMessagesRead } from '../../services/contactService'
 import {
   Home, ChevronDown, Bell, LayoutDashboard, CreditCard, Globe, Menu,
-  Settings, LogOut, User, Gem, CheckCircle2, AlertCircle, Clock,
+  Settings, LogOut, User, Gem, CheckCircle2, AlertCircle, Clock,HelpCircle,
 } from 'lucide-react'
 
 const NAV_LINKS = [
@@ -297,8 +297,8 @@ export default function Topbar({ onMenuToggle }) {
                   <div style={{ padding: '6px 8px' }}>
                     {[
                       { Icon: User,     label: 'Account Settings',     action: () => { setProfileOpen(false); navigate('/owner-dashboard/settings') } },
-                      { Icon: Gem,      label: 'Manage Subscription',  action: () => { setProfileOpen(false); navigate('/billing') } },
-                      { Icon: Settings, label: 'General Settings',     action: () => { setProfileOpen(false); navigate('/owner-dashboard/settings') } },
+                      { Icon: Gem,      label: 'Manage Subscription',  action: () => { setProfileOpen(false); navigate('/owner-dashboard/subscription') } },
+                      { Icon: HelpCircle, label: 'Help Center',     action: () => { setProfileOpen(false); navigate('/owner-dashboard/help') } },
                     ].map(({ Icon: ItemIcon, label, action }) => (
                       <button key={label} onClick={action} style={{
                         width: '100%', display: 'flex', alignItems: 'center', gap: 10,
@@ -412,10 +412,10 @@ export default function Topbar({ onMenuToggle }) {
                 </button>
               )}
               <button
-                onClick={() => { setPanelOpen(false); navigate('/owner-dashboard/communication') }}
+                onClick={() => { setPanelOpen(false); navigate('/owner-dashboard/messages') }}
                 className="w-full py-2.5 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer"
               >
-                View all in Communication →
+                View all messages →
               </button>
             </div>
           </div>

@@ -1,8 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
-import { fetchMembers, createMember, assignPlan, deleteMember, updateMember, fetchPlans } from '../../services/membershipService'
-import { fetchTrainers, assignTrainerToMember } from '../../services/trainerService'
-import { useDialog } from '../../components/ui/Dialog'
+import { fetchMembers, createMember, assignPlan, fetchPlans } from '../../services/membershipService'
+import { fetchTrainers } from '../../services/trainerService'
 import CustomSelect from '../../components/ui/CustomSelect'
 import MemberDrawer from '../../components/ui/MemberDrawer'
 import Pagination from '../../components/ui/Pagination'
@@ -10,7 +9,7 @@ import { Sk } from '../../components/ui/Skeleton'
 
 function MembersSkeleton() {
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div className="flex items-center justify-between">
         <div className="space-y-2"><Sk h={28} w={140} /><Sk h={14} w={180} /></div>
         <Sk h={38} w={120} r={10} />
@@ -38,40 +37,24 @@ function MembersSkeleton() {
 }
 
 export default function MembersPage() {
-  const dialog = useDialog()
   const { gymId } = useAuth()
   const [members, setMembers] = useState([])
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [assigningId, setAssigningId] = useState(null)
-  const [editingId, setEditingId] = useState(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [filter, setFilter] = useState('all')
-  const [search, setSearch] = useState('')
+  const [showAddForm, setShowAddForm]   = useState(false)
+  const [submitting, setSubmitting]     = useState(false)
+  const [error, setError]               = useState('')
+  const [filter, setFilter]             = useState('all')
+  const [search, setSearch]             = useState('')
   const [drawerMember, setDrawerMember] = useState(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage]                 = useState(1)
   const PAGE_SIZE = 10
 
-  // Add member form
-  const [newName, setNewName] = useState('')
-  const [newPhone, setNewPhone] = useState('')
-  const [newEmail, setNewEmail] = useState('')
+  const [newName, setNewName]     = useState('')
+  const [newPhone, setNewPhone]   = useState('')
+  const [newEmail, setNewEmail]   = useState('')
   const [newPlanId, setNewPlanId] = useState('')
-
-  // Edit member form
-  const [editName, setEditName] = useState('')
-  const [editPhone, setEditPhone] = useState('')
-  const [editEmail, setEditEmail] = useState('')
-
-  // Assign plan form
-  const [selectedPlanId, setSelectedPlanId] = useState('')
-
-  // Assign trainer form
-  const [trainers, setTrainers]               = useState([])
-  const [assigningTrainerId, setAssigningTrainerId] = useState(null)
-  const [selectedTrainerId, setSelectedTrainerId]   = useState('')
+  const [trainers, setTrainers]   = useState([])
 
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
@@ -91,20 +74,6 @@ export default function MembersPage() {
 
     return () => { cancelled = true }
   }, [gymId])
-
-  async function handleAssignTrainer(memberId) {
-    setSubmitting(true)
-    try {
-      const updated = await assignTrainerToMember({ memberId, trainerId: selectedTrainerId || null })
-      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, trainer_id: updated.trainer_id } : m))
-      setAssigningTrainerId(null)
-      setSelectedTrainerId('')
-    } catch (err) {
-      dialog.alert(err.message || 'Failed to assign trainer')
-    } finally {
-      setSubmitting(false)
-    }
-  }
 
   async function handleAddMember(e) {
     e.preventDefault()
@@ -134,67 +103,6 @@ export default function MembersPage() {
       setError(err.message || 'Failed to add member')
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  function startEdit(member) {
-    setEditingId(member.id)
-    setEditName(member.name || '')
-    setEditPhone(member.phone || '')
-    setEditEmail(member.email || '')
-    setError('')
-  }
-
-  async function handleEditMember(e) {
-    e.preventDefault()
-    if (!editName.trim()) return setError('Name is required')
-
-    setSubmitting(true)
-    try {
-      const updated = await updateMember({
-        memberId: editingId,
-        name: editName.trim(),
-        phone: editPhone.trim(),
-        email: editEmail.trim(),
-      })
-      setMembers((prev) => prev.map((m) => m.id === editingId ? updated : m))
-      setEditingId(null)
-    } catch (err) {
-      setError(err.message || 'Failed to update member')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  async function handleAssignPlan(memberId) {
-    if (!selectedPlanId) return
-    const plan = plans.find((p) => p.id === selectedPlanId)
-    if (!plan) return
-
-    setSubmitting(true)
-    try {
-      const updated = await assignPlan({
-        memberId,
-        planId: plan.id,
-        durationDays: plan.duration_days,
-      })
-      setMembers((prev) => prev.map((m) => m.id === memberId ? updated : m))
-      setAssigningId(null)
-      setSelectedPlanId('')
-    } catch (err) {
-      dialog.alert(err.message || 'Failed to assign plan')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  async function handleDelete(memberId) {
-    if (!await dialog.confirm('Remove this member from the list? Their payment history and attendance records will be preserved.')) return
-    try {
-      await deleteMember(memberId)
-      setMembers((prev) => prev.filter((m) => m.id !== memberId))
-    } catch (err) {
-      dialog.alert(err.message || 'Failed to delete member')
     }
   }
 
@@ -233,7 +141,7 @@ export default function MembersPage() {
   if (loading) return <MembersSkeleton />
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -322,51 +230,37 @@ export default function MembersPage() {
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Plan</th>
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Expiry</th>
-                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {pagedMembers.map((member) => {
-                  const status = getMemberStatus(member)
+                  const status    = getMemberStatus(member)
                   const remaining = daysLeft(member.expiry_date)
-
                   return (
-                    <tr key={member.id} className="hover:bg-gray-50/50 transition-colors">
+                    <tr key={member.id}
+                      onClick={() => setDrawerMember(member)}
+                      className="hover:bg-gray-50/60 transition-colors cursor-pointer">
                       <td className="px-5 py-4">
-                        {editingId === member.id ? (
-                          <form onSubmit={handleEditMember} className="flex flex-wrap items-center gap-2">
-                            <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm w-28 outline-none focus:border-indigo-500" />
-                            <input value={editPhone} onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, ''))} placeholder="Phone" maxLength={10} className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm w-24 outline-none focus:border-indigo-500" />
-                            <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Email" className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm w-36 outline-none focus:border-indigo-500" />
-                            <button type="submit" disabled={submitting} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 cursor-pointer disabled:opacity-50">Save</button>
-                            <button type="button" onClick={() => setEditingId(null)} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
-                          </form>
-                        ) : (
-                          <button
-                            onClick={() => setDrawerMember(member)}
-                            className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity cursor-pointer"
-                          >
-                            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-sm shrink-0">
-                              {member.name?.charAt(0).toUpperCase() || '?'}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-900 hover:text-indigo-700 transition-colors">{member.name || 'Unnamed'}</p>
-                              <p className="text-xs text-gray-400">{member.phone || member.email || 'No contact'}</p>
-                            </div>
-                          </button>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-sm shrink-0">
+                            {member.name?.charAt(0).toUpperCase() || '?'}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{member.name || 'Unnamed'}</p>
+                            <p className="text-xs text-gray-400">{member.phone || member.email || 'No contact'}</p>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-5 py-4">
-                        {member.plan ? (
-                          <span className="text-sm text-gray-700">{member.plan.name}</span>
-                        ) : (
-                          <span className="text-xs text-gray-400">No plan</span>
-                        )}
+                        {member.plan
+                          ? <span className="text-sm text-gray-700">{member.plan.name}</span>
+                          : <span className="text-xs text-gray-400">No plan</span>
+                        }
                       </td>
                       <td className="px-5 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          status === 'active' ? 'bg-green-50 text-green-700' :
-                          status === 'expired' ? 'bg-red-50 text-red-700' :
+                          status === 'active'  ? 'bg-green-50 text-green-700' :
+                          status === 'expired' ? 'bg-red-50 text-red-700'    :
                           'bg-gray-100 text-gray-500'
                         }`}>
                           {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -381,53 +275,8 @@ export default function MembersPage() {
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-400">{'\u2014'}</span>
+                          <span className="text-xs text-gray-400">\u2014</span>
                         )}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {assigningId === member.id ? (
-                            <div className="flex items-center gap-2">
-                              <CustomSelect
-                                value={selectedPlanId}
-                                onChange={setSelectedPlanId}
-                                placeholder="Select plan..."
-                                compact
-                                className="w-48"
-                                options={plans.map((p) => ({
-                                  value: p.id,
-                                  label: `${p.name} \u2014 \u20B9${Number(p.price).toLocaleString('en-IN')}`,
-                                }))}
-                              />
-                              <button onClick={() => handleAssignPlan(member.id)} disabled={!selectedPlanId || submitting} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">{submitting ? '...' : 'Assign'}</button>
-                              <button onClick={() => { setAssigningId(null); setSelectedPlanId('') }} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
-                            </div>
-                          ) : assigningTrainerId === member.id ? (
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={selectedTrainerId}
-                                onChange={e => setSelectedTrainerId(e.target.value)}
-                                className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-500 bg-gray-50"
-                              >
-                                <option value="">No trainer</option>
-                                {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                              </select>
-                              <button onClick={() => handleAssignTrainer(member.id)} disabled={submitting} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">{submitting ? '...' : 'Save'}</button>
-                              <button onClick={() => { setAssigningTrainerId(null); setSelectedTrainerId('') }} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Cancel</button>
-                            </div>
-                          ) : editingId !== member.id ? (
-                            <>
-                              <button onClick={() => { setAssigningId(member.id); setSelectedPlanId(member.plan_id || '') }} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">
-                                {member.plan_id ? 'Change Plan' : 'Assign Plan'}
-                              </button>
-                              <button onClick={() => { setAssigningTrainerId(member.id); setSelectedTrainerId(member.trainer_id || '') }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium cursor-pointer ml-1">
-                                {member.trainer_id ? 'Trainer' : '+ Trainer'}
-                              </button>
-                              <button onClick={() => startEdit(member)} className="text-xs text-blue-500 hover:text-blue-700 font-medium cursor-pointer ml-1">Edit</button>
-                              <button onClick={() => handleDelete(member.id)} className="text-xs text-red-400 hover:text-red-600 cursor-pointer ml-1">Remove</button>
-                            </>
-                          ) : null}
-                        </div>
                       </td>
                     </tr>
                   )
@@ -439,7 +288,18 @@ export default function MembersPage() {
         </div>
       )}
 
-      <MemberDrawer member={drawerMember} onClose={() => setDrawerMember(null)} />
+      {drawerMember && (
+        <MemberDrawer
+          member={drawerMember}
+          gymId={gymId}
+          plans={plans}
+          trainers={trainers}
+          defaultTab="Info"
+          onClose={() => setDrawerMember(null)}
+          onUpdated={updated => setMembers(prev => prev.map(m => m.id === updated.id ? updated : m))}
+          onDeleted={id => setMembers(prev => prev.filter(m => m.id !== id))}
+        />
+      )}
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { Sk } from '../../components/ui/Skeleton'
 
 function MessagesSkeleton() {
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div className="space-y-2"><Sk h={28} w={140} /><Sk h={14} w={260} /></div>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 space-y-1.5">
@@ -97,7 +97,7 @@ export default function MessagesPage() {
   if (loading) return <MessagesSkeleton />
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
         <p className="text-sm text-gray-500 mt-0.5">Enquiries and messages from your gym website.</p>

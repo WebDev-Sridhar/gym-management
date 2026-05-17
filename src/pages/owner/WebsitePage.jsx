@@ -4,7 +4,7 @@ import { Sk } from '../../components/ui/Skeleton'
 
 function WebsiteSkeleton() {
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div className="flex items-center justify-between">
         <div className="space-y-2"><Sk h={28} w={180} /><Sk h={14} w={260} /></div>
         <Sk h={36} w={110} r={10} />
@@ -2383,7 +2383,7 @@ export default function WebsitePage() {
   }
 
   return (
-    <div className="max-w-7xl space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Page header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">

@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import {
   LayoutDashboard, Users, UserCheck, QrCode, ClipboardList, CreditCard,
-  BarChart2, Megaphone, MessageSquare, Settings, UserCircle, Gem,
+  BarChart2, Megaphone, MessageSquare, Settings, HelpCircle, Gem,
 } from 'lucide-react'
 
 const sections = [
@@ -36,10 +36,15 @@ const sections = [
     ],
   },
   {
+    label: 'SUPPORT',
+    links: [
+      { to: '/owner-dashboard/help', label: 'Help & Support', Icon: HelpCircle },
+    ],
+  },
+  {
     label: 'SETTINGS',
     links: [
-      { to: '/owner-dashboard/settings', label: 'General Settings', Icon: Settings },
-      { to: '/owner-dashboard/settings', label: 'Profile',          Icon: UserCircle },
+      { to: '/owner-dashboard/settings', label: 'Account & Settings', Icon: Settings },
     ],
   },
 ]
@@ -111,7 +116,7 @@ export default function Sidebar() {
           </div>
           <p style={{ color: 'var(--shell-muted)', fontSize: 11, marginBottom: 12 }}>{planName} Plan</p>
           <button
-            onClick={() => navigate('/billing')}
+            onClick={() => navigate('/owner-dashboard/subscription')}
             style={{
               width: '100%', padding: '8px 0', border: '1px solid var(--p-glow)',
               borderRadius: 8, background: 'transparent', color: 'var(--p-pale)',

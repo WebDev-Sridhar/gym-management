@@ -3,10 +3,11 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import EmailRequiredGuard from '../auth/EmailRequiredGuard'
+import SupportWidget from '../support/SupportWidget'
 import {
   X, Home, LayoutDashboard, CreditCard, Globe,
   Users, UserCheck, QrCode, ClipboardList, BarChart2,
-  Megaphone, Settings, UserCircle,Gem
+  Megaphone, Settings, UserCircle, Gem, MessageSquare, HelpCircle
 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 
@@ -39,11 +40,17 @@ const MOBILE_NAV_SECTIONS = [
     ],
   },
   {
-    label: 'COMMUNICATION & SETTINGS',
+    label: 'COMMUNICATION',
     links: [
       { to: '/owner-dashboard/communication', label: 'Announcements', Icon: Megaphone },
-      { to: '/owner-dashboard/settings',      label: 'Settings',      Icon: Settings },
-      { to: '/owner-dashboard/settings',      label: 'Profile',       Icon: UserCircle },
+      { to: '/owner-dashboard/messages', label: 'Messages', Icon: MessageSquare},
+    ],
+  },
+  {
+    label: 'SUPPORT & SETTINGS',
+    links: [
+      { to: '/owner-dashboard/help',     label: 'Help & Support',     Icon: HelpCircle },
+      { to: '/owner-dashboard/settings', label: 'Account & Settings', Icon: Settings },
     ],
   },
 ]
@@ -159,7 +166,7 @@ export default function DashboardLayout() {
                       </div>
                       <p style={{ color: 'var(--shell-muted)', fontSize: 11, marginBottom: 12 }}>{planName} Plan</p>
                       <button
-                        onClick={() => navigate('/billing')}
+                        onClick={() => {navigate('/owner-dashboard/subscription');setMobileNavOpen(false)}}
                         style={{
                           width: '100%', padding: '8px 0', border: '1px solid var(--p-glow)',
                           borderRadius: 8, background: 'transparent', color: 'var(--p-pale)',
@@ -173,6 +180,9 @@ export default function DashboardLayout() {
             </aside>
           </div>
         )}
+
+        {/* Floating support widget — visible across all owner-dashboard pages */}
+        <SupportWidget />
 
       </div>
     </EmailRequiredGuard>

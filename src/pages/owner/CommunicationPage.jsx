@@ -10,7 +10,7 @@ import { Sk } from '../../components/ui/Skeleton'
 
 function CommunicationSkeleton() {
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div className="space-y-2"><Sk h={28} w={180} /><Sk h={14} w={280} /></div>
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
         <div className="space-y-1.5"><Sk h={16} w={100} /><Sk h={12} w={220} /></div>
@@ -167,7 +167,7 @@ export default function CommunicationPage() {
   if (loading || !prefs) return <CommunicationSkeleton />
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Announcements</h1>
         <p className="text-sm text-gray-500 mt-0.5">Manage how members and you receive messages.</p>

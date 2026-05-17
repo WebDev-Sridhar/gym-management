@@ -10,7 +10,7 @@ import { Sk } from '../../components/ui/Skeleton'
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <div className="flex items-center justify-between">
         <div className="space-y-2"><Sk h={28} w={160} /><Sk h={14} w={220} /></div>
         <Sk h={36} w={130} r={10} />
@@ -192,7 +192,7 @@ export default function OwnerDashboard() {
     : 0
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
 
       {/* Subscription warning */}
       {isExpiringSoon && (

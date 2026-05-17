@@ -26,6 +26,8 @@ import PaymentSettingsPage from './pages/owner/PaymentSettingsPage'
 import CommunicationPage from './pages/owner/CommunicationPage'
 import MessagesPage from './pages/owner/MessagesPage'
 import ProgramsPage from './pages/owner/ProgramsPage'
+import SubscriptionPage from './pages/owner/SubscriptionPage'
+import SupportPage from './pages/owner/SupportPage'
 import StarterWebsitePage from './pages/owner/StarterWebsitePage'
 import TrainerLayout from './components/layout/TrainerLayout'
 import MemberLayout from './components/layout/MemberLayout'
@@ -122,6 +124,8 @@ export default function App() {
             <Route path="communication" element={<CommunicationPage />} />
             <Route path="messages" element={<MessagesPage />} />
             <Route path="programs" element={<ProgramsPage />} />
+            <Route path="subscription" element={<SubscriptionPage />} />
+            <Route path="help" element={<SupportPage />} />
           </Route>
 
           {/* Trainer dashboard — keep-alive layout handles all sub-routes internally */}

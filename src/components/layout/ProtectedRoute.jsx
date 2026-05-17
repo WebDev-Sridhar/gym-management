@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 
 export default function ProtectedRoute({ allowedRoles, children }) {
-  const { isAuthenticated, profile, role, gymId, hasActiveSubscription, loading, initialized } = useAuth()
+  const { isAuthenticated, profile, role, gymId, loading, initialized } = useAuth()
 
   // Block ALL route decisions until the first auth check finishes.
   // Without this, a re-render between setSession() and loadProfile()
@@ -33,12 +33,11 @@ export default function ProtectedRoute({ allowedRoles, children }) {
     if (!gymId || !step || step === 'started') {
       return <Navigate to="/create-gym" replace />
     }
+    // Not yet subscribed (first-time onboarding) — send to billing flow
     if (step === 'gym_created' || step === 'setup_done') {
       return <Navigate to="/billing" replace />
     }
-    if (!hasActiveSubscription) {
-      return <Navigate to="/billing" replace />
-    }
+    // Subscription expired — stay in dashboard; upgrade banner handled in-app
   }
 
   // Role mismatch — send to the correct dashboard
