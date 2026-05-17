@@ -228,7 +228,7 @@ export default function Topbar({ onMenuToggle }) {
               const daysLeft  = expiresAt ? Math.ceil((expiresAt - new Date()) / 86400000) : null
 
               return (
-                <div style={{
+                <div data-profile-dropdown style={{
                   position: 'absolute', top: 'calc(100% + 14px)', right: -20,
                   width: 280, background: '#fff', borderRadius: 16,
                   boxShadow: '0 8px 40px rgba(0,0,0,0.18)', border: '1px solid #e5e7eb',
@@ -357,7 +357,7 @@ export default function Topbar({ onMenuToggle }) {
                   </div>
 
                   {/* Logout */}
-                  <div style={{ padding: '6px 8px 10px', borderTop: '1px solid #f3f4f6' }}>
+                  <div data-divider-top style={{ padding: '6px 8px 10px', borderTop: '1px solid #f3f4f6' }}>
                     <button onClick={handleLogout} style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                       padding: '9px 10px', borderRadius: 10, border: 'none', background: 'none',

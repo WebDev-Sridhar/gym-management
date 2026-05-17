@@ -17,6 +17,7 @@ import { assignTrainerToMember } from '../../services/trainerService'
 import { supabaseData as supabase } from '../../services/supabaseClient'
 import { markPaymentPaid } from '../../services/paymentService'
 import { sendPaymentReminder, fetchLastReminders } from '../../services/reminderService'
+import CustomSelect from './CustomSelect'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -150,11 +151,16 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
           </div>
           {changingTrainer ? (
             <div className="space-y-2">
-              <select value={selTrainer} onChange={e => setSelTrainer(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500">
-                <option value="">No trainer</option>
-                {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              <CustomSelect
+                compact
+                value={selTrainer}
+                onChange={setSelTrainer}
+                placeholder="No trainer"
+                options={[
+                  { value: '', label: 'No trainer' },
+                  ...trainers.map(t => ({ value: t.id, label: t.name })),
+                ]}
+              />
               <div className="flex gap-2">
                 <button onClick={saveTrainer} disabled={savingTrainer}
                   className="flex-1 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 cursor-pointer disabled:opacity-50">
@@ -263,13 +269,16 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
           </div>
           {changingPlan ? (
             <div className="space-y-2">
-              <select value={selPlanId} onChange={e => setSelPlanId(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500">
-                <option value="">Select plan…</option>
-                {plans.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} — ₹{p.price} / {p.duration_days}d</option>
-                ))}
-              </select>
+              <CustomSelect
+                compact
+                value={selPlanId}
+                onChange={setSelPlanId}
+                placeholder="Select plan…"
+                options={plans.map(p => ({
+                  value: p.id,
+                  label: `${p.name} — ₹${p.price} / ${p.duration_days}d`,
+                }))}
+              />
               <div className="flex gap-2">
                 <button onClick={handleSavePlan} disabled={!selPlanId || savingPlan}
                   className="flex-1 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 cursor-pointer disabled:opacity-50">
@@ -476,13 +485,18 @@ function PaymentsTab({ member, gymId }) {
         {isPending && (
           markingId === p.id ? (
             <div className="space-y-2 pt-2 border-t border-gray-200">
-              <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-500">
-                <option value="cash">Cash</option>
-                <option value="upi">UPI</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="card">Card</option>
-              </select>
+              <CustomSelect
+                compact
+                value={payMethod}
+                onChange={setPayMethod}
+                placeholder="Payment method"
+                options={[
+                  { value: 'cash',          label: 'Cash' },
+                  { value: 'upi',           label: 'UPI' },
+                  { value: 'bank_transfer', label: 'Bank Transfer' },
+                  { value: 'card',          label: 'Card' },
+                ]}
+              />
               <div className="flex gap-2">
                 <button onClick={() => handleMarkPaid(p.id)}
                   className="flex-1 py-2 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 cursor-pointer">
@@ -638,7 +652,7 @@ export default function MemberDrawer({
   const sc = memberStatus(local)
 
   const panel = (
-    <>
+    <div data-theme-aware="true">
       <div className="fixed inset-0 bg-black/25 z-40 backdrop-blur-[1px]" onClick={onClose} />
 
       <div
@@ -751,7 +765,7 @@ export default function MemberDrawer({
           </div>
         )}
       </div>
-    </>
+    </div>
   )
 
   return createPortal(panel, document.body)

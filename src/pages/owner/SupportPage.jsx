@@ -9,6 +9,7 @@ import {
   createTicket, fetchMyTickets, reopenTicket, uploadTicketScreenshot,
 } from '../../services/supportService'
 import FormModal from '../../components/ui/FormModal'
+import CustomSelect from '../../components/ui/CustomSelect'
 import { Sk } from '../../components/ui/Skeleton'
 import {
   Search, Sparkles, ArrowRight, X, Send, ChevronRight, ChevronDown,
@@ -1113,14 +1114,15 @@ function TicketModal({
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Category</label>
-            <select
+            <CustomSelect
               value={category}
-              onChange={e => setCategory(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 outline-none bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            >
-              {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
-              <option value="other">Other</option>
-            </select>
+              onChange={setCategory}
+              placeholder="Choose category"
+              options={[
+                ...categories.map(c => ({ value: c.slug, label: c.name })),
+                { value: 'other', label: 'Other' },
+              ]}
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Priority</label>

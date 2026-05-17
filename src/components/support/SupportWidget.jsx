@@ -8,6 +8,7 @@ import {
   fetchFaqCategoryCounts, incrementFaqView,
   createTicket, fetchMyTickets,
 } from '../../services/supportService'
+import CustomSelect from '../ui/CustomSelect'
 import {
   HelpCircle, X, Search, ArrowLeft, ChevronRight, Sparkles,
   MessageCircle, CheckCircle2, AlertTriangle, ThumbsUp, ThumbsDown,
@@ -859,24 +860,24 @@ function TicketView({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-[11px] font-medium text-gray-500 mb-1.5">Category</label>
-          <select
+          <CustomSelect
             value={category}
-            onChange={e => setCategory(e.target.value)}
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 outline-none bg-white focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
-          >
-            {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
-            <option value="other">Other</option>
-          </select>
+            onChange={setCategory}
+            placeholder="Choose category"
+            options={[
+              ...categories.map(c => ({ value: c.slug, label: c.name })),
+              { value: 'other', label: 'Other' },
+            ]}
+          />
         </div>
         <div>
           <label className="block text-[11px] font-medium text-gray-500 mb-1.5">Priority</label>
-          <select
+          <CustomSelect
             value={priority}
-            onChange={e => setPriority(e.target.value)}
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 outline-none bg-white focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
-          >
-            {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
+            onChange={setPriority}
+            placeholder="Pick a priority"
+            options={PRIORITIES.map(p => ({ value: p.value, label: p.label }))}
+          />
         </div>
       </div>
 

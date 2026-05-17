@@ -102,8 +102,10 @@ export default function CustomSelect({
         type="button"
         disabled={disabled}
         onClick={toggleDropdown}
-        className={`w-full flex items-center justify-between gap-2 ${px} ${py} ${textSz} bg-gray-50 border rounded-lg text-left transition-colors outline-none
-          ${open ? 'border-indigo-500 ring-1 ring-indigo-500 bg-white' : 'border-gray-200 hover:border-gray-300'}
+        className={`w-full flex items-center justify-between gap-2 ${px} ${py} ${textSz} border rounded-lg text-left transition-colors outline-none
+          ${open
+            ? 'border-indigo-500 ring-1 ring-indigo-500 bg-white'
+            : 'bg-gray-50 border-gray-200 hover:border-gray-300'}
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
       >
@@ -122,6 +124,7 @@ export default function CustomSelect({
       {open && createPortal(
         <div
           ref={dropdownRef}
+          data-theme-aware="true"
           style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, zIndex: 9999 }}
           className="bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
         >

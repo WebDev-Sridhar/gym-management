@@ -36,34 +36,36 @@ export default function FormModal({ title, onClose, children, wide = false, dark
     <div
       ref={backdropRef}
       onMouseDown={handleBackdrop}
+      data-theme-aware="true"
+      data-modal-root="form"
       className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
       style={{ background: d ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)' }}
     >
       <div
-        className={`relative w-full rounded-2xl shadow-2xl flex flex-col ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
+        className={`relative w-full rounded-2xl shadow-2xl flex flex-col bg-white border border-gray-200 ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
         style={{
           maxHeight: 'calc(100vh - 3rem)',
-          background: d ? '#0f1020' : '#ffffff',
-          border: d ? '1px solid rgba(255,255,255,0.08)' : 'none',
+          background: d ? '#0f1020' : undefined,
           fontFamily: d ? "'Plus Jakarta Sans', sans-serif" : undefined,
         }}
       >
         {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4 shrink-0"
-          style={{ borderBottom: d ? '1px solid rgba(255,255,255,0.06)' : '1px solid #f3f4f6' }}
-        >
-          <h3 style={{
-            fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-            color: d ? 'rgba(255,255,255,0.6)' : '#111827',
-          }}>{title}</h3>
+        <div className="flex items-center justify-between px-6 py-4 shrink-0 border-b border-gray-100">
+          <h3
+            className="text-gray-900"
+            style={{
+              fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+              color: d ? 'rgba(255,255,255,0.6)' : undefined,
+            }}
+          >{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
+            className="text-gray-400 hover:bg-gray-100"
             style={{
               background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 8,
-              color: d ? 'rgba(255,255,255,0.35)' : '#9ca3af',
+              color: d ? 'rgba(255,255,255,0.35)' : undefined,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >

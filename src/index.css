@@ -322,8 +322,11 @@ html.lenis body {
 [data-theme="dark"] .app-owner .bg-white               { background-color: var(--owner-surface) !important; }
 [data-theme="dark"] .app-owner .bg-gray-50             { background-color: var(--owner-surface-2) !important; }
 [data-theme="dark"] .app-owner .bg-gray-50\/60         { background-color: rgba(26,27,37,0.6) !important; }
+[data-theme="dark"] .app-owner .bg-gray-50\/50         { background-color: rgba(26,27,37,0.5) !important; }
 [data-theme="dark"] .app-owner .bg-gray-50\/40         { background-color: rgba(26,27,37,0.4) !important; }
 [data-theme="dark"] .app-owner .bg-gray-100            { background-color: var(--owner-surface-3) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-gray-50\/50:hover { background-color: rgba(255,255,255,0.035) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-gray-50\/40:hover { background-color: rgba(255,255,255,0.025) !important; }
 
 /* Tinted brand surfaces (badges, cards) — translucent over dark */
 [data-theme="dark"] .app-owner .bg-indigo-50           { background-color: rgba(99,102,241,0.14) !important; }
@@ -394,6 +397,58 @@ html.lenis body {
 [data-theme="dark"] .app-owner .border-gray-200       { border-color: var(--owner-border) !important; }
 [data-theme="dark"] .app-owner .border-gray-100       { border-color: var(--owner-border-subtle) !important; }
 [data-theme="dark"] .app-owner .border-gray-50        { border-color: var(--owner-border-faint) !important; }
+
+/* Explicit per-side overrides — defensive against Tailwind v4 cascade layers
+   that can outrank shorthand `border-color`. Covers tables (<tr>), thead
+   underlines, and any "row-1-divider" pattern. */
+[data-theme="dark"] .app-owner .border-gray-200,
+[data-theme="dark"] [data-theme-aware] .border-gray-200,
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).border-gray-200 {
+  border-top-color:    var(--owner-border) !important;
+  border-right-color:  var(--owner-border) !important;
+  border-bottom-color: var(--owner-border) !important;
+  border-left-color:   var(--owner-border) !important;
+}
+[data-theme="dark"] .app-owner .border-gray-100,
+[data-theme="dark"] [data-theme-aware] .border-gray-100,
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).border-gray-100 {
+  border-top-color:    var(--owner-border-subtle) !important;
+  border-right-color:  var(--owner-border-subtle) !important;
+  border-bottom-color: var(--owner-border-subtle) !important;
+  border-left-color:   var(--owner-border-subtle) !important;
+}
+[data-theme="dark"] .app-owner .border-gray-50,
+[data-theme="dark"] [data-theme-aware] .border-gray-50,
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).border-gray-50 {
+  border-top-color:    var(--owner-border-faint) !important;
+  border-right-color:  var(--owner-border-faint) !important;
+  border-bottom-color: var(--owner-border-faint) !important;
+  border-left-color:   var(--owner-border-faint) !important;
+}
+
+/* <tr> borders in modern browsers don't always paint a clean line when
+   border-collapse:separate. Move the bottom border to the cells themselves
+   inside dark mode so the header divider is consistent across all tables. */
+[data-theme="dark"] .app-owner table,
+[data-theme="dark"] [data-theme-aware] table { border-collapse: separate; border-spacing: 0; }
+
+[data-theme="dark"] .app-owner table thead tr.border-b,
+[data-theme="dark"] .app-owner table thead tr.border-b-2,
+[data-theme="dark"] [data-theme-aware] table thead tr.border-b,
+[data-theme="dark"] [data-theme-aware] table thead tr.border-b-2 { border-bottom-width: 0 !important; }
+
+[data-theme="dark"] .app-owner table thead tr.border-b > th,
+[data-theme="dark"] .app-owner table thead tr.border-b > td,
+[data-theme="dark"] [data-theme-aware] table thead tr.border-b > th,
+[data-theme="dark"] [data-theme-aware] table thead tr.border-b > td {
+  border-bottom: 1px solid var(--owner-border-subtle) !important;
+}
+[data-theme="dark"] .app-owner table thead tr.border-b.border-gray-200 > th,
+[data-theme="dark"] .app-owner table thead tr.border-b.border-gray-200 > td,
+[data-theme="dark"] [data-theme-aware] table thead tr.border-b.border-gray-200 > th,
+[data-theme="dark"] [data-theme-aware] table thead tr.border-b.border-gray-200 > td {
+  border-bottom: 1px solid var(--owner-border) !important;
+}
 [data-theme="dark"] .app-owner .border-gray-300       { border-color: rgba(255,255,255,0.10) !important; }
 [data-theme="dark"] .app-owner .border-indigo-100     { border-color: rgba(99,102,241,0.30) !important; }
 [data-theme="dark"] .app-owner .border-indigo-200     { border-color: rgba(99,102,241,0.40) !important; }
@@ -408,6 +463,33 @@ html.lenis body {
 
 [data-theme="dark"] .app-owner .divide-gray-50  > * + * { border-color: var(--owner-border-faint) !important; }
 [data-theme="dark"] .app-owner .divide-gray-100 > * + * { border-color: var(--owner-border-subtle) !important; }
+
+/* `divide-y` in Tailwind v4 may use any of several child selectors
+   (`> :not([hidden]) ~ :not([hidden])`, `> :not(:last-child)`,
+   `> * + *`, `> :where(:not(:last-child))`). Rather than mirror every
+   variant, brute-force every direct child — the rule only sets the
+   border-color, and divider children don't have visible borders elsewhere. */
+[data-theme="dark"] .app-owner .divide-gray-50  > *,
+[data-theme="dark"] [data-theme-aware] .divide-gray-50  > *,
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).divide-gray-50  > * {
+  border-top-color:    var(--owner-border-faint) !important;
+  border-bottom-color: var(--owner-border-faint) !important;
+  border-color:        var(--owner-border-faint) !important;
+}
+[data-theme="dark"] .app-owner .divide-gray-100 > *,
+[data-theme="dark"] [data-theme-aware] .divide-gray-100 > *,
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).divide-gray-100 > * {
+  border-top-color:    var(--owner-border-subtle) !important;
+  border-bottom-color: var(--owner-border-subtle) !important;
+  border-color:        var(--owner-border-subtle) !important;
+}
+[data-theme="dark"] .app-owner .divide-gray-200 > *,
+[data-theme="dark"] [data-theme-aware] .divide-gray-200 > *,
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).divide-gray-200 > * {
+  border-top-color:    var(--owner-border) !important;
+  border-bottom-color: var(--owner-border) !important;
+  border-color:        var(--owner-border) !important;
+}
 
 /* ── Hover backgrounds ─────────────────────────────────────────────────── */
 [data-theme="dark"] .app-owner .hover\:bg-gray-50:hover      { background-color: rgba(255,255,255,0.04) !important; }
@@ -433,7 +515,8 @@ html.lenis body {
 }
 
 /* ── Skeleton — owner skeleton uses the light gradient; swap for dark ─── */
-[data-theme="dark"] .app-owner .skeleton-shimmer {
+[data-theme="dark"] .app-owner .skeleton-shimmer,
+[data-theme="dark"] [data-theme-aware] .skeleton-shimmer {
   background: linear-gradient(
     90deg,
     rgba(255,255,255,0.04) 0%,
@@ -454,4 +537,306 @@ html.lenis body {
 [data-theme="dark"] .app-owner code.bg-gray-100 {
   background-color: rgba(255,255,255,0.08) !important;
   color: #e0e1ea !important;
+}
+
+/* ── Brighter dividers (subtle borders were too invisible in dark) ──── */
+:root[data-theme="dark"] {
+  --owner-border:         rgba(255,255,255,0.10);
+  --owner-border-subtle:  rgba(255,255,255,0.07);
+  --owner-border-faint:   rgba(255,255,255,0.05);
+}
+
+/* ── Additional colour ramps used in owner pages ─────────────────────── */
+[data-theme="dark"] .app-owner .bg-blue-50              { background-color: rgba(59,130,246,0.14) !important; }
+[data-theme="dark"] .app-owner .bg-blue-100             { background-color: rgba(59,130,246,0.22) !important; }
+[data-theme="dark"] .app-owner .text-blue-600           { color: #93c5fd !important; }
+[data-theme="dark"] .app-owner .text-blue-700           { color: #bfdbfe !important; }
+[data-theme="dark"] .app-owner .border-blue-200         { border-color: rgba(59,130,246,0.40) !important; }
+
+[data-theme="dark"] .app-owner .bg-purple-50            { background-color: rgba(168,85,247,0.14) !important; }
+[data-theme="dark"] .app-owner .bg-purple-100           { background-color: rgba(168,85,247,0.22) !important; }
+[data-theme="dark"] .app-owner .text-purple-600         { color: #d8b4fe !important; }
+[data-theme="dark"] .app-owner .text-purple-700         { color: #e9d5ff !important; }
+
+[data-theme="dark"] .app-owner .bg-teal-50              { background-color: rgba(20,184,166,0.14) !important; }
+[data-theme="dark"] .app-owner .bg-teal-100             { background-color: rgba(20,184,166,0.22) !important; }
+[data-theme="dark"] .app-owner .text-teal-600           { color: #5eead4 !important; }
+[data-theme="dark"] .app-owner .text-teal-700           { color: #99f6e4 !important; }
+
+[data-theme="dark"] .app-owner .bg-cyan-50              { background-color: rgba(6,182,212,0.14) !important; }
+[data-theme="dark"] .app-owner .text-cyan-600           { color: #67e8f9 !important; }
+
+[data-theme="dark"] .app-owner .bg-orange-50            { background-color: rgba(249,115,22,0.14) !important; }
+[data-theme="dark"] .app-owner .bg-orange-100           { background-color: rgba(249,115,22,0.22) !important; }
+[data-theme="dark"] .app-owner .text-orange-600         { color: #fdba74 !important; }
+
+[data-theme="dark"] .app-owner .bg-pink-50              { background-color: rgba(236,72,153,0.14) !important; }
+[data-theme="dark"] .app-owner .text-pink-600           { color: #f9a8d4 !important; }
+
+/* ── Recharts (grid lines, axis ticks) ────────────────────────────────── */
+[data-theme="dark"] .app-owner .recharts-cartesian-grid line {
+  stroke: rgba(255,255,255,0.06) !important;
+}
+[data-theme="dark"] .app-owner .recharts-cartesian-axis-line {
+  stroke: rgba(255,255,255,0.10) !important;
+}
+[data-theme="dark"] .app-owner .recharts-cartesian-axis-tick-line {
+  stroke: rgba(255,255,255,0.10) !important;
+}
+[data-theme="dark"] .app-owner .recharts-cartesian-axis-tick text,
+[data-theme="dark"] .app-owner .recharts-text {
+  fill: var(--owner-text-5) !important;
+}
+[data-theme="dark"] .app-owner .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: var(--owner-surface) !important;
+  border-color: var(--owner-border) !important;
+  color: var(--owner-text) !important;
+}
+[data-theme="dark"] .app-owner .recharts-default-tooltip .recharts-tooltip-label,
+[data-theme="dark"] .app-owner .recharts-default-tooltip .recharts-tooltip-item {
+  color: var(--owner-text-3) !important;
+}
+
+/* Custom tooltip components rendered inside the wrapper use bg-white +
+   border-gray-200; force them onto the dark surface even though Recharts
+   may inject its own positioning wrapper. */
+[data-theme="dark"] .app-owner .recharts-tooltip-wrapper,
+[data-theme="dark"] .app-owner .recharts-tooltip-wrapper > * {
+  background-color: transparent !important;
+}
+[data-theme="dark"] .app-owner .recharts-tooltip-wrapper .bg-white {
+  background-color: var(--owner-surface) !important;
+}
+[data-theme="dark"] .app-owner .recharts-tooltip-wrapper .border-gray-200 {
+  border-color: var(--owner-border) !important;
+}
+[data-theme="dark"] .app-owner .recharts-tooltip-wrapper .text-gray-500 {
+  color: var(--owner-text-5) !important;
+}
+
+/* Active hover dot/bar fill on bar+area charts can also appear bright */
+[data-theme="dark"] .app-owner .recharts-rectangle.recharts-tooltip-cursor,
+[data-theme="dark"] .app-owner .recharts-tooltip-cursor {
+  fill: rgba(255,255,255,0.06) !important;
+  stroke: rgba(255,255,255,0.10) !important;
+}
+
+/* Pie chart sector hover stroke */
+[data-theme="dark"] .app-owner .recharts-pie-sector path {
+  stroke: var(--owner-surface) !important;
+}
+
+/* Legend text */
+[data-theme="dark"] .app-owner .recharts-legend-item-text {
+  color: var(--owner-text-4) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   PORTAL-RENDERED COMPONENTS (modals, drawers, dropdowns)
+   These render into document.body, OUTSIDE `.app-owner`. We mark them with
+   `data-theme-aware="true"` so the same dark overrides apply.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* `:where(..., ...)` matches the element itself OR any descendant — fixes the
+   case where `data-theme-aware` and the utility class live on the SAME element
+   (e.g. CustomSelect's portal root has `data-theme-aware bg-white`). */
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-white               { background-color: var(--owner-surface) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-gray-50             { background-color: var(--owner-surface-2) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-gray-50\/60         { background-color: rgba(26,27,37,0.6) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-gray-100            { background-color: var(--owner-surface-3) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-indigo-50           { background-color: rgba(99,102,241,0.14) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-indigo-100          { background-color: rgba(99,102,241,0.22) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-emerald-50          { background-color: rgba(16,185,129,0.14) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-amber-50            { background-color: rgba(245,158,11,0.14) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-red-50              { background-color: rgba(239,68,68,0.14) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-blue-50             { background-color: rgba(59,130,246,0.14) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).bg-blue-100            { background-color: rgba(59,130,246,0.22) !important; }
+
+[data-theme="dark"] [data-theme-aware] .text-gray-900          { color: var(--owner-text)   !important; }
+[data-theme="dark"] [data-theme-aware] .text-gray-800          { color: var(--owner-text-2) !important; }
+[data-theme="dark"] [data-theme-aware] .text-gray-700          { color: var(--owner-text-3) !important; }
+[data-theme="dark"] [data-theme-aware] .text-gray-600          { color: var(--owner-text-4) !important; }
+[data-theme="dark"] [data-theme-aware] .text-gray-500          { color: var(--owner-text-5) !important; }
+[data-theme="dark"] [data-theme-aware] .text-gray-400          { color: var(--owner-text-6) !important; }
+[data-theme="dark"] [data-theme-aware] .text-gray-300          { color: var(--owner-text-7) !important; }
+[data-theme="dark"] [data-theme-aware] .text-indigo-600        { color: #a5b4fc !important; }
+[data-theme="dark"] [data-theme-aware] .text-indigo-700        { color: #c7d2fe !important; }
+[data-theme="dark"] [data-theme-aware] .text-indigo-800        { color: #e0e7ff !important; }
+[data-theme="dark"] [data-theme-aware] .text-indigo-900        { color: #eef2ff !important; }
+[data-theme="dark"] [data-theme-aware] .text-violet-600        { color: #c4b5fd !important; }
+[data-theme="dark"] [data-theme-aware] .text-violet-700        { color: #ddd6fe !important; }
+[data-theme="dark"] [data-theme-aware] .text-purple-600        { color: #d8b4fe !important; }
+[data-theme="dark"] [data-theme-aware] .text-red-500           { color: #fca5a5 !important; }
+[data-theme="dark"] [data-theme-aware] .text-red-600           { color: #fca5a5 !important; }
+[data-theme="dark"] [data-theme-aware] .text-red-700           { color: #fecaca !important; }
+[data-theme="dark"] [data-theme-aware] .text-emerald-600       { color: #6ee7b7 !important; }
+[data-theme="dark"] [data-theme-aware] .text-emerald-700       { color: #a7f3d0 !important; }
+[data-theme="dark"] [data-theme-aware] .text-green-600         { color: #6ee7b7 !important; }
+[data-theme="dark"] [data-theme-aware] .text-green-700         { color: #a7f3d0 !important; }
+[data-theme="dark"] [data-theme-aware] .text-amber-600         { color: #fcd34d !important; }
+[data-theme="dark"] [data-theme-aware] .text-amber-700         { color: #fde68a !important; }
+[data-theme="dark"] [data-theme-aware] .text-amber-800         { color: #fef3c7 !important; }
+[data-theme="dark"] [data-theme-aware] .text-blue-600          { color: #93c5fd !important; }
+[data-theme="dark"] [data-theme-aware] .text-blue-700          { color: #bfdbfe !important; }
+[data-theme="dark"] [data-theme-aware] .text-teal-600          { color: #5eead4 !important; }
+[data-theme="dark"] [data-theme-aware] .text-orange-600        { color: #fdba74 !important; }
+[data-theme="dark"] [data-theme-aware] .text-pink-600          { color: #f9a8d4 !important; }
+[data-theme="dark"] [data-theme-aware] .text-sky-600           { color: #7dd3fc !important; }
+[data-theme="dark"] [data-theme-aware] .text-rose-600          { color: #fda4af !important; }
+
+[data-theme="dark"] [data-theme-aware] .bg-violet-50           { background-color: rgba(139,92,246,0.14) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-violet-100          { background-color: rgba(139,92,246,0.22) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-purple-50           { background-color: rgba(168,85,247,0.14) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-purple-100          { background-color: rgba(168,85,247,0.22) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-emerald-100         { background-color: rgba(16,185,129,0.22) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-green-50            { background-color: rgba(16,185,129,0.14) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-amber-100           { background-color: rgba(245,158,11,0.22) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-red-100             { background-color: rgba(239,68,68,0.22) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-sky-50              { background-color: rgba(14,165,233,0.14) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-rose-50             { background-color: rgba(244,63,94,0.14) !important; }
+
+[data-theme="dark"] [data-theme-aware] .border-indigo-200      { border-color: rgba(99,102,241,0.40) !important; }
+[data-theme="dark"] [data-theme-aware] .border-emerald-100     { border-color: rgba(16,185,129,0.30) !important; }
+[data-theme="dark"] [data-theme-aware] .border-emerald-200     { border-color: rgba(16,185,129,0.40) !important; }
+[data-theme="dark"] [data-theme-aware] .border-amber-200       { border-color: rgba(245,158,11,0.40) !important; }
+[data-theme="dark"] [data-theme-aware] .border-red-200         { border-color: rgba(239,68,68,0.40) !important; }
+[data-theme="dark"] [data-theme-aware] .border-dashed          { border-color: rgba(255,255,255,0.12) !important; }
+[data-theme="dark"] [data-theme-aware] .border-gray-300        { border-color: rgba(255,255,255,0.10) !important; }
+
+[data-theme="dark"] [data-theme-aware] .bg-indigo-50\/30       { background-color: rgba(99,102,241,0.06) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-indigo-50\/50       { background-color: rgba(99,102,241,0.10) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-indigo-50\/60       { background-color: rgba(99,102,241,0.12) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-gray-50\/50         { background-color: rgba(26,27,37,0.5) !important; }
+[data-theme="dark"] [data-theme-aware] .bg-gray-50\/40         { background-color: rgba(26,27,37,0.4) !important; }
+[data-theme="dark"] [data-theme-aware] mark.bg-indigo-100      { background-color: rgba(99,102,241,0.30) !important; color: #e0e7ff !important; }
+[data-theme="dark"] [data-theme-aware] code.bg-gray-100        { background-color: rgba(255,255,255,0.08) !important; color: #e0e1ea !important; }
+
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).border-gray-200        { border-color: var(--owner-border) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).border-gray-100        { border-color: var(--owner-border-subtle) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).border-gray-50         { border-color: var(--owner-border-faint) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).border-red-100         { border-color: rgba(239,68,68,0.30) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).border-indigo-100      { border-color: rgba(99,102,241,0.30) !important; }
+[data-theme="dark"] :where([data-theme-aware], [data-theme-aware] *).border-amber-100       { border-color: rgba(245,158,11,0.30) !important; }
+
+[data-theme="dark"] [data-theme-aware] .divide-gray-50  > * + * { border-color: var(--owner-border-faint) !important; }
+[data-theme="dark"] [data-theme-aware] .divide-gray-100 > * + * { border-color: var(--owner-border-subtle) !important; }
+
+[data-theme="dark"] [data-theme-aware] .hover\:bg-gray-50:hover      { background-color: rgba(255,255,255,0.04) !important; }
+[data-theme="dark"] [data-theme-aware] .hover\:bg-gray-50\/60:hover  { background-color: rgba(255,255,255,0.03) !important; }
+[data-theme="dark"] [data-theme-aware] .hover\:bg-gray-100:hover     { background-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] [data-theme-aware] .hover\:bg-indigo-50:hover    { background-color: rgba(99,102,241,0.20) !important; }
+[data-theme="dark"] [data-theme-aware] .hover\:bg-red-50:hover       { background-color: rgba(239,68,68,0.18) !important; }
+
+[data-theme="dark"] [data-theme-aware] .placeholder-gray-400::placeholder { color: var(--owner-text-6) !important; }
+[data-theme="dark"] [data-theme-aware] .placeholder-gray-300::placeholder { color: var(--owner-text-7) !important; }
+[data-theme="dark"] [data-theme-aware] input,
+[data-theme="dark"] [data-theme-aware] textarea,
+[data-theme="dark"] [data-theme-aware] select { color-scheme: dark; }
+
+/* ── FormModal explicit overrides ─────────────────────────────────────── */
+[data-theme="dark"] [data-theme-aware][data-modal-root="form"] > div {
+  background: var(--owner-surface) !important;
+}
+[data-theme="dark"] [data-theme-aware][data-modal-root="form"] > div > div:first-child {
+  border-bottom-color: var(--owner-border-subtle) !important;
+}
+
+/* ── Profile dropdown (Topbar inline styles) ──────────────────────────── */
+[data-theme="dark"] .app-owner [data-profile-dropdown] {
+  background: var(--owner-surface) !important;
+  border-color: var(--owner-border) !important;
+}
+/* Header gradient → dark indigo tint */
+[data-theme="dark"] .app-owner [data-profile-dropdown] > div:first-child {
+  background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(99,102,241,0.10)) !important;
+  border-bottom-color: var(--owner-border-subtle) !important;
+}
+/* All children with hard-coded light borderBottom */
+[data-theme="dark"] .app-owner [data-profile-dropdown] > div {
+  border-bottom-color: var(--owner-border-subtle) !important;
+}
+[data-theme="dark"] .app-owner [data-profile-dropdown] [data-divider-top] {
+  border-top-color: var(--owner-border-subtle) !important;
+}
+/* Force any inline-styled text into the dark palette */
+[data-theme="dark"] .app-owner [data-profile-dropdown] p,
+[data-theme="dark"] .app-owner [data-profile-dropdown] span,
+[data-theme="dark"] .app-owner [data-profile-dropdown] button {
+  color: var(--owner-text-3) !important;
+}
+[data-theme="dark"] .app-owner [data-profile-dropdown] p[style*="111827"] {
+  color: var(--owner-text) !important;
+}
+[data-theme="dark"] .app-owner [data-profile-dropdown] p[style*="6b7280"],
+[data-theme="dark"] .app-owner [data-profile-dropdown] span[style*="9ca3af"] {
+  color: var(--owner-text-5) !important;
+}
+[data-theme="dark"] .app-owner [data-profile-dropdown] button:hover {
+  background: rgba(255,255,255,0.04) !important;
+}
+/* Logout button stays red */
+[data-theme="dark"] .app-owner [data-profile-dropdown] [data-divider-top] button {
+  color: #fca5a5 !important;
+}
+[data-theme="dark"] .app-owner [data-profile-dropdown] [data-divider-top] button:hover {
+  background: rgba(239,68,68,0.12) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NUCLEAR OVERRIDE — guaranteed-final-word border colour rules
+   ───────────────────────────────────────────────────────────────────────────
+   These selectors chain `html[data-theme="dark"]` for max specificity
+   (id+attr+class+class) and target both `.app-owner` and `[data-theme-aware]`
+   contexts. They must come last in this file so they win the cascade
+   regardless of Tailwind v4's layer order or any future utility additions.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="dark"] .app-owner .border-gray-50,
+html[data-theme="dark"] [data-theme-aware] .border-gray-50,
+html[data-theme="dark"] [data-theme-aware].border-gray-50 {
+  border-color:        var(--owner-border-faint) !important;
+  border-top-color:    var(--owner-border-faint) !important;
+  border-right-color:  var(--owner-border-faint) !important;
+  border-bottom-color: var(--owner-border-faint) !important;
+  border-left-color:   var(--owner-border-faint) !important;
+}
+html[data-theme="dark"] .app-owner .border-gray-100,
+html[data-theme="dark"] [data-theme-aware] .border-gray-100,
+html[data-theme="dark"] [data-theme-aware].border-gray-100 {
+  border-color:        var(--owner-border-subtle) !important;
+  border-top-color:    var(--owner-border-subtle) !important;
+  border-right-color:  var(--owner-border-subtle) !important;
+  border-bottom-color: var(--owner-border-subtle) !important;
+  border-left-color:   var(--owner-border-subtle) !important;
+}
+html[data-theme="dark"] .app-owner .border-gray-200,
+html[data-theme="dark"] [data-theme-aware] .border-gray-200,
+html[data-theme="dark"] [data-theme-aware].border-gray-200 {
+  border-color:        var(--owner-border) !important;
+  border-top-color:    var(--owner-border) !important;
+  border-right-color:  var(--owner-border) !important;
+  border-bottom-color: var(--owner-border) !important;
+  border-left-color:   var(--owner-border) !important;
+}
+
+/* divide-y children — direct child selector, brute-force every utility class */
+html[data-theme="dark"] .app-owner .divide-gray-50  > *,
+html[data-theme="dark"] [data-theme-aware] .divide-gray-50  > *,
+html[data-theme="dark"] [data-theme-aware].divide-gray-50  > * {
+  border-top-color:    var(--owner-border-faint) !important;
+  border-bottom-color: var(--owner-border-faint) !important;
+  border-color:        var(--owner-border-faint) !important;
+}
+html[data-theme="dark"] .app-owner .divide-gray-100 > *,
+html[data-theme="dark"] [data-theme-aware] .divide-gray-100 > *,
+html[data-theme="dark"] [data-theme-aware].divide-gray-100 > * {
+  border-top-color:    var(--owner-border-subtle) !important;
+  border-bottom-color: var(--owner-border-subtle) !important;
+  border-color:        var(--owner-border-subtle) !important;
+}
+html[data-theme="dark"] .app-owner .divide-gray-200 > *,
+html[data-theme="dark"] [data-theme-aware] .divide-gray-200 > *,
+html[data-theme="dark"] [data-theme-aware].divide-gray-200 > * {
+  border-top-color:    var(--owner-border) !important;
+  border-bottom-color: var(--owner-border) !important;
+  border-color:        var(--owner-border) !important;
 }

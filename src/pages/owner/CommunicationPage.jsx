@@ -7,6 +7,7 @@ import {
 import { useDialog } from '../../components/ui/Dialog'
 import Pagination from '../../components/ui/Pagination'
 import { Sk } from '../../components/ui/Skeleton'
+import CustomSelect from '../../components/ui/CustomSelect'
 
 function CommunicationSkeleton() {
   return (
@@ -243,24 +244,30 @@ export default function CommunicationPage() {
             <p className="text-xs text-gray-500 mt-0.5">Last 50 notifications across all channels</p>
           </div>
           <div className="flex items-center gap-2">
-            <select
+            <CustomSelect
+              compact
+              className="w-36"
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-indigo-500"
-            >
-              <option value="">All types</option>
-              {Object.entries(TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <select
+              onChange={setFilterType}
+              placeholder="All types"
+              options={[
+                { value: '', label: 'All types' },
+                ...Object.entries(TYPE_LABEL).map(([k, v]) => ({ value: k, label: v })),
+              ]}
+            />
+            <CustomSelect
+              compact
+              className="w-36"
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-indigo-500"
-            >
-              <option value="">All statuses</option>
-              <option value="sent">Sent</option>
-              <option value="partial">Partial</option>
-              <option value="failed">Failed</option>
-            </select>
+              onChange={setFilterStatus}
+              placeholder="All statuses"
+              options={[
+                { value: '',        label: 'All statuses' },
+                { value: 'sent',    label: 'Sent' },
+                { value: 'partial', label: 'Partial' },
+                { value: 'failed',  label: 'Failed' },
+              ]}
+            />
           </div>
         </div>
 
