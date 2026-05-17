@@ -4,8 +4,10 @@ import { useAuth } from '../../store/AuthContext'
 import { fetchContactMessages, markMessageRead, markAllMessagesRead } from '../../services/contactService'
 import {
   Home, ChevronDown, Bell, LayoutDashboard, CreditCard, Globe, Menu,
-  Settings, LogOut, User, Gem, CheckCircle2, AlertCircle, Clock,HelpCircle,
+  Settings, LogOut, User, Gem, CheckCircle2, AlertCircle, Clock, HelpCircle,
+  Sun, Moon,
 } from 'lucide-react'
+import { useTheme } from '../../store/ThemeContext'
 
 const NAV_LINKS = [
   { to: '/owner-dashboard/home',            label: 'Home',          Icon: Home },
@@ -35,6 +37,7 @@ function statusConfig(status) {
 export default function Topbar({ onMenuToggle }) {
   const navigate  = useNavigate()
   const { gymId, role, profile, subscription, gymName, logout } = useAuth()
+  const { isDark, toggle: toggleTheme } = useTheme()
   const isOwner   = role === 'owner'
 
   const [enquiries, setEnquiries]     = useState([])
@@ -298,7 +301,7 @@ export default function Topbar({ onMenuToggle }) {
                     {[
                       { Icon: User,     label: 'Account Settings',     action: () => { setProfileOpen(false); navigate('/owner-dashboard/settings') } },
                       { Icon: Gem,      label: 'Manage Subscription',  action: () => { setProfileOpen(false); navigate('/owner-dashboard/subscription') } },
-                      { Icon: HelpCircle, label: 'Help Center',     action: () => { setProfileOpen(false); navigate('/owner-dashboard/help') } },
+                      { Icon: HelpCircle, label: 'Help Center',        action: () => { setProfileOpen(false); navigate('/owner-dashboard/help') } },
                     ].map(({ Icon: ItemIcon, label, action }) => (
                       <button key={label} onClick={action} style={{
                         width: '100%', display: 'flex', alignItems: 'center', gap: 10,
@@ -314,6 +317,43 @@ export default function Topbar({ onMenuToggle }) {
                         {label}
                       </button>
                     ))}
+
+                    {/* Dark mode toggle row */}
+                    <button
+                      onClick={toggleTheme}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '9px 10px', borderRadius: 10, border: 'none', background: 'none',
+                        cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                        color: '#374151', fontSize: 13, fontWeight: 500,
+                        transition: 'background 0.12s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      {isDark
+                        ? <Sun  size={15} strokeWidth={1.9} color="#9ca3af" />
+                        : <Moon size={15} strokeWidth={1.9} color="#9ca3af" />
+                      }
+                      <span style={{ flex: 1 }}>{isDark ? 'Light mode' : 'Dark mode'}</span>
+                      <span
+                        aria-hidden
+                        style={{
+                          position: 'relative', width: 28, height: 16, borderRadius: 9999,
+                          background: isDark ? '#4f46e5' : '#d1d5db',
+                          transition: 'background 0.18s',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span style={{
+                          position: 'absolute', top: 2, left: 2,
+                          width: 12, height: 12, borderRadius: 9999, background: '#fff',
+                          transform: isDark ? 'translateX(12px)' : 'translateX(0)',
+                          transition: 'transform 0.18s',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                        }} />
+                      </span>
+                    </button>
                   </div>
 
                   {/* Logout */}

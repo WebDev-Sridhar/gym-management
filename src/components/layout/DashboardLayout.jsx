@@ -64,7 +64,7 @@ export default function DashboardLayout() {
 
   return (
     <EmailRequiredGuard>
-      <div className="flex flex-col h-screen overflow-hidden" style={{ background: '#f1f5f9' }}>
+      <div className="app-owner flex flex-col h-screen overflow-hidden" style={{ background: 'var(--app-canvas-bg)' }}>
 
         {/* Topbar — always full-width, no layout shift */}
         <Topbar onMenuToggle={() => setMobileNavOpen(v => !v)} />

@@ -10,7 +10,9 @@ import {
   Users, MessageSquare, ClipboardList, Zap, Copy, Check,
   ExternalLink, LogOut, Mail, Phone, MapPin, ChevronRight,
   Bell, HelpCircle, AlertTriangle, CheckCircle, Lock, Pencil, X,
+  Palette, Sun, Moon, Monitor,
 } from 'lucide-react'
+import { useTheme } from '../../store/ThemeContext'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function fmtDate(iso) {
@@ -151,6 +153,7 @@ function SettingsSkeleton() {
 export default function SettingsPage() {
   const navigate    = useNavigate()
   const { user, profile, gymId, gymName, subscription, logout, refreshProfile } = useAuth()
+  const { theme, setTheme } = useTheme()
 
   const [loading, setLoading]         = useState(true)
   const [gym, setGym]                 = useState(null)
@@ -668,6 +671,62 @@ export default function SettingsPage() {
                   {signingOut ? 'Signing out…' : 'Sign out of this session'}
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Appearance */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center gap-2 mb-5">
+              <Palette size={15} className="text-indigo-600" />
+              <h2 className="text-sm font-semibold text-gray-900">Appearance</h2>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Pick how the dashboard looks. Your choice is remembered on this browser.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { value: 'light', label: 'Light', Icon: Sun,
+                  preview: { bg: '#f1f5f9', card: '#ffffff', text: '#0f172a', border: '#e5e7eb' } },
+                { value: 'dark',  label: 'Dark',  Icon: Moon,
+                  preview: { bg: '#0a0b14', card: '#15161f', text: '#f4f4f8', border: 'rgba(255,255,255,0.08)' } },
+                { value: 'system', label: 'System', Icon: Monitor, disabled: true,
+                  preview: { bg: 'linear-gradient(135deg,#f1f5f9 50%,#0a0b14 50%)', card: 'linear-gradient(135deg,#fff 50%,#15161f 50%)', text: '#6366f1', border: 'rgba(99,102,241,0.3)' } },
+              ].map(({ value, label, Icon, preview, disabled }) => {
+                const isActive = theme === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => !disabled && setTheme(value)}
+                    title={disabled ? 'Coming soon' : `Use ${label.toLowerCase()} mode`}
+                    className={`relative p-3 rounded-xl border-2 text-left transition-all ${
+                      isActive
+                        ? 'border-indigo-500 bg-indigo-50/40'
+                        : 'border-gray-200 hover:border-indigo-300'
+                    } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    {/* Mini preview card */}
+                    <div
+                      className="w-full h-12 rounded-lg mb-2.5 relative overflow-hidden border"
+                      style={{ background: preview.bg, borderColor: preview.border }}
+                    >
+                      <div
+                        className="absolute left-1.5 right-1.5 bottom-1.5 h-5 rounded-md flex items-center px-2 gap-1"
+                        style={{ background: preview.card, border: `1px solid ${preview.border}` }}
+                      >
+                        <div className="w-1 h-1 rounded-full" style={{ background: preview.text, opacity: 0.7 }} />
+                        <div className="flex-1 h-1 rounded-full" style={{ background: preview.text, opacity: 0.18 }} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Icon size={12} className={isActive ? 'text-indigo-600' : 'text-gray-400'} />
+                      <span className={`text-xs font-semibold ${isActive ? 'text-indigo-700' : 'text-gray-700'}`}>{label}</span>
+                      {disabled && <span className="ml-auto text-[9px] font-bold text-amber-700 uppercase tracking-wide">Soon</span>}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 

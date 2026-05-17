@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './store/AuthContext'
+import { ThemeProvider } from './store/ThemeContext'
 import { DialogProvider } from './components/ui/Dialog'
 import DashboardLayout from './components/layout/DashboardLayout'
 import ProtectedRoute from './components/layout/ProtectedRoute'
@@ -71,6 +72,7 @@ export default function App() {
       <ScrollToTop />
       <DialogProvider>
       <AuthProvider>
+        <ThemeProvider>
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<LandingPage />} />
@@ -152,6 +154,7 @@ export default function App() {
             <Route path="join" element={<GymJoinPage />} />
           </Route>
         </Routes>
+        </ThemeProvider>
       </AuthProvider>
       </DialogProvider>
     </BrowserRouter>
