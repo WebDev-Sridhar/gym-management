@@ -550,7 +550,7 @@ function HomeView({
       {/* Category chips */}
       <div>
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Categories</p>
-        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+        <div className="support-categories-scroll flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
           {categories.map(c => {
             const Icon = getCategoryIcon(c.icon)
             return (

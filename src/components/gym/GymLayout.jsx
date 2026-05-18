@@ -86,7 +86,7 @@ function GymLayoutInner() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-10 mb-12">
 
             {/* Brand + social */}
-            <div className="sm:col-span-2 md:col-span-5">
+            <div className="sm:col-span-2 md:col-span-4">
               <div className="flex items-center gap-3 mb-5">
                 {gym.logo_url ? (
                   <img src={gym.logo_url} alt={gym.name} className="w-10 h-10 rounded-xl object-cover" />
@@ -125,7 +125,7 @@ function GymLayoutInner() {
             </div>
 
             {/* Navigate */}
-            <div className="md:col-span-3 md:col-start-7">
+            <div className="md:col-span-2">
               <h4 className="text-xs tracking-[0.2em] uppercase mb-5 font-sans font-bold" style={{ color: 'var(--gym-text-muted)' }}>Navigate</h4>
               <ul className="space-y-3">
                 {[
@@ -134,6 +134,32 @@ function GymLayoutInner() {
                   { to: `${base}/pricing`, label: 'Pricing' },
                   { to: `${base}/trainers`, label: 'Trainers' },
                   { to: `${base}/contact`, label: 'Contact' },
+                ].map(link => (
+                  <li key={link.to}>
+                    <a
+                      href={link.to}
+                      className="text-sm transition-colors duration-200"
+                      style={{ color: 'var(--gym-text-secondary)' }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div className="md:col-span-3">
+              <h4 className="text-xs tracking-[0.2em] uppercase mb-5 font-sans font-bold" style={{ color: 'var(--gym-text-muted)' }}>Legal</h4>
+              <ul className="space-y-3">
+                {[
+                  { to: `${base}/privacy`, label: 'Privacy Policy' },
+                  { to: `${base}/terms`, label: 'Terms & Conditions' },
+                  { to: `${base}/refund`, label: 'Refund & Cancellation' },
+                  { to: `${base}/membership`, label: 'Membership Agreement' },
+                  { to: `${base}/waiver`, label: 'Health & Liability Waiver' },
                 ].map(link => (
                   <li key={link.to}>
                     <a

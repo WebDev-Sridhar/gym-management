@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './store/AuthContext'
 import { ThemeProvider } from './store/ThemeContext'
@@ -8,7 +9,7 @@ import PublicRoute from './components/layout/PublicRoute'
 import LandingPage from './pages/landing/LandingPage'
 import LoginPage from './pages/auth/LoginPage'
 import SignupPage from './pages/auth/SignupPage'
-import ResetPasswordPage from './pages/auth/ResetPasswordPage'  
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import CreateGymPage from './pages/auth/CreateGymPage'
 import OnboardingPage from './pages/auth/OnboardingPage'
 import BillingPage from './pages/auth/BillingPage'
@@ -42,19 +43,29 @@ import GymTrainers from './pages/gym/GymTrainers'
 import GymContact from './pages/gym/GymContact'
 import GymLoginPage from './pages/gym/GymLoginPage'
 import GymJoinPage from './pages/gym/GymJoinPage'
-import FeaturesPage from './pages/landing/FeaturesPage'
-import PricingPage from './pages/landing/PricingPage'
-import DemoPage from './pages/landing/DemoPage'
-import ChangelogPage from './pages/landing/ChangelogPage'
-import AboutPage from './pages/landing/AboutPage'
-import BlogPage from './pages/landing/BlogPage'
-import CareersPage from './pages/landing/CareersPage'
-import ContactPage from './pages/landing/ContactPage'
-import PrivacyPage from './pages/landing/PrivacyPage'
-import TermsPage from './pages/landing/TermsPage'
-import SecurityPage from './pages/landing/SecurityPage'
-import RefundPolicyPage from './pages/landing/RefundPolicyPage'
 import ScrollToTop from './ScrollToTop'
+import { ROUTES } from './lib/constants/routes'
+
+// Lazy-load marketing & legal pages — they're public, not the hot path.
+const FeaturesPage = lazy(() => import('./pages/landing/FeaturesPage'))
+const PricingPage = lazy(() => import('./pages/landing/PricingPage'))
+const DemoPage = lazy(() => import('./pages/landing/DemoPage'))
+const ChangelogPage = lazy(() => import('./pages/landing/ChangelogPage'))
+const AboutPage = lazy(() => import('./pages/landing/AboutPage'))
+const BlogPage = lazy(() => import('./pages/landing/BlogPage'))
+const CareersPage = lazy(() => import('./pages/landing/CareersPage'))
+const ContactPage = lazy(() => import('./pages/landing/ContactPage'))
+const PrivacyPage = lazy(() => import('./pages/landing/PrivacyPage'))
+const TermsPage = lazy(() => import('./pages/landing/TermsPage'))
+const SecurityPage = lazy(() => import('./pages/landing/SecurityPage'))
+const RefundPolicyPage = lazy(() => import('./pages/landing/RefundPolicyPage'))
+
+// Per-gym public legal pages — same content template, gym data injected at runtime
+const GymPrivacyPage = lazy(() => import('./pages/gym/legal/GymPrivacyPage'))
+const GymTermsPage = lazy(() => import('./pages/gym/legal/GymTermsPage'))
+const GymRefundPage = lazy(() => import('./pages/gym/legal/GymRefundPage'))
+const GymMembershipPage = lazy(() => import('./pages/gym/legal/GymMembershipPage'))
+const GymWaiverPage = lazy(() => import('./pages/gym/legal/GymWaiverPage'))
 
 
 function WebsitePageRouter() {
@@ -73,34 +84,35 @@ export default function App() {
       <DialogProvider>
       <AuthProvider>
         <ThemeProvider>
+        <Suspense fallback={null}>
         <Routes>
           {/* Public routes */}
-          <Route path="/" element={<LandingPage />} />
+          <Route path={ROUTES.HOME} element={<LandingPage />} />
           <Route path="/checkin" element={<CheckinPage />} />
           <Route path="/pay/:token" element={<PayLandingPage />} />
-          <Route path="/features" element={<FeaturesPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/demo" element={<DemoPage />} />
-        <Route path="/changelog" element={<ChangelogPage />} />
+          <Route path={ROUTES.FEATURES} element={<FeaturesPage />} />
+          <Route path={ROUTES.PRICING} element={<PricingPage />} />
+          <Route path={ROUTES.DEMO} element={<DemoPage />} />
+          <Route path={ROUTES.CHANGELOG} element={<ChangelogPage />} />
 
-<Route path="/about" element={<AboutPage />} />
-<Route path="/blog" element={<BlogPage />} />
-<Route path="/careers" element={<CareersPage />} />
-<Route path="/contact" element={<ContactPage />} />
+          <Route path={ROUTES.ABOUT} element={<AboutPage />} />
+          <Route path={ROUTES.BLOG} element={<BlogPage />} />
+          <Route path={ROUTES.CAREERS} element={<CareersPage />} />
+          <Route path={ROUTES.CONTACT} element={<ContactPage />} />
 
-<Route path="/privacy" element={<PrivacyPage />} />
-<Route path="/terms" element={<TermsPage />} />
-<Route path="/security" element={<SecurityPage />} />
-<Route path="/refund-policy" element={<RefundPolicyPage />} />
+          <Route path={ROUTES.LEGAL.PRIVACY} element={<PrivacyPage />} />
+          <Route path={ROUTES.LEGAL.TERMS} element={<TermsPage />} />
+          <Route path={ROUTES.LEGAL.SECURITY} element={<SecurityPage />} />
+          <Route path={ROUTES.LEGAL.REFUND} element={<RefundPolicyPage />} />
 
           {/* Auth & onboarding flow */}
-          <Route path="/login" element={
+          <Route path={ROUTES.AUTH.LOGIN} element={
             <PublicRoute><LoginPage /></PublicRoute>
           } />
-          <Route path="/signup" element={
+          <Route path={ROUTES.AUTH.SIGNUP} element={
             <PublicRoute><SignupPage /></PublicRoute>
           } />
-<Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path={ROUTES.AUTH.RESET} element={<ResetPasswordPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/create-gym" element={<CreateGymPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
@@ -152,8 +164,15 @@ export default function App() {
             <Route path="contact" element={<GymContact />} />
             <Route path="login" element={<GymLoginPage />} />
             <Route path="join" element={<GymJoinPage />} />
+            {/* Per-gym legal pages (common templates, gym data injected at runtime) */}
+            <Route path="privacy" element={<GymPrivacyPage />} />
+            <Route path="terms" element={<GymTermsPage />} />
+            <Route path="refund" element={<GymRefundPage />} />
+            <Route path="membership" element={<GymMembershipPage />} />
+            <Route path="waiver" element={<GymWaiverPage />} />
           </Route>
         </Routes>
+        </Suspense>
         </ThemeProvider>
       </AuthProvider>
       </DialogProvider>

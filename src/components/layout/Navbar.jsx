@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { NAV_LINKS } from '../../lib/constants'
+import { ROUTES } from '../../lib/constants/routes'
 import Button from '../ui/Button'
 
 export default function Navbar() {
@@ -28,40 +30,43 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
         {/* Logo */}
-        <a href="#" className="flex items-center group gap-2">
+        <Link to={ROUTES.HOME} className="flex items-center group gap-2" aria-label="Gymmobius home">
           <div className="w-12 h-auto flex items-center justify-center">
-            <img src="/logo.png" alt="Logo" className="w-full h-auto" />
+            <img src="/logo.png" alt="Gymmobius logo" className="w-full h-auto" />
           </div>
           <span className=" text-text-primary font-bold text-xl tracking-tight">
             Gymmobius
           </span>
-        </a>
+        </Link>
 
         {/* Desktop Links */}
         <div className="hidden md:flex items-center gap-8">
           {NAV_LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
+            <Link
+              key={link.to}
+              to={link.to}
               className="relative text-text-secondary hover:text-text-primary transition-colors duration-300 text-sm font-medium group"
             >
               {link.label}
               <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-gradient-to-r from-accent-purple to-accent-blue group-hover:w-full transition-all duration-300" />
-            </a>
+            </Link>
           ))}
         </div>
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-4">
-          <Button variant="glass" size="sm" href="/login">Login</Button>
-          <Button size="sm" href="/signup">Get Started</Button>
+          <Button variant="glass" size="sm" href={ROUTES.AUTH.LOGIN}>Login</Button>
+          <Button size="sm" href={ROUTES.AUTH.SIGNUP}>Get Started</Button>
         </div>
         <div className="md:hidden flex items-center gap-2">
-        <Button size="sm" href="/signup" className="">
+        <Button size="sm" href={ROUTES.AUTH.SIGNUP} className="">
               Get Started
               </Button>
         {/* Mobile Menu Button */}
         <button
+          type="button"
+          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={mobileOpen}
           onClick={() => setMobileOpen(!mobileOpen)}
           className="md:hidden relative w-8 h-8 flex flex-col items-center justify-center gap-1.5 cursor-pointer"
         >
@@ -93,21 +98,21 @@ export default function Navbar() {
           >
             <div className="px-6 py-6 flex flex-col gap-4">
               {NAV_LINKS.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
+                <Link
+                  key={link.to}
+                  to={link.to}
                   onClick={() => setMobileOpen(false)}
                   className="text-text-secondary hover:text-text-primary transition-colors text-base font-medium py-2"
                 >
                   {link.label}
-                </a>
+                </Link>
               ))}
     <div className="flex items-center mt-2 gap-2">
-              <Button variant="glass" size="sm" href="/login"
+              <Button variant="glass" size="sm" href={ROUTES.AUTH.LOGIN}
                 onClick={() => setMobileOpen(false)}
               >
             Login</Button>
-              <Button size="sm" href="/signup" >
+              <Button size="sm" href={ROUTES.AUTH.SIGNUP} >
               Get Started
               </Button>
               </div>

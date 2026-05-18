@@ -1,31 +1,44 @@
 import { motion } from 'framer-motion'
 import { fadeUp, scrollViewport } from '../../lib/animations'
 import { Link } from 'react-router-dom'
+import { ROUTES, SITE } from '../../lib/constants/routes'
 
-const footerLinks = {
-  Product: ['Features', 'Pricing', 'Demo', 'Changelog'],
-  Company: ['About', 'Blog', 'Careers', 'Contact'],
-  Legal: ['Privacy', 'Terms', 'Security','Refund'],
-}
-const routeMap = {
-  // Product
-  Features: '/features',
-  Pricing: '/pricing',
-  Demo: '/demo',
-  Changelog: '/changelog',
+const footerSections = [
+  {
+    title: 'Product',
+    links: [
+      { label: 'Features', to: ROUTES.FEATURES },
+      { label: 'Pricing', to: ROUTES.PRICING },
+      { label: 'Demo', to: ROUTES.DEMO },
+      { label: 'Changelog', to: ROUTES.CHANGELOG },
+    ],
+  },
+  {
+    title: 'Company',
+    links: [
+      { label: 'About', to: ROUTES.ABOUT },
+      { label: 'Blog', to: ROUTES.BLOG },
+      { label: 'Careers', to: ROUTES.CAREERS },
+      { label: 'Contact', to: ROUTES.CONTACT },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Privacy', to: ROUTES.LEGAL.PRIVACY },
+      { label: 'Terms', to: ROUTES.LEGAL.TERMS },
+      { label: 'Security', to: ROUTES.LEGAL.SECURITY },
+      { label: 'Refund', to: ROUTES.LEGAL.REFUND },
+    ],
+  },
+]
 
-  // Company
-  About: '/about',
-  Blog: '/blog',
-  Careers: '/careers',
-  Contact: '/contact',
+const socialLinks = [
+  { label: 'Twitter', href: 'https://twitter.com/gymmobius' },
+  { label: 'LinkedIn', href: 'https://linkedin.com/company/gymmobius' },
+  { label: 'Instagram', href: 'https://instagram.com/gymmobius' },
+]
 
-  // Legal
-  Privacy: '/privacy',
-  Terms: '/terms',
-  Security: '/security',
-  Refund : '/refund-policy',
-}
 export default function Footer() {
   return (
     <motion.footer
@@ -38,30 +51,30 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
           {/* Brand */}
           <motion.div variants={fadeUp} className="col-span-2 md:col-span-1">
-            <div className="flex items-center mb-4 gap-2">
+            <Link to={ROUTES.HOME} className="flex items-center mb-4 gap-2" aria-label={`${SITE.NAME} home`}>
               <div className="w-12 h-auto flex items-center justify-center">
-               <img src="/logo.png" alt="Logo" className="w-full h-auto" />
+                <img src="/logo.png" alt="Gymmobius logo" className="w-full h-auto" />
               </div>
-              <span className="text-text-primary font-bold text-xl tracking-tight">Gymmobius</span>
-            </div>
+              <span className="text-text-primary font-bold text-xl tracking-tight">{SITE.NAME}</span>
+            </Link>
             <p className="text-text-muted text-sm leading-relaxed max-w-xs">
               The complete operating system for modern gyms. Manage, grow, and retain — all in one platform.
             </p>
           </motion.div>
 
           {/* Link Columns */}
-          {Object.entries(footerLinks).map(([title, links]) => (
-            <motion.div key={title} variants={fadeUp}>
-              <h4 className="text-text-primary font-semibold text-sm mb-4">{title}</h4>
+          {footerSections.map((section) => (
+            <motion.div key={section.title} variants={fadeUp}>
+              <h4 className="text-text-primary font-semibold text-sm mb-4">{section.title}</h4>
               <ul className="space-y-3">
-                {links.map((link) => (
-                  <li key={link}>
-                <Link
-  to={routeMap[link] || '#'}
-  className="text-text-muted hover:text-text-secondary transition-colors duration-300 text-sm"
->
-  {link}
-</Link>
+                {section.links.map((link) => (
+                  <li key={link.to}>
+                    <Link
+                      to={link.to}
+                      className="text-text-muted hover:text-text-secondary transition-colors duration-300 text-sm"
+                    >
+                      {link.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -75,16 +88,18 @@ export default function Footer() {
           className="mt-14 pt-8 border-t border-border/30 flex flex-col md:flex-row items-center justify-between gap-4"
         >
           <p className="text-text-muted text-sm">
-            &copy; {new Date().getFullYear()} Gymmobius. All rights reserved.
+            &copy; {new Date().getFullYear()} {SITE.NAME}. All rights reserved.
           </p>
           <div className="flex gap-6">
-            {['Twitter', 'LinkedIn', 'Instagram'].map((social) => (
+            {socialLinks.map((social) => (
               <a
-                key={social}
-                href="#"
+                key={social.label}
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-text-muted hover:text-accent-purple transition-colors duration-300 text-sm"
               >
-                {social}
+                {social.label}
               </a>
             ))}
           </div>

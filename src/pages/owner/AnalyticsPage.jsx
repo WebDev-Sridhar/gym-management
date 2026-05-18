@@ -2,6 +2,8 @@
 import { useNavigate } from 'react-router-dom'
 import MemberDrawer from '../../components/ui/MemberDrawer'
 import { useAuth } from '../../store/AuthContext'
+import { canAccess } from '../../lib/featureGates'
+import FeatureGate from './cms/components/FeatureGate'
 import {
   fetchRevenueAnalytics,
   fetchMembershipAnalytics,
@@ -17,6 +19,7 @@ import {
   IndianRupee, Users, TrendingUp, TrendingDown, Activity,
   UserCheck, AlertTriangle, RefreshCw, Download, Clock,
   Zap, Eye, Target, BarChart3, ShieldAlert,
+  Sparkles, Crown, ArrowRight, Lock,
 } from 'lucide-react'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -238,7 +241,13 @@ function generateInsights(revenue, membership, attend, inactive, payIns) {
 
 export default function AnalyticsPage() {
   const navigate  = useNavigate()
-  const { gymId } = useAuth()
+  const { gymId, subscription } = useAuth()
+  const planName    = subscription?.plan_name || 'Starter'
+  const hasAdvanced = canAccess('advanced_analytics', planName)
+  const hasExtendedRange = canAccess('extended_date_range', planName)
+
+  // Filter range chips — Starter capped at 30D
+  const visibleRanges = hasExtendedRange ? RANGES : RANGES.filter(r => r.days <= 30)
 
   const [range,      setRange]      = useState(30)
   const [drawerMember, setDrawerMember] = useState(null)
@@ -261,7 +270,9 @@ export default function AnalyticsPage() {
       fetchRevenueAnalytics(gymId, startDate, endDate),
       fetchMembershipAnalytics(gymId, startDate, endDate),
       fetchAttendanceAnalytics(gymId, startDate, endDate),
-      fetchInactiveMembers(gymId),
+      // Skip the expensive 90-day attendance scan on Starter — the at-risk
+      // section is gated anyway, so no point spending the query.
+      hasAdvanced ? fetchInactiveMembers(gymId) : Promise.resolve([]),
       fetchPaymentInsights(gymId, startDate, endDate),
     ]).then(([r, m, a, i, p]) => {
       if (cancelled) return
@@ -270,7 +281,7 @@ export default function AnalyticsPage() {
       .finally(() => { if (!cancelled) { setLoading(false); setSpinning(false) } })
 
     return () => { cancelled = true }
-  }, [gymId, range, refreshKey])
+  }, [gymId, range, refreshKey, hasAdvanced])
 
   function handleRefresh() { setSpinning(true); setRefreshKey(k => k + 1) }
 
@@ -372,7 +383,7 @@ export default function AnalyticsPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            {RANGES.map(({ label, days }) => (
+            {visibleRanges.map(({ label, days }) => (
               <button
                 key={label}
                 onClick={() => setRange(days)}
@@ -383,6 +394,15 @@ export default function AnalyticsPage() {
                 {label}
               </button>
             ))}
+            {!hasExtendedRange && (
+              <button
+                onClick={() => navigate('/owner-dashboard/subscription')}
+                title="90-day and 1-year ranges available on Pro"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-indigo-600 hover:bg-white/60 transition-all cursor-pointer"
+              >
+                <Lock size={10} /> 90D · 1Y
+              </button>
+            )}
           </div>
           <button
             onClick={handleExport}
@@ -402,6 +422,38 @@ export default function AnalyticsPage() {
           </button>
         </div>
       </div>
+
+      {/* Upgrade banner — Starter plan only */}
+      {!hasAdvanced && !loading && (
+        <div className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 sm:p-6">
+          <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-indigo-200/30 blur-3xl pointer-events-none" />
+          <div className="relative flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shrink-0 shadow-md shadow-indigo-200">
+                <Sparkles size={18} className="text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                  <h3 className="text-sm font-bold text-gray-900">Unlock advanced analytics</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full tracking-wide uppercase">Pro</span>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Get peak-hour heatmaps, churn-risk detection, plan-mix insights, payment-method breakdowns, and AI-generated recommendations.
+                </p>
+                <p className="text-[11px] text-gray-400 mt-1.5">
+                  You're on <span className="font-semibold text-gray-600">Starter</span> · 30-day date range
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/owner-dashboard/subscription')}
+              className="w-full md:w-auto px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer shrink-0 inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
+            >
+              <Crown size={14} /> Upgrade to Pro
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? <SkeletonDashboard /> : (
         <>
@@ -458,37 +510,39 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
-                <h2 className="text-base font-semibold text-gray-900">Payment Methods</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Revenue by channel</p>
-              </div>
-              <div className="p-6">
-                {payMethodData.length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height={160}>
-                      <PieChart>
-                        <Pie data={payMethodData} cx="50%" cy="50%" outerRadius={65} dataKey="value" stroke="none">
-                          {payMethodData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                        </Pie>
-                        <Tooltip formatter={v => formatRupee(v)} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="space-y-2 mt-3">
-                      {payMethodData.map((p, i) => (
-                        <div key={p.name} className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
-                            <span className="text-gray-600">{p.name}</span>
+            <FeatureGate feature="advanced_analytics" planName={planName} minHeight={300}>
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden h-full">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-base font-semibold text-gray-900">Payment Methods</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Revenue by channel</p>
+                </div>
+                <div className="p-6">
+                  {payMethodData.length > 0 ? (
+                    <>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <PieChart>
+                          <Pie data={payMethodData} cx="50%" cy="50%" outerRadius={65} dataKey="value" stroke="none">
+                            {payMethodData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip formatter={v => formatRupee(v)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-2 mt-3">
+                        {payMethodData.map((p, i) => (
+                          <div key={p.name} className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                              <span className="text-gray-600">{p.name}</span>
+                            </div>
+                            <span className="font-semibold text-gray-900">{formatRupee(p.value)}</span>
                           </div>
-                          <span className="font-semibold text-gray-900">{formatRupee(p.value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : <EmptyChart message="No paid payments in this period" />}
+                        ))}
+                      </div>
+                    </>
+                  ) : <EmptyChart message="No paid payments in this period" />}
+                </div>
               </div>
-            </div>
+            </FeatureGate>
           </div>
 
           {/* ── Membership ── */}
@@ -507,31 +561,33 @@ export default function AnalyticsPage() {
               ) : <EmptyChart />}
             </Section>
 
-            <Section title="Plan Distribution" subtitle="Active members per membership plan">
-              {planDistData.length > 0 ? (
-                <>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <PieChart>
-                      <Pie data={planDistData} cx="50%" cy="50%" outerRadius={65} dataKey="value" stroke="none">
-                        {planDistData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip formatter={(v, n, p) => [`${v} members`, p.payload.name]} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="space-y-2 mt-3">
-                    {planDistData.map((p, i) => (
-                      <div key={p.name} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
-                          <span className="text-gray-600 truncate max-w-[130px]">{p.name}</span>
+            <FeatureGate feature="advanced_analytics" planName={planName} minHeight={300}>
+              <Section title="Plan Distribution" subtitle="Active members per membership plan">
+                {planDistData.length > 0 ? (
+                  <>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <PieChart>
+                        <Pie data={planDistData} cx="50%" cy="50%" outerRadius={65} dataKey="value" stroke="none">
+                          {planDistData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={(v, n, p) => [`${v} members`, p.payload.name]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-2 mt-3">
+                      {planDistData.map((p, i) => (
+                        <div key={p.name} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                            <span className="text-gray-600 truncate max-w-[130px]">{p.name}</span>
+                          </div>
+                          <span className="font-semibold text-gray-900">{p.value} members</span>
                         </div>
-                        <span className="font-semibold text-gray-900">{p.value} members</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : <EmptyChart message="No plans assigned yet" />}
-            </Section>
+                      ))}
+                    </div>
+                  </>
+                ) : <EmptyChart message="No plans assigned yet" />}
+              </Section>
+            </FeatureGate>
           </div>
 
           {/* ── Attendance ── */}
@@ -550,24 +606,27 @@ export default function AnalyticsPage() {
               ) : <EmptyChart message="No check-ins in this period" />}
             </Section>
 
-            <Section title="Day of Week" subtitle="Which days are most active">
-              {attend?.total > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={dowData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip content={<CountTooltip />} />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                      {dowData.map((d, i) => <Cell key={i} fill={d.isBusiest ? '#f59e0b' : '#3b82f6'} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <EmptyChart message="No check-ins in this period" />}
-            </Section>
+            <FeatureGate feature="advanced_analytics" planName={planName} minHeight={300}>
+              <Section title="Day of Week" subtitle="Which days are most active">
+                {attend?.total > 0 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={dowData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <Tooltip content={<CountTooltip />} />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                        {dowData.map((d, i) => <Cell key={i} fill={d.isBusiest ? '#f59e0b' : '#3b82f6'} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : <EmptyChart message="No check-ins in this period" />}
+              </Section>
+            </FeatureGate>
           </div>
 
-          {/* ── Peak Hours Heatmap ── */}
+          {/* ── Peak Hours Heatmap (Advanced) ── */}
+          <FeatureGate feature="advanced_analytics" planName={planName} minHeight={220}>
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100">
               <h2 className="text-base font-semibold text-gray-900">Peak Hours</h2>
@@ -618,8 +677,10 @@ export default function AnalyticsPage() {
               ) : <EmptyChart message="No attendance data in this period" />}
             </div>
           </div>
+          </FeatureGate>
 
-          {/* ── At-Risk Members ── */}
+          {/* ── At-Risk Members (Advanced) ── */}
+          <FeatureGate feature="advanced_analytics" planName={planName} minHeight={240}>
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
@@ -703,22 +764,25 @@ export default function AnalyticsPage() {
               </div>
             )}
           </div>
+          </FeatureGate>
 
           {/* ── Payment Insights ── */}
           <div className="grid lg:grid-cols-2 gap-6">
-            <Section title="Revenue by Plan" subtitle="Which plans generate the most income">
-              {payIns?.revenueByPlan?.length > 0 ? (
-                <ResponsiveContainer width="100%" height={Math.max(180, payIns.revenueByPlan.length * 48)}>
-                  <BarChart layout="vertical" data={payIns.revenueByPlan} margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-                    <XAxis type="number" tickFormatter={v => formatRupee(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="planName" tick={{ fontSize: 11, fill: '#374151' }} axisLine={false} tickLine={false} width={96} />
-                    <Tooltip content={<RupeeTooltip />} />
-                    <Bar dataKey="revenue" fill="#6366f1" radius={[0, 4, 4, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <EmptyChart message="No paid payments in this period" />}
-            </Section>
+            <FeatureGate feature="advanced_analytics" planName={planName} minHeight={260}>
+              <Section title="Revenue by Plan" subtitle="Which plans generate the most income">
+                {payIns?.revenueByPlan?.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={Math.max(180, payIns.revenueByPlan.length * 48)}>
+                    <BarChart layout="vertical" data={payIns.revenueByPlan} margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                      <XAxis type="number" tickFormatter={v => formatRupee(v)} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="planName" tick={{ fontSize: 11, fill: '#374151' }} axisLine={false} tickLine={false} width={96} />
+                      <Tooltip content={<RupeeTooltip />} />
+                      <Bar dataKey="revenue" fill="#6366f1" radius={[0, 4, 4, 0]} maxBarSize={28} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : <EmptyChart message="No paid payments in this period" />}
+              </Section>
+            </FeatureGate>
 
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100">
@@ -763,30 +827,44 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* ── Smart Insights ── */}
-          {insights.length > 0 && (
-            <div>
-              <div className="mb-4">
-                <h2 className="text-base font-semibold text-gray-900">Smart Insights</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Auto-generated from your gym data</p>
+          {/* ── Smart Insights (Advanced) ── */}
+          <FeatureGate
+            feature="advanced_analytics"
+            planName={planName}
+            minHeight={180}
+            hint="AI-style insights surface churn risk, revenue trends and optimisation tips automatically — Pro feature."
+          >
+            {insights.length > 0 ? (
+              <div>
+                <div className="mb-4 flex items-center gap-2">
+                  <Sparkles size={15} className="text-indigo-600" />
+                  <h2 className="text-base font-semibold text-gray-900">Smart Insights</h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full uppercase tracking-wide">AI</span>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {insights.map((ins, i) => {
+                    const { Icon: InsIcon } = ins
+                    const cfg =
+                      ins.type === 'positive' ? { bg: 'bg-green-50',  border: 'border-green-200',  ic: 'text-green-600'  } :
+                      ins.type === 'warning'  ? { bg: 'bg-amber-50',  border: 'border-amber-200',  ic: 'text-amber-600'  } :
+                                               { bg: 'bg-blue-50',   border: 'border-blue-200',   ic: 'text-blue-600'   }
+                    return (
+                      <div key={i} className={`rounded-xl border p-4 flex items-start gap-3 ${cfg.bg} ${cfg.border}`}>
+                        <InsIcon size={17} className={`${cfg.ic} shrink-0 mt-0.5`} strokeWidth={2} />
+                        <p className="text-sm text-gray-700 leading-relaxed">{ins.text}</p>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {insights.map((ins, i) => {
-                  const { Icon: InsIcon } = ins
-                  const cfg =
-                    ins.type === 'positive' ? { bg: 'bg-green-50',  border: 'border-green-200',  ic: 'text-green-600'  } :
-                    ins.type === 'warning'  ? { bg: 'bg-amber-50',  border: 'border-amber-200',  ic: 'text-amber-600'  } :
-                                             { bg: 'bg-blue-50',   border: 'border-blue-200',   ic: 'text-blue-600'   }
-                  return (
-                    <div key={i} className={`rounded-xl border p-4 flex items-start gap-3 ${cfg.bg} ${cfg.border}`}>
-                      <InsIcon size={17} className={`${cfg.ic} shrink-0 mt-0.5`} strokeWidth={2} />
-                      <p className="text-sm text-gray-700 leading-relaxed">{ins.text}</p>
-                    </div>
-                  )
-                })}
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+                <Sparkles size={20} className="text-indigo-300 mx-auto mb-2" />
+                <p className="text-sm font-medium text-gray-700">No insights yet</p>
+                <p className="text-xs text-gray-400 mt-1">Insights appear once you have enough revenue, attendance and member data.</p>
               </div>
-            </div>
-          )}
+            )}
+          </FeatureGate>
         </>
       )}
 

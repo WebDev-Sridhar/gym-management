@@ -25,6 +25,10 @@ const FEATURE_RULES = {
   page_hero_image:      ['premium'],     // background image on page heroes
   page_hero_align:      ['premium'],     // text alignment on page heroes
   section_visibility:   ['premium'],     // hide/show sections from CMS
+
+  // ── Analytics tiers ────────────────────────────────────────────────────
+  advanced_analytics:   ['pro', 'premium'],   // peak hours, churn, insights, pie breakdowns
+  extended_date_range:  ['pro', 'premium'],   // 90D / 1Y range pickers (Starter capped at 30D)
 }
 
 /**

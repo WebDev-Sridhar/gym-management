@@ -243,6 +243,25 @@ html.lenis body {
   .screen-shell::-webkit-scrollbar { display: none; }
 }
 
+/* Support widget category chips — slim 3px scrollbar so it doesn't visually
+   compete with the chip row above it. */
+.support-categories-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.18) transparent;
+}
+.support-categories-scroll::-webkit-scrollbar { height: 3px; }
+.support-categories-scroll::-webkit-scrollbar-track { background: transparent; }
+.support-categories-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.18);
+  border-radius: 9999px;
+}
+[data-theme="dark"] .support-categories-scroll {
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+[data-theme="dark"] .support-categories-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+}
+
 /* Trainer day-tab scrollbar — thin on desktop, hidden on mobile */
 .trainer-day-tabs {
   scrollbar-width: thin;

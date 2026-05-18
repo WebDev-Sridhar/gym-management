@@ -1,55 +1,46 @@
 import SectionWrapper from '../../components/layout/SectionWrapper'
+import MarketingLayout from '../../components/layout/MarketingLayout'
+import MarketingErrorBoundary from '../../components/error/MarketingErrorBoundary'
+import SEO from '../../components/seo/SEO'
+import { usePageTracking } from '../../lib/hooks/usePageTracking'
+import { PRIVACY_CONTENT } from '../../lib/content/legal/privacy'
+import { mapPrivacyData } from '../../lib/mappers/legalMapper'
 
 export default function PrivacyPage() {
+  usePageTracking('privacy')
+  const data = mapPrivacyData(PRIVACY_CONTENT)
+
   return (
-      <SectionWrapper>
+    <MarketingLayout>
+      <SEO {...data.seo} />
+      <MarketingErrorBoundary>
+        <SectionWrapper>
 
-        <div className="max-w-3xl mx-auto">
-          <h1 className="text-4xl font-extrabold text-text-primary mb-6">
-            Privacy Policy
-          </h1>
+          <div className="max-w-3xl mx-auto">
+            <h1 className="text-4xl font-extrabold text-text-primary mb-6">
+              {data.title}
+            </h1>
 
-          <p className="text-text-muted mb-6">
-            We value your privacy and are committed to protecting your data.
-          </p>
+            <p className="text-text-muted mb-6">
+              {data.intro}
+            </p>
 
-          <div className="space-y-6 text-text-secondary text-sm leading-relaxed">
+            <p className="text-xs text-text-muted mb-10">
+              Effective: {data.meta.effectiveDate} · Last updated: {data.meta.lastUpdated} · Version {data.meta.version} · Jurisdiction: {data.meta.jurisdiction}
+            </p>
 
-            <div>
-              <h3 className="font-semibold text-text-primary mb-2">Information We Collect</h3>
-              <p>
-                We collect information such as your name, email, phone number,
-                and gym-related data to provide and improve our services.
-              </p>
+            <div className="space-y-6 text-text-secondary text-sm leading-relaxed">
+              {data.sections.map((section) => (
+                <div key={section.id} id={section.id}>
+                  <h3 className="font-semibold text-text-primary mb-2">{section.heading}</h3>
+                  <p>{section.body}</p>
+                </div>
+              ))}
             </div>
-
-            <div>
-              <h3 className="font-semibold text-text-primary mb-2">How We Use Data</h3>
-              <p>
-                Your data is used to operate the platform, process payments,
-                send notifications, and improve user experience.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-text-primary mb-2">Data Security</h3>
-              <p>
-                We implement industry-standard security practices to protect your data.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-text-primary mb-2">Third-Party Services</h3>
-              <p>
-                We may use trusted services like payment gateways and messaging APIs
-                to deliver core features.
-              </p>
-            </div>
-
           </div>
-        </div>
 
-      </SectionWrapper>
-   
+        </SectionWrapper>
+      </MarketingErrorBoundary>
+    </MarketingLayout>
   )
 }
