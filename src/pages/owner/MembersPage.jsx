@@ -3,6 +3,7 @@ import { useAuth } from '../../store/AuthContext'
 import { fetchMembers, createMember, assignPlan, fetchPlans } from '../../services/membershipService'
 import { fetchTrainers } from '../../services/trainerService'
 import CustomSelect from '../../components/ui/CustomSelect'
+import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 import MemberDrawer from '../../components/ui/MemberDrawer'
 import Pagination from '../../components/ui/Pagination'
 import { Sk } from '../../components/ui/Skeleton'
@@ -142,6 +143,8 @@ export default function MembersPage() {
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
+      <BannerSlot pageKey="members" />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

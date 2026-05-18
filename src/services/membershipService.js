@@ -181,12 +181,13 @@ export async function fetchDashboardStats(gymId) {
   const today = new Date().toISOString().split('T')[0]
   const fiveDaysFromNow = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  const [membersRes, activeRes, expiringRes, revenueRes, todayCheckinsRes] = await Promise.all([
+  const [membersRes, activeRes, expiringRes, revenueRes, todayCheckinsRes, trainersRes] = await Promise.all([
     supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).is('deleted_at', null),
     supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active').is('deleted_at', null),
     supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active').gte('expiry_date', today).lte('expiry_date', fiveDaysFromNow).is('deleted_at', null),
     supabase.from('payments').select('amount').eq('gym_id', gymId).eq('status', 'paid'),
     supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).gte('check_in', today),
+    supabase.from('trainers').select('id', { count: 'exact', head: true }).eq('gym_id', gymId),
   ])
 
   const totalRevenue = (revenueRes.data || []).reduce((sum, p) => sum + Number(p.amount || 0), 0)
@@ -197,6 +198,7 @@ export async function fetchDashboardStats(gymId) {
     expiringSoon: expiringRes.count || 0,
     totalRevenue,
     todayCheckins: todayCheckinsRes.count || 0,
+    trainerCount: trainersRes.count || 0,
   }
 }
 

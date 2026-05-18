@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
 import { signUpWithEmail } from '../../services/authService'
+import PasswordInput from '../../components/ui/PasswordInput'
 
 const inputStyle = {
   width: '100%',
@@ -142,17 +143,29 @@ export default function GymJoinPage() {
               </div>
               <div>
                 <label style={labelStyle}>Password</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="At least 6 characters" style={inputStyle}
+                <PasswordInput
+                  className=""
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  style={inputStyle}
+                  iconColor="var(--gym-text-muted)"
                   onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}
-                  onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }} />
+                  onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Confirm Password</label>
-                <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
-                  placeholder="••••••••" style={inputStyle}
+                <PasswordInput
+                  className=""
+                  value={confirm}
+                  onChange={e => setConfirm(e.target.value)}
+                  placeholder="••••••••"
+                  style={inputStyle}
+                  iconColor="var(--gym-text-muted)"
                   onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}
-                  onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }} />
+                  onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }}
+                />
               </div>
               <button type="submit" disabled={loading}
                 className="w-full py-3 text-white font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"

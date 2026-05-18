@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { Moon, Sun } from 'lucide-react'
 import { Sk } from '../../components/ui/Skeleton'
+import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 
 function WebsiteSkeleton() {
   return (
@@ -2384,6 +2385,8 @@ export default function WebsitePage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+      <BannerSlot pageKey="website" />
+
       {/* Page header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">

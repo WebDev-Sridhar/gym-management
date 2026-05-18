@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { fetchDashboardStats, fetchRecentActivity, fetchRevenueByMonth } from '../../services/membershipService'
+import { fetchDashboardStats, fetchRecentActivity, fetchRevenueByMonth, fetchGymDetails } from '../../services/membershipService'
+import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 import {
   Users, CheckCircle2, IndianRupee, Clock, UserPlus, BarChart3,
   CreditCard, ScanLine, TrendingUp,
@@ -157,6 +158,7 @@ export default function OwnerDashboard() {
   const [stats, setStats]               = useState(null)
   const [activities, setActivities]     = useState([])
   const [revenueByMonth, setRevenueByMonth] = useState({})
+  const [gym, setGym]                   = useState(null)
   const [loading, setLoading]           = useState(true)
 
   const expiresAt      = subscription?.expires_at ? new Date(subscription.expires_at) : null
@@ -167,8 +169,13 @@ export default function OwnerDashboard() {
     if (!gymId) { setLoading(false); return }
     let cancelled = false
     setLoading(true)
-    Promise.all([fetchDashboardStats(gymId), fetchRecentActivity(gymId), fetchRevenueByMonth(gymId)])
-      .then(([s, a, r]) => { if (!cancelled) { setStats(s); setActivities(a); setRevenueByMonth(r) } })
+    Promise.all([
+      fetchDashboardStats(gymId),
+      fetchRecentActivity(gymId),
+      fetchRevenueByMonth(gymId),
+      fetchGymDetails(gymId),
+    ])
+      .then(([s, a, r, g]) => { if (!cancelled) { setStats(s); setActivities(a); setRevenueByMonth(r); setGym(g) } })
       .catch(err => console.error('Dashboard load error:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -206,6 +213,9 @@ export default function OwnerDashboard() {
           </button>
         </div>
       )}
+
+      {/* Contextual onboarding / activation banner */}
+      <BannerSlot pageKey="dashboard" context={{ gym, stats }} />
 
       {/* Page header */}
       <div className="flex items-center justify-between">

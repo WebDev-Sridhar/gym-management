@@ -10,6 +10,35 @@ import {
 import { fetchMembers } from '../../services/membershipService'
 import { EXERCISES } from '../../data/exercisesDb'
 import { MEALS } from '../../data/mealsDb'
+import { Sk } from '../../components/ui/Skeleton'
+import BannerSlot from '../../components/dashboard/banner/BannerSlot'
+import { Dumbbell, Utensils } from 'lucide-react'
+
+function ProgramsSkeleton() {
+  return (
+    <div className="space-y-6 max-w-[1200px] mx-auto">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2"><Sk h={28} w={140} /><Sk h={14} w={300} /></div>
+        <Sk h={38} w={140} r={10} />
+      </div>
+      <Sk h={42} w={220} r={12} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array(6).fill(0).map((_, i) => (
+          <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <Sk h={40} w={40} r={12} />
+              <Sk h={22} w={56} r={20} />
+            </div>
+            <div className="space-y-2"><Sk h={18} w="65%" /><Sk h={13} w="45%" /></div>
+            <div className="flex gap-2 pt-2 border-t border-gray-50">
+              <Sk h={32} w="33%" r={8} /><Sk h={32} w="33%" r={8} /><Sk h={32} w="33%" r={8} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -48,7 +77,7 @@ function DbSearch({ type, onAdd }) {
         <svg className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" /></svg>
         <input value={query} onChange={e => setQuery(e.target.value)}
           placeholder={`Search ${type === 'workout' ? 'exercises' : 'meals'} from library…`}
-          className="flex-1 bg-transparent text-xs text-gray-700 placeholder-indigo-300 outline-none" />
+          className="flex-1 bg-transparent text-xs text-gray-900 placeholder-indigo-300 outline-none" />
         {query && <button type="button" onClick={() => setQuery('')} className="text-indigo-300 hover:text-indigo-500 cursor-pointer">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>}
@@ -79,7 +108,7 @@ function DbSearch({ type, onAdd }) {
 function DayEditor({ type, day, onChange }) {
   const items   = type === 'workout' ? (day.exercises || []) : (day.meals || [])
   const itemKey = type === 'workout' ? 'exercises' : 'meals'
-  const inputCls = 'px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-500 w-full transition-all'
+  const inputCls = 'px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full transition-all'
 
   const setItems = (fn) => onChange({ ...day, [itemKey]: fn(items) })
   const addItem  = (item) => setItems(r => [...r, item])
@@ -192,7 +221,7 @@ function TemplateForm({ type, initial, onSave, onCancel }) {
           <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Template Title</label>
           <input value={title} onChange={e => setTitle(e.target.value)} autoFocus
             placeholder={type === 'workout' ? 'e.g. 5-Day Strength Split' : 'e.g. High Protein Cut — Weekly'}
-            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all" />
+            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all" />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">
@@ -200,7 +229,7 @@ function TemplateForm({ type, initial, onSave, onCancel }) {
           </label>
           <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
             placeholder="Brief overview of the plan…"
-            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 resize-none transition-all" />
+            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none transition-all" />
         </div>
       </div>
 
@@ -240,7 +269,7 @@ function TemplateForm({ type, initial, onSave, onCancel }) {
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Day Name</label>
             <input value={currentDay.name} onChange={e => updateDay(activeDay, { name: e.target.value })}
               placeholder="e.g. Chest & Triceps"
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all" />
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" />
           </div>
           <div className="shrink-0 pt-5">
             <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -327,7 +356,7 @@ function AssignModal({ template, planType, gymId, onClose, onAssigned }) {
         <div>
           <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Assign to Member</label>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name or phone…" autoFocus
-            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all" />
+            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" />
         </div>
 
         <div className="max-h-52 overflow-y-auto space-y-1 -mx-1 px-1">
@@ -483,45 +512,60 @@ export default function ProgramsPage() {
     }
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
+  if (loading) return <ProgramsSkeleton />
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between gap-4">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
+      <BannerSlot pageKey="programs" />
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Programs</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Programs</h1>
           <p className="text-sm text-gray-500 mt-0.5">Create weekly workout and diet templates, then assign them to members.</p>
         </div>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 cursor-pointer shadow-sm shadow-indigo-200">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-          New Template
+        <button
+          onClick={() => setShowCreate(true)}
+          className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
+        >
+          + New Template
         </button>
       </div>
 
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
-        {[['workout', 'Workouts'], ['diet', 'Diet Plans']].map(([val, label]) => (
-          <button key={val} onClick={() => setActiveTab(val)}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-all ${activeTab === val ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+      {/* Tabs — same pill style as Members/Filters */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        {[
+          { val: 'workout', label: 'Workouts',   count: workoutTemplates.length, Icon: Dumbbell },
+          { val: 'diet',    label: 'Diet Plans', count: dietTemplates.length,    Icon: Utensils },
+        ].map(({ val, label, count, Icon }) => (
+          <button
+            key={val}
+            onClick={() => setActiveTab(val)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${
+              activeTab === val
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Icon size={13} className={activeTab === val ? 'text-indigo-600' : 'text-gray-400'} />
             {label}
-            <span className={`ml-2 text-xs font-normal ${activeTab === val ? 'text-indigo-400' : 'text-gray-400'}`}>
-              {val === 'workout' ? workoutTemplates.length : dietTemplates.length}
-            </span>
+            <span className="text-xs text-gray-400 font-normal">({count})</span>
           </button>
         ))}
       </div>
 
       {templates.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200">
-          <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
-            <svg className="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
+            {activeTab === 'workout'
+              ? <Dumbbell size={22} className="text-indigo-500" strokeWidth={1.8} />
+              : <Utensils size={22} className="text-indigo-500" strokeWidth={1.8} />
+            }
           </div>
-          <p className="text-sm font-medium text-gray-700">No {activeTab === 'workout' ? 'workout' : 'diet'} templates yet</p>
-          <p className="text-xs text-gray-400 mt-1">Create a weekly template and assign it to your members</p>
+          <h3 className="text-base font-semibold text-gray-900 mb-1">
+            No {activeTab === 'workout' ? 'workout' : 'diet'} templates yet
+          </h3>
+          <p className="text-sm text-gray-500">Create a weekly template and assign it to your members.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

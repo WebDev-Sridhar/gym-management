@@ -4,6 +4,7 @@ import MemberDrawer from '../../components/ui/MemberDrawer'
 import { useAuth } from '../../store/AuthContext'
 import { canAccess } from '../../lib/featureGates'
 import FeatureGate from './cms/components/FeatureGate'
+import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 import {
   fetchRevenueAnalytics,
   fetchMembershipAnalytics,
@@ -423,37 +424,8 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Upgrade banner — Starter plan only */}
-      {!hasAdvanced && !loading && (
-        <div className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 sm:p-6">
-          <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-indigo-200/30 blur-3xl pointer-events-none" />
-          <div className="relative flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shrink-0 shadow-md shadow-indigo-200">
-                <Sparkles size={18} className="text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                  <h3 className="text-sm font-bold text-gray-900">Unlock advanced analytics</h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full tracking-wide uppercase">Pro</span>
-                </div>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Get peak-hour heatmaps, churn-risk detection, plan-mix insights, payment-method breakdowns, and AI-generated recommendations.
-                </p>
-                <p className="text-[11px] text-gray-400 mt-1.5">
-                  You're on <span className="font-semibold text-gray-600">Starter</span> · 30-day date range
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate('/owner-dashboard/subscription')}
-              className="w-full md:w-auto px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer shrink-0 inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
-            >
-              <Crown size={14} /> Upgrade to Pro
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Contextual banner — registry picks between upgrade-to-pro & analytics-tips */}
+      {!loading && <BannerSlot pageKey="analytics" />}
 
       {loading ? <SkeletonDashboard /> : (
         <>

@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../../services/supabaseClient'
+import PasswordInput from '../../components/ui/PasswordInput'
+import PasswordRequirements, { isPasswordValid, friendlyPasswordError } from '../../components/ui/PasswordRequirements'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [pwFocused, setPwFocused] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [hasSession, setHasSession] = useState(true) // Track if the link is valid
   const navigate = useNavigate()
+
+  const passwordOK = isPasswordValid(password)
+  const confirmOK  = confirm.length > 0 && confirm === password
 
   // 1. Check if the user actually has a valid recovery session on mount
   useEffect(() => {
@@ -28,8 +34,8 @@ export default function ResetPasswordPage() {
     setError('')
     setSuccess('')
 
-    if (password.length < 6) {
-      return setError('Password must be at least 6 characters')
+    if (!isPasswordValid(password)) {
+      return setError('Password must include lowercase, uppercase letters and a number (min 6 chars).')
     }
     if (password !== confirm) {
       return setError('Passwords do not match')
@@ -55,7 +61,7 @@ export default function ResetPasswordPage() {
       }, 3000)
 
     } catch (err) {
-      setError(err.message || 'Something went wrong')
+      setError(friendlyPasswordError(err.message) || 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -119,32 +125,37 @@ export default function ResetPasswordPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">New Password</label>
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
+                  onFocus={() => setPwFocused(true)}
+                  onBlur={() => setPwFocused(false)}
                   required
+                />
+                <PasswordRequirements
+                  value={password}
+                  visible={pwFocused || password.length > 0}
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Confirm Password</label>
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="••••••••"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
                   required
                 />
+                {confirm.length > 0 && !confirmOK && (
+                  <p className="text-[11px] text-red-500 mt-1.5">Passwords do not match</p>
+                )}
               </div>
 
               <button
                 type="submit"
-                disabled={loading || success}
-                className="w-full mt-4 py-3 bg-violet-600 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 disabled:opacity-50 transition-all"
+                disabled={loading || success || !passwordOK || !confirmOK}
+                className="w-full mt-4 py-3 bg-violet-600 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? 'Updating...' : 'Save New Password'}
               </button>

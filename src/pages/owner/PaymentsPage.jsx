@@ -4,6 +4,7 @@ import { fetchPayments } from '../../services/paymentService'
 import { fetchMembers, fetchPlans, fetchGymDetails } from '../../services/membershipService'
 
 import CustomSelect from '../../components/ui/CustomSelect'
+import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 import Pagination from '../../components/ui/Pagination'
 import { Sk } from '../../components/ui/Skeleton'
 import MemberDrawer from '../../components/ui/MemberDrawer'
@@ -165,6 +166,8 @@ export default function PaymentsPage() {
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
+      <BannerSlot pageKey="payments" />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

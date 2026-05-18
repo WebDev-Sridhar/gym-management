@@ -155,7 +155,7 @@ export default function CreateGymPage() {
                 onChange={(e) => setOwnerName(e.target.value)}
                 placeholder="John Doe"
                 autoFocus
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
               />
             </div>
 
@@ -173,7 +173,7 @@ export default function CreateGymPage() {
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
                   placeholder="9876543210"
                   maxLength={10}
-                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
+                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
                 />
               </div>
             </div>
@@ -185,7 +185,7 @@ export default function CreateGymPage() {
                 value={gymName}
                 onChange={(e) => setGymName(e.target.value)}
                 placeholder="e.g. Iron Paradise Fitness"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
               />
               {slug && (
                 <p className="text-[11px] text-gray-400 mt-2 flex items-center gap-1">
@@ -202,7 +202,7 @@ export default function CreateGymPage() {
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="e.g. Mumbai"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
               />
             </div>
 

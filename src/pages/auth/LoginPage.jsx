@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { signInWithEmail, signInWithGoogle } from '../../services/authService'
 import { useAuth } from '../../store/AuthContext'
 import { supabase } from '../../services/supabaseClient'
+import PasswordInput from '../../components/ui/PasswordInput'
 
 export default function LoginPage() {
   // --- States ---
@@ -217,7 +218,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   autoFocus
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
                 />
                 <button 
                   type="submit"
@@ -236,14 +237,12 @@ export default function LoginPage() {
                     Change
                   </button>
                 </div>
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoFocus
                   required
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
                 />
                 <div className="mt-2 text-right">
                   <button type="button" onClick={() => setStep('forgot')} className="text-xs text-gray-500 hover:text-gray-800">
@@ -267,7 +266,7 @@ export default function LoginPage() {
                   placeholder="name@gym.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-violet-500"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
                 />
                 <button
                   type="submit"

@@ -29,24 +29,29 @@ export default function FeatureGate({ feature, planName, children, hint, minHeig
       </div>
 
       {/* Upgrade overlay */}
-      <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/55 dark:bg-black/40 backdrop-blur-[3px] z-10 p-4">
-        <div className="flex flex-col items-center gap-3 px-5 py-5 rounded-2xl bg-white border border-gray-200 shadow-md text-center max-w-[280px]">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 relative">
-            <Lock size={15} className="text-indigo-600" />
-            <Sparkles size={10} className="text-amber-500 absolute -top-1 -right-1" />
+      <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/55 dark:bg-black/40 backdrop-blur-[3px] z-10 p-3">
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-gray-200 shadow-md text-left max-w-[340px]">
+          <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0 relative">
+            <Lock size={13} className="text-indigo-600" />
+            <Sparkles size={8} className="text-amber-500 absolute -top-0.5 -right-0.5" />
           </div>
-          {required && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full tracking-wide uppercase">
-              {required} feature
-            </span>
-          )}
-          <p className="text-xs text-gray-600 leading-relaxed">{message}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              {required && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded tracking-wide uppercase">
+                  {required}
+                </span>
+              )}
+              <span className="text-[11px] font-semibold text-gray-700">Locked</span>
+            </div>
+            <p className="text-[11px] text-gray-500 leading-snug line-clamp-2">{message}</p>
+          </div>
           <Link
             to="/owner-dashboard/subscription"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white text-[11px] font-semibold rounded-lg hover:bg-indigo-700 transition-colors shrink-0"
           >
-            Upgrade plan
-            <ArrowRight size={11} />
+            Upgrade
+            <ArrowRight size={10} />
           </Link>
         </div>
       </div>

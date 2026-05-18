@@ -3,13 +3,18 @@ import { Link } from 'react-router-dom'
 import { signUpWithEmail, signInWithGoogle } from '../../services/authService'
 import { supabase } from '../../services/supabaseClient'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
+import PasswordInput from '../../components/ui/PasswordInput'
+import PasswordRequirements, { isPasswordValid, friendlyPasswordError } from '../../components/ui/PasswordRequirements'
 
 export default function SignupPage() {
   const [step, setStep] = useState('info') // 'info' | 'confirm-email'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [pwFocused, setPwFocused] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const passwordOK = isPasswordValid(password)
 
   useEffect(() => {
     setError('')
@@ -19,8 +24,9 @@ export default function SignupPage() {
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError('Enter a valid email address'); return false
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters'); return false
+    if (!isPasswordValid(password)) {
+      setError('Password must include lowercase, uppercase letters and a number (min 6 chars).')
+      return false
     }
     return true
   }
@@ -36,7 +42,7 @@ export default function SignupPage() {
       const { data, error: signUpError } = await signUpWithEmail(email.trim(), password)
 
       if (signUpError) {
-        setError(signUpError.message)
+        setError(friendlyPasswordError(signUpError.message))
         return
       }
 
@@ -173,25 +179,29 @@ export default function SignupPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@gym.com"
                     autoFocus
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Password</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 6 characters"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
+                    placeholder="Use letters and a number"
+                    onFocus={() => setPwFocused(true)}
+                    onBlur={() => setPwFocused(false)}
+                  />
+                  <PasswordRequirements
+                    value={password}
+                    visible={pwFocused || password.length > 0}
                   />
                 </div>
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full mt-2 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 disabled:opacity-50 transition-all"
+                  disabled={loading || !email.trim() || !passwordOK}
+                  className="w-full mt-2 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-violet-200 hover:shadow-violet-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {loading ? 'Creating Account...' : 'Get Started Free'}
                 </button>

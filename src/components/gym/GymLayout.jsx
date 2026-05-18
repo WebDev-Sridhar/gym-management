@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, Link } from 'react-router-dom'
 import { GymProvider, useGym } from '../../store/GymContext'
 import GymNavbar from './GymNavbar'
 import { getFullThemeCSSVars, getFontStack } from '../../lib/gymTheme'
@@ -136,15 +136,15 @@ function GymLayoutInner() {
                   { to: `${base}/contact`, label: 'Contact' },
                 ].map(link => (
                   <li key={link.to}>
-                    <a
-                      href={link.to}
+                    <Link
+                      to={link.to}
                       className="text-sm transition-colors duration-200"
                       style={{ color: 'var(--gym-text-secondary)' }}
                       onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
                       onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
                     >
                       {link.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -162,15 +162,15 @@ function GymLayoutInner() {
                   { to: `${base}/waiver`, label: 'Health & Liability Waiver' },
                 ].map(link => (
                   <li key={link.to}>
-                    <a
-                      href={link.to}
+                    <Link
+                      to={link.to}
                       className="text-sm transition-colors duration-200"
                       style={{ color: 'var(--gym-text-secondary)' }}
                       onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
                       onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
                     >
                       {link.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>

@@ -4,6 +4,7 @@ import { fetchPlans, createPlan, updatePlan, deletePlan, fetchMembers } from '..
 import { useDialog } from '../../components/ui/Dialog'
 import FormModal from '../../components/ui/FormModal'
 import { Sk } from '../../components/ui/Skeleton'
+import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 
 function PlansSkeleton() {
   return (
@@ -177,6 +178,8 @@ export default function PlansPage() {
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
+      <BannerSlot pageKey="plans" />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -184,18 +187,19 @@ export default function PlansPage() {
           <p className="text-sm text-gray-500 mt-0.5">{plans.length} plan{plans.length !== 1 ? 's' : ''} created</p>
         </div>
         <button
-          onClick={() => setShowCreate(true)}
+          onClick={() => setShowCreate(v => !v)}
           className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
         >
-          + New Plan
+          {showCreate ? 'Cancel' : '+ New Plan'}
         </button>
       </div>
 
-      {/* Create modal */}
+      {/* Inline create form */}
       {showCreate && (
-        <FormModal title="New Plan" onClose={() => setShowCreate(false)}>
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">New Membership Plan</h2>
           <PlanForm onSave={handleCreate} onCancel={() => setShowCreate(false)} />
-        </FormModal>
+        </div>
       )}
 
       {/* Edit modal */}

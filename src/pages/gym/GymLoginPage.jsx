@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
 import { signInWithEmail } from '../../services/authService'
 import { supabase, setAccessToken } from '../../services/supabaseClient'
+import PasswordInput from '../../components/ui/PasswordInput'
 import {
   fetchUserProfile,
   createUserProfile,
@@ -211,10 +212,18 @@ export default function GymLoginPage() {
               </div>
               <div>
                 <label style={labelStyle}>Password</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••" autoFocus required style={inputStyle}
+                <PasswordInput
+                  className=""
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoFocus
+                  required
+                  style={inputStyle}
+                  iconColor="var(--gym-text-muted)"
                   onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}
-                  onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }} />
+                  onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }}
+                />
               </div>
               <div className="text-right">
                 <button type="button" onClick={() => setStep('forgot')}

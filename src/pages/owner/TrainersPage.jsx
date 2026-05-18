@@ -4,6 +4,7 @@ import { fetchTrainerInvites, createTrainerInvite, deleteTrainerInvite } from '.
 import { fetchTrainers, updateTrainer, removeTrainer } from '../../services/trainerService'
 import { useDialog } from '../../components/ui/Dialog'
 import { Sk } from '../../components/ui/Skeleton'
+import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 
 function TrainersSkeleton() {
   return (
@@ -139,6 +140,8 @@ export default function TrainersPage() {
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
+      <BannerSlot pageKey="trainers" />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
