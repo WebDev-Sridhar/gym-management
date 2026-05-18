@@ -1,11 +1,13 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
-import { fetchGymBySlug } from '../services/gymPublicService'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { fetchGymBySlug, resolveSlugRedirect } from '../services/gymPublicService'
 
 const GymContext = createContext(null)
 
 export function GymProvider({ children }) {
   const { gymSlug } = useParams()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [gym, setGym] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -28,13 +30,25 @@ export function GymProvider({ children }) {
 
     let cancelled = false
     fetchGymBySlug(gymSlug)
-      .then((data) => {
+      .then(async (data) => {
         if (cancelled) return
         if (data) {
           setGym(data)
-        } else {
-          setError(true)
+          return
         }
+
+        // Direct slug missed — check redirect table. Owner may have renamed.
+        const redirectTarget = await resolveSlugRedirect(gymSlug)
+        if (cancelled) return
+
+        if (redirectTarget) {
+          // Preserve any sub-path (about/pricing/...) when redirecting
+          const subPath = location.pathname.slice(`/${gymSlug}`.length) || ''
+          navigate(`/${redirectTarget}${subPath}${location.search || ''}`, { replace: true })
+          return
+        }
+
+        setError(true)
       })
       .catch(() => {
         if (!cancelled) setError(true)
@@ -44,6 +58,7 @@ export function GymProvider({ children }) {
       })
 
     return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gymSlug])
 
   return (

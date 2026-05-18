@@ -438,3 +438,69 @@ export async function updateGymDetails({ gymId, name, city, description, logo_ur
   if (error) throw error
   return data
 }
+
+// ─── Slug management ──────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the given slug is free to claim.
+ * Checks both the live gyms.slug column AND the redirects table
+ * (so a previously-claimed slug can't be re-used while its redirect lives).
+ */
+export async function checkSlugAvailable(slug) {
+  if (!slug) return false
+  const [{ data: gymHit }, { data: redirHit }] = await Promise.all([
+    supabase.from('gyms').select('id').eq('slug', slug).maybeSingle(),
+    supabase.from('gym_slug_redirects').select('old_slug').eq('old_slug', slug).maybeSingle(),
+  ])
+  return !gymHit && !redirHit
+}
+
+/**
+ * Change a gym's public slug. Writes the old slug into gym_slug_redirects so
+ * external links keep working (GymLayout resolves redirects automatically).
+ *
+ * Returns the updated gym row.
+ */
+export async function updateGymSlug({ gymId, currentSlug, newSlug }) {
+  if (!gymId || !newSlug) throw new Error('gymId and newSlug are required')
+  if (newSlug === currentSlug) {
+    const { data, error } = await supabase.from('gyms').select('*').eq('id', gymId).single()
+    if (error) throw error
+    return data
+  }
+
+  // Pre-flight availability check
+  const free = await checkSlugAvailable(newSlug)
+  if (!free) throw new Error('That URL is already taken — try another.')
+
+  // Update the gym record
+  const { data: updated, error: upErr } = await supabase
+    .from('gyms')
+    .update({ slug: newSlug })
+    .eq('id', gymId)
+    .select('*')
+    .single()
+
+  if (upErr) {
+    // Defensive — race could have claimed it between check + update
+    if (upErr.code === '23505' || /duplicate/i.test(upErr.message || '')) {
+      throw new Error('That URL was just taken — try another.')
+    }
+    throw upErr
+  }
+
+  // Insert old slug → gym_id mapping so old links redirect.
+  // Ignore errors here — the rename succeeded; a missing redirect is
+  // a small loss, not a blocker. Also fine if old slug already exists
+  // in the table (e.g. owner did A → B → A → C).
+  if (currentSlug) {
+    await supabase
+      .from('gym_slug_redirects')
+      .upsert({ old_slug: currentSlug, gym_id: gymId }, { onConflict: 'old_slug' })
+      .then(({ error }) => {
+        if (error) console.warn('[updateGymSlug] redirect insert failed:', error.message)
+      })
+  }
+
+  return updated
+}

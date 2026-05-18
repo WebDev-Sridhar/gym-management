@@ -15,6 +15,26 @@ export async function fetchGymBySlug(slug) {
 }
 
 /**
+ * Resolve an old slug → current slug via gym_slug_redirects.
+ * Returns the current slug string, or null if no redirect exists.
+ *
+ * Used by GymLayout when the direct slug lookup misses — owners who
+ * renamed their gym leave a trail of redirects so external links
+ * (member bookmarks, WhatsApp messages) keep working.
+ */
+export async function resolveSlugRedirect(slug) {
+  if (!slug) return null
+  const { data, error } = await supabaseAnon
+    .from('gym_slug_redirects')
+    .select('gym_id, gyms!inner(slug)')
+    .eq('old_slug', slug)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return data.gyms?.slug || null
+}
+
+/**
  * Fetch gym content (hero, about) by gym_id.
  */
 export async function fetchGymContent(gymId) {

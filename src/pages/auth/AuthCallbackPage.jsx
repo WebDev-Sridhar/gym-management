@@ -10,6 +10,7 @@ import {
   createTrainerRecord,
 } from '../../services/userService'
 import { useAuth } from '../../store/AuthContext'
+import BrandLoader from '../../components/ui/BrandLoader'
 
 export default function AuthCallbackPage() {
   const [status, setStatus]   = useState('processing') // 'processing' | 'error'
@@ -96,10 +97,19 @@ export default function AuthCallbackPage() {
           }
         }
 
-        // 3. Email not found in any gym — sign them out and show a clear error
-        await supabase.auth.signOut()
-        setStatus('error')
-        setErrorMsg('Your email is not registered with any gym. Ask your gym owner to add your email, then try again.')
+        // 3. Email isn't a member or trainer-invite — treat as a fresh owner.
+        //
+        // Covers two cases:
+        //   a) Brand-new signup just confirmed their email — they haven't
+        //      hit /create-gym yet, so no profile exists yet.
+        //   b) Owner whose gym row was deleted (manual cleanup, account
+        //      deletion, etc.) and CASCADE removed their users row. The
+        //      auth.users record persists; they can recreate their gym.
+        //
+        // Either way, /create-gym is the right destination. CreateGymPage
+        // checks for an existing profile and skips itself if present, so
+        // the eventual "completed" user gets redirected onward correctly.
+        navigate('/create-gym', { replace: true })
         return
       }
 
@@ -148,12 +158,10 @@ export default function AuthCallbackPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="text-center">
-        <div className="w-10 h-10 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Signing you in...</h2>
-        <p className="text-sm text-gray-500">Please wait while we verify your login</p>
-      </div>
-    </div>
+    <BrandLoader
+      fullScreen
+      title="Signing you in"
+      subtitle="Setting up your workspace — this only takes a moment."
+    />
   )
 }

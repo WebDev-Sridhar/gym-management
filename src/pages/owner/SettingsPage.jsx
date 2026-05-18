@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { updateUserProfile } from '../../services/userService'
-import { fetchGymDetails, updateGymDetails } from '../../services/membershipService'
+import { fetchGymDetails, updateGymDetails, updateGymSlug, checkSlugAvailable } from '../../services/membershipService'
+import { slugify, validateSlug, getGymPublicUrl } from '../../lib/slug'
+import { useDebounce } from '../../hooks/useDebounce'
 import { supabase } from '../../services/supabaseClient'
 import { Sk } from '../../components/ui/Skeleton'
 import {
@@ -159,6 +161,8 @@ export default function SettingsPage() {
   const [gym, setGym]                 = useState(null)
   const [signingOut, setSigningOut]   = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showSlugModal, setShowSlugModal] = useState(false)
+  const [copiedUrl, setCopiedUrl] = useState(false)
   const [copiedGymId, setCopiedGymId] = useState(false)
 
   // ── personal info ──
@@ -610,6 +614,43 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* Public URL — always visible; never auto-changes with gym name */}
+            {gym?.slug && (
+              <div className="mt-5 pt-5 border-t border-gray-100">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-gray-500">Public URL</p>
+                    <p className="text-sm font-mono text-gray-800 truncate mt-1" title={getGymPublicUrl(gym.slug)}>
+                      {getGymPublicUrl(gym.slug)}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+                      Shared with members on WhatsApp, posters and the gym landing page. Old URLs keep working after a change.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(getGymPublicUrl(gym.slug))
+                        setCopiedUrl(true)
+                        setTimeout(() => setCopiedUrl(false), 1500)
+                      }}
+                      className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:border-gray-300 cursor-pointer flex items-center gap-1.5"
+                    >
+                      {copiedUrl ? <><Check size={12} className="text-green-500" />Copied</> : <><Copy size={12} />Copy</>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSlugModal(true)}
+                      className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:border-indigo-300 hover:text-indigo-700 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Pencil size={11} />Change URL
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {!editGym && gMsg.text && (
               <span className={`flex items-center gap-1.5 text-xs font-medium mt-3 ${gMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
                 {gMsg.type === 'success' ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
@@ -805,6 +846,18 @@ export default function SettingsPage() {
           }}
         />
       )}
+
+      {showSlugModal && gym && (
+        <ChangeUrlModal
+          gymId={gymId}
+          currentSlug={gym.slug}
+          onClose={() => setShowSlugModal(false)}
+          onSaved={(updated) => {
+            setGym(updated)
+            setShowSlugModal(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -911,6 +964,177 @@ function DeleteAccountConfirm({ gymName, onClose, onConfirm }) {
             className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Continue to request
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Change URL slug modal ───────────────────────────────────────────────────
+function ChangeUrlModal({ gymId, currentSlug, onClose, onSaved }) {
+  const [draft, setDraft]       = useState(currentSlug || '')
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
+  const [available, setAvailable] = useState(null) // null | true | false
+  const [checking, setChecking] = useState(false)
+
+  // Normalise input as the user types (lowercase, hyphens)
+  function onInput(value) {
+    setError('')
+    setAvailable(null)
+    // Allow incremental typing but collapse spaces/uppercase live
+    const normalised = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    setDraft(normalised)
+  }
+
+  const debouncedDraft = useDebounce(draft, 350)
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [onClose])
+
+  // Live availability check
+  useEffect(() => {
+    const trimmed = (debouncedDraft || '').trim()
+    if (!trimmed || trimmed === currentSlug) {
+      setAvailable(null)
+      return
+    }
+    const validationErr = validateSlug(trimmed)
+    if (validationErr) {
+      setAvailable(false)
+      return
+    }
+    let cancelled = false
+    setChecking(true)
+    checkSlugAvailable(trimmed)
+      .then(ok => { if (!cancelled) setAvailable(ok) })
+      .catch(() => { if (!cancelled) setAvailable(null) })
+      .finally(() => { if (!cancelled) setChecking(false) })
+    return () => { cancelled = true }
+  }, [debouncedDraft, currentSlug])
+
+  async function handleSave() {
+    setError('')
+    const trimmed = draft.trim()
+    if (trimmed === currentSlug) return onClose()
+
+    const validationErr = validateSlug(trimmed)
+    if (validationErr) return setError(validationErr)
+    if (available === false) return setError('That URL is already taken.')
+
+    setSaving(true)
+    try {
+      const updated = await updateGymSlug({ gymId, currentSlug, newSlug: trimmed })
+      onSaved(updated)
+    } catch (err) {
+      setError(err.message || 'Failed to update URL')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const trimmed     = draft.trim()
+  const unchanged   = trimmed === currentSlug
+  const showAvail   = trimmed && !unchanged && !validateSlug(trimmed)
+  const canSave     = !saving && !unchanged && available === true
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)' }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+          <h3 className="text-base font-bold text-gray-900">Change public URL</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Your old URL will keep working — visitors are redirected.</p>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">New URL slug</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-mono select-none pointer-events-none">
+                {typeof window !== 'undefined' ? window.location.host : 'gymmobius.app'}/
+              </span>
+              <input
+                value={draft}
+                onChange={e => onInput(e.target.value)}
+                placeholder="iron-paradise-mumbai"
+                style={{ paddingLeft: `${(typeof window !== 'undefined' ? window.location.host.length : 14) * 7 + 18}px` }}
+                className="w-full pr-10 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono"
+                autoFocus
+              />
+              {showAvail && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {checking
+                    ? <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin block" />
+                    : available === true  ? <Check size={14} className="text-emerald-600" />
+                    : available === false ? <X size={14} className="text-red-500" />
+                    : null
+                  }
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+              Lowercase letters, numbers and hyphens. {trimmed.length}/40 characters.
+            </p>
+          </div>
+
+          {/* Suggestion chip if input matches generated default */}
+          {!trimmed && gymId && (
+            <button
+              type="button"
+              onClick={() => setDraft(slugify(currentSlug || ''))}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+            >
+              ↺ Reset to {currentSlug}
+            </button>
+          )}
+
+          {error && (
+            <p className="flex items-center gap-1.5 text-xs text-red-500 font-medium">
+              <AlertTriangle size={12} /> {error}
+            </p>
+          )}
+
+          {unchanged && trimmed && (
+            <p className="text-[11px] text-gray-400">This is your current URL.</p>
+          )}
+
+          <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+            <p className="text-[11px] text-amber-800 leading-relaxed">
+              <strong>Heads up:</strong> updates to printed posters, ads, or hard-coded links pointing to the old URL won't be auto-redirected by search engines for a few days. The in-app redirect works immediately.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!canSave}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            {saving ? 'Saving…' : 'Save new URL'}
           </button>
         </div>
       </div>

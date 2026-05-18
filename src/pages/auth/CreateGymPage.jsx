@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { createGym, createUserProfile, updateGymOnboardingStep } from '../../services/userService'
+import { checkSlugAvailable } from '../../services/membershipService'
+import { buildNameSlug, buildNameCitySlug } from '../../lib/slug'
+import { useDebounce } from '../../hooks/useDebounce'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
-import { LogOut } from 'lucide-react'
+import { LogOut, Check, Loader2 } from 'lucide-react'
 
 export default function CreateGymPage() {
   const { user, profile, isAuthenticated, loading, refreshProfile, logout } = useAuth()
@@ -41,10 +44,31 @@ export default function CreateGymPage() {
     )
   }
 
-  const slug = gymName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
+  // ── Live URL preview ────────────────────────────────────────────────
+  // First-attempt slug = name only. If taken, createGym escalates to
+  // name+city, then to a random-suffix variant. The preview reflects
+  // exactly what we'll attempt first; if taken, we show the fallback.
+  const nameSlug   = buildNameSlug(gymName)
+  const cityFallback = buildNameCitySlug(gymName, city)
+  const debouncedNameSlug = useDebounce(nameSlug, 350)
+
+  const [slugStatus, setSlugStatus] = useState('idle') // 'idle' | 'checking' | 'available' | 'taken'
+
+  useEffect(() => {
+    if (!debouncedNameSlug || debouncedNameSlug === 'gym') {
+      setSlugStatus('idle')
+      return
+    }
+    let cancelled = false
+    setSlugStatus('checking')
+    checkSlugAvailable(debouncedNameSlug)
+      .then(ok => { if (!cancelled) setSlugStatus(ok ? 'available' : 'taken') })
+      .catch(() => { if (!cancelled) setSlugStatus('idle') })
+    return () => { cancelled = true }
+  }, [debouncedNameSlug])
+
+  // What the user will actually get if the name-only slug is taken
+  const fallbackSlug = cityFallback || (nameSlug !== 'gym' ? `${nameSlug}-XXXX` : null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -187,11 +211,36 @@ export default function CreateGymPage() {
                 placeholder="e.g. Iron Paradise Fitness"
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
               />
-              {slug && (
-                <p className="text-[11px] text-gray-400 mt-2 flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Your URL: <span className="text-violet-600 font-semibold tracking-tight">gymmobius.app/{slug}</span>
-                </p>
+              {nameSlug && nameSlug !== 'gym' && (
+                <div className="mt-2 flex items-center gap-1.5 text-[11px] flex-wrap">
+                  {slugStatus === 'checking' && (
+                    <Loader2 size={11} className="text-gray-400 animate-spin" />
+                  )}
+                  {slugStatus === 'available' && (
+                    <Check size={11} className="text-emerald-600" strokeWidth={3} />
+                  )}
+                  {slugStatus === 'taken' && (
+                    <svg className="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                    </svg>
+                  )}
+                  {slugStatus !== 'taken' && (
+                    <span className="text-gray-400">
+                      Your URL: <span className={`font-semibold tracking-tight ${slugStatus === 'available' ? 'text-emerald-600' : 'text-violet-600'}`}>
+                        gymmobius.app/{nameSlug}
+                      </span>
+                    </span>
+                  )}
+                  {slugStatus === 'taken' && (
+                    <span className="text-amber-700">
+                      <span className="line-through text-gray-400 font-mono mr-1">gymmobius.app/{nameSlug}</span>
+                      is taken — you'll get{' '}
+                      <span className="text-violet-600 font-semibold tracking-tight">
+                        gymmobius.app/{fallbackSlug || `${nameSlug}-XXXX`}
+                      </span>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 

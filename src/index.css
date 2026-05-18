@@ -48,6 +48,40 @@
   to   { opacity: 1; transform: scale(1); }
 }
 
+/* ── BrandLoader animations ──────────────────────────────────────────── */
+/* Halo behind the logo — gentle radial pulse */
+@keyframes brandHaloPulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.9);  filter: blur(8px); }
+  50%      { opacity: 0.85; transform: scale(1.35); filter: blur(14px); }
+}
+/* Logo itself — subtle breathing without rotation */
+@keyframes brandLogoBreath {
+  0%, 100% { opacity: 1;    transform: scale(1);    }
+  50%      { opacity: 0.85; transform: scale(0.96); }
+}
+/* Indeterminate progress bar — slides left → right, loops */
+@keyframes brandBarSlide {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(360%);  }
+}
+.brand-loader-halo {
+  animation: brandHaloPulse 2s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+.brand-loader-logo {
+  animation: brandLogoBreath 2.4s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+.brand-loader-bar {
+  animation: brandBarSlide 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-loader-halo,
+  .brand-loader-logo,
+  .brand-loader-bar { animation: none; }
+}
+
 
 @theme {
   --color-bg: #000000;
@@ -370,16 +404,77 @@ html.lenis body {
 [data-theme="dark"] .app-owner .bg-slate-50            { background-color: rgba(255,255,255,0.04) !important; }
 [data-theme="dark"] .app-owner .bg-slate-100           { background-color: rgba(255,255,255,0.06) !important; }
 
-/* Gradients used in CTAs / hero cards */
-[data-theme="dark"] .app-owner [class*="from-indigo-50"] {
-  --tw-gradient-from: rgba(99,102,241,0.10) var(--tw-gradient-from-position) !important;
-}
-[data-theme="dark"] .app-owner [class*="to-violet-50"] {
-  --tw-gradient-to: rgba(139,92,246,0.10) var(--tw-gradient-to-position) !important;
-}
+/* ── Gradient stops used by CTAs, hero cards, and DashboardBanner ─────── */
+/* `via-white` is the middle stop on banner gradients — swap to dark surface */
 [data-theme="dark"] .app-owner [class*="via-white"] {
   --tw-gradient-via: var(--owner-surface) !important;
 }
+
+/* `from-*` overrides — tinted dark surfaces matching each colour family */
+[data-theme="dark"] .app-owner [class*="from-indigo-50"] {
+  --tw-gradient-from: rgba(99,102,241,0.10) var(--tw-gradient-from-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="from-indigo-100"] {
+  --tw-gradient-from: rgba(99,102,241,0.16) var(--tw-gradient-from-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="from-violet-50"] {
+  --tw-gradient-from: rgba(139,92,246,0.10) var(--tw-gradient-from-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="from-violet-100"] {
+  --tw-gradient-from: rgba(139,92,246,0.16) var(--tw-gradient-from-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="from-amber-50"] {
+  --tw-gradient-from: rgba(245,158,11,0.10) var(--tw-gradient-from-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="from-emerald-50"] {
+  --tw-gradient-from: rgba(16,185,129,0.10) var(--tw-gradient-from-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="from-green-50"] {
+  --tw-gradient-from: rgba(16,185,129,0.10) var(--tw-gradient-from-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="from-blue-50"] {
+  --tw-gradient-from: rgba(59,130,246,0.10) var(--tw-gradient-from-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="from-rose-50"] {
+  --tw-gradient-from: rgba(244,63,94,0.10) var(--tw-gradient-from-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="from-black"] {
+  --tw-gradient-from: #000 var(--tw-gradient-from-position) !important;
+}
+
+/* `to-*` overrides */
+[data-theme="dark"] .app-owner [class*="to-violet-50"] {
+  --tw-gradient-to: rgba(139,92,246,0.10) var(--tw-gradient-to-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="to-violet-100"] {
+  --tw-gradient-to: rgba(139,92,246,0.16) var(--tw-gradient-to-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="to-indigo-50"] {
+  --tw-gradient-to: rgba(99,102,241,0.10) var(--tw-gradient-to-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="to-indigo-100"] {
+  --tw-gradient-to: rgba(99,102,241,0.16) var(--tw-gradient-to-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="to-orange-50"] {
+  --tw-gradient-to: rgba(249,115,22,0.10) var(--tw-gradient-to-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="to-teal-50"] {
+  --tw-gradient-to: rgba(20,184,166,0.10) var(--tw-gradient-to-position) !important;
+}
+[data-theme="dark"] .app-owner [class*="to-amber-50"] {
+  --tw-gradient-to: rgba(245,158,11,0.10) var(--tw-gradient-to-position) !important;
+}
+
+/* DashboardBanner — borders + glass surface + blurred decorative orbs */
+[data-theme="dark"] .app-owner .border-blue-100         { border-color: rgba(59,130,246,0.30) !important; }
+[data-theme="dark"] .app-owner .border-emerald-100      { border-color: rgba(16,185,129,0.30) !important; }
+[data-theme="dark"] .app-owner .bg-white\/80            { background-color: rgba(21,22,31,0.80) !important; }
+[data-theme="dark"] .app-owner .bg-white\/60            { background-color: rgba(21,22,31,0.60) !important; }
+[data-theme="dark"] .app-owner .bg-indigo-200\/30       { background-color: rgba(99,102,241,0.18) !important; }
+[data-theme="dark"] .app-owner .bg-violet-200\/30       { background-color: rgba(139,92,246,0.18) !important; }
+[data-theme="dark"] .app-owner .bg-amber-200\/30        { background-color: rgba(245,158,11,0.18) !important; }
+[data-theme="dark"] .app-owner .bg-emerald-200\/30      { background-color: rgba(16,185,129,0.18) !important; }
+[data-theme="dark"] .app-owner .bg-blue-200\/25         { background-color: rgba(59,130,246,0.18) !important; }
 
 /* ── Text colours ──────────────────────────────────────────────────────── */
 [data-theme="dark"] .app-owner .text-gray-900         { color: var(--owner-text)   !important; }

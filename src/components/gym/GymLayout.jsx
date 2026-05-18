@@ -4,6 +4,7 @@ import { GymProvider, useGym } from '../../store/GymContext'
 import GymNavbar from './GymNavbar'
 import { getFullThemeCSSVars, getFontStack } from '../../lib/gymTheme'
 import { SocialIcon } from '../../lib/socialPlatforms.jsx'
+import { useDocumentHead } from '../../hooks/useDocumentHead'
 
 export default function GymLayout() {
   return (
@@ -15,6 +16,19 @@ export default function GymLayout() {
 
 function GymLayoutInner() {
   const { gym, loading, error } = useGym()
+
+  // Per-gym browser tab + social-share metadata. Auto-restores SaaS defaults
+  // when the user navigates away from the gym public site.
+  useDocumentHead({
+    title:         gym?.name ? `${gym.name} — Train with us` : undefined,
+    description:   gym?.description || (gym ? `Premium fitness facility${gym.city ? ` in ${gym.city}` : ''}.` : undefined),
+    ogTitle:       gym?.name,
+    ogDescription: gym?.description,
+    ogImage:       gym?.logo_url || undefined,
+    ogUrl:         gym?.slug ? `${typeof window !== 'undefined' ? window.location.origin : ''}/${gym.slug}` : undefined,
+    themeColor:    gym?.theme_color || undefined,
+    favicon:       gym?.logo_url || undefined,
+  })
 
   const fontStack = gym ? getFontStack(gym.font_family) : null
 

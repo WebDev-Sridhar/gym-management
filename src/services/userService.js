@@ -22,26 +22,44 @@ export async function fetchUserProfile(authId) {
 
 /**
  * Create a new gym with name, city, and auto-generated slug.
+ *
+ * Slug escalation (first one that's free wins):
+ *   1. `iron-paradise`              (name only — clean URL for first claimant)
+ *   2. `iron-paradise-mumbai`       (name + city, if city provided)
+ *   3. `iron-paradise-mumbai-7k2`   (random 4-char suffix, up to 5 retries)
+ *
+ * The redirect table makes this safe — even if attempt 1 was someone else's,
+ * we never break their URL.
  */
 export async function createGym({ gymName, city, ownerId }) {
-  const slug = gymName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
+  const { buildSlugCandidates } = await import('../lib/slug')
+  const candidates = buildSlugCandidates(gymName, city, 6)
 
-  const { data, error } = await supabase
-    .from('gyms')
-    .upsert({
-      name: gymName,
-      city,
-      slug,
-      owner_id: ownerId,
-    })
-    .select('id')
-    .single()
+  let lastError = null
 
-  if (error) throw error
-  return data.id
+  for (const slug of candidates) {
+    const { data, error } = await supabase
+      .from('gyms')
+      .insert({
+        name: gymName,
+        city,
+        slug,
+        owner_id: ownerId,
+      })
+      .select('id')
+      .single()
+
+    if (!error) return data.id
+
+    // Postgres unique-violation code = 23505. Try the next candidate.
+    if (error.code === '23505' || /duplicate/i.test(error.message || '')) {
+      lastError = error
+      continue
+    }
+    throw error
+  }
+
+  throw lastError || new Error('Could not allocate a unique gym URL — please try again.')
 }
 
 /**
