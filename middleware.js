@@ -1,31 +1,41 @@
 /**
- * Vercel Edge Middleware — per-gym OG / Twitter / favicon injection.
+ * Vercel Edge Middleware — host-aware routing + per-gym OG injection.
  *
- * Why this exists:
- *   The app is a Vite SPA. React updates the <title> and <meta> tags AFTER
- *   the JS bundle loads. Social crawlers (WhatsApp, LinkedIn, Slack, Facebook,
- *   Twitter, iMessage) DON'T execute JS — they only read the HTML the server
- *   returns. So shared gym links would otherwise show generic Gymmobius
- *   previews instead of the gym's brand.
+ * Three execution paths:
  *
- *   This middleware intercepts `/{gymSlug}` requests, fetches the gym from
- *   Supabase, and rewrites the index.html meta tags before sending the
- *   response. Cached aggressively at the edge to keep latency negligible.
+ *   A. Main domain + path-based slug (gymmobius.app/iron-paradise)
+ *      → Look up gym by slug
+ *      → If gym has `subdomain` claimed → 301 redirect to https://{sub}.{MAIN}
+ *      → Else → inject gym OG tags into index.html, serve SPA
  *
- * Fast-paths out for non-gym paths (assets, API, dashboard, marketing) within
- * a few microseconds via the matcher + reserved-word check.
+ *   B. Subdomain (iron-paradise.gymmobius.app)
+ *      → Look up gym by subdomain
+ *      → Inject gym OG tags, serve SPA at path "/"
  *
- * Requires Vercel env vars: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY.
+ *   C. Anything else (assets, marketing, auth, dashboard, /api/*, ...)
+ *      → Pass-through. Vercel serves the SPA / static asset as normal.
+ *
+ * Phase 2 will add: custom-domain host → look up by custom_domain column.
+ *
+ * Why this exists in middleware (not just client React): social crawlers
+ * (WhatsApp, Slack, LinkedIn, Facebook) don't run JS — they only read the
+ * HTML the server returns. We rewrite <head> server-side so shared links
+ * always show the right gym brand.
+ *
+ * SYNC WITH src/lib/host.js + src/lib/slug.js — keep RESERVED + MAIN_DOMAIN
+ * in lockstep when those files change.
  */
 
 export const config = {
-  // Skip obvious non-matches before invoking the function at all.
   matcher: [
     '/((?!_next|_vercel|api|assets|static|sw\\.js|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|woff2?|ttf|map)).*)',
   ],
 }
 
-// Keep in sync with src/lib/slug.js RESERVED_SLUGS.
+const MAIN_DOMAIN = process.env.VITE_MAIN_DOMAIN || process.env.MAIN_DOMAIN || 'gymmobius.app'
+
+// Routes that share the /:slug space on the main domain.
+// SYNC WITH src/lib/slug.js RESERVED_SLUGS.
 const RESERVED = new Set([
   '',
   'features', 'pricing', 'demo', 'changelog', 'about', 'blog', 'careers',
@@ -37,8 +47,23 @@ const RESERVED = new Set([
   'settings', 'account', 'subscription', 'analytics', 'members',
 ])
 
+// DNS-flavour reserved words that should NOT resolve as subdomains.
+// SYNC WITH src/lib/slug.js RESERVED_SUBDOMAINS.
+const RESERVED_SUB = new Set([
+  ...RESERVED,
+  'cdn', 'mail', 'smtp', 'imap', 'pop', 'ftp', 'sftp',
+  'ns', 'ns1', 'ns2', 'mx', 'mx1', 'mx2', 'dns',
+  'staging', 'stage', 'dev', 'test', 'preview', 'beta', 'alpha',
+  'static', 'assets', 'media', 'img', 'images',
+  'dashboard', 'panel', 'console', 'portal',
+  'status', 'health', 'metrics', 'ping',
+  'webhook', 'webhooks', 'callback', 'oauth', 'sso', 'logout',
+])
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function escapeHtml(s = '') {
   return String(s)
@@ -49,16 +74,57 @@ function escapeHtml(s = '') {
     .replace(/'/g, '&#39;')
 }
 
+function normaliseHost(host) {
+  return String(host || '').toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '')
+}
+
+/** Returns { kind: 'main' | 'subdomain' | 'custom', subdomain? } */
+function classifyHost(host) {
+  const h = normaliseHost(host)
+  if (!h || h === 'localhost' || h === '127.0.0.1') return { kind: 'main' }
+  if (h === MAIN_DOMAIN || h === `www.${MAIN_DOMAIN}`) return { kind: 'main' }
+  if (h.endsWith(`.${MAIN_DOMAIN}`)) {
+    const sub = h.slice(0, -(MAIN_DOMAIN.length + 1))
+    if (!sub || sub.includes('.')) return { kind: 'main' }
+    if (RESERVED_SUB.has(sub)) return { kind: 'main' }
+    return { kind: 'subdomain', subdomain: sub }
+  }
+  // Anything else = custom domain (Phase 2 will use this branch)
+  return { kind: 'custom' }
+}
+
+async function fetchGymBy(column, value) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/gyms?${column}=eq.${encodeURIComponent(value)}&select=name,slug,subdomain,custom_domain,city,description,logo_url,theme_color,seo_description,seo_og_image,seo_keywords&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      },
+    )
+    if (!res.ok) return null
+    const rows = await res.json()
+    return rows[0] || null
+  } catch {
+    return null
+  }
+}
+
 function buildMetaBlock(gym, requestUrl) {
-  const origin      = new URL(requestUrl).origin
-  const title       = `${gym.name} — Train with us`
-  const description = gym.description ||
+  const origin = new URL(requestUrl).origin
+  const title  = `${gym.name} — Train with us`
+  const description = gym.seo_description ||
+    gym.description ||
     `Premium fitness facility${gym.city ? ` in ${gym.city}` : ''}. Join ${gym.name} today.`
-  const image       = gym.logo_url || `${origin}/logo.png`
+  const image = gym.seo_og_image || gym.logo_url || `${origin}/logo.png`
 
   return [
     `<title>${escapeHtml(title)}</title>`,
     `<meta name="description" content="${escapeHtml(description)}" />`,
+    gym.seo_keywords ? `<meta name="keywords" content="${escapeHtml(gym.seo_keywords)}" />` : '',
 
     `<meta property="og:type" content="website" />`,
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
@@ -77,69 +143,84 @@ function buildMetaBlock(gym, requestUrl) {
   ].filter(Boolean).join('\n    ')
 }
 
-export default async function middleware(request) {
-  const url = new URL(request.url)
-  const firstSegment = url.pathname.slice(1).split('/')[0] || ''
-
-  // 1. Fast-path: not a gym slug → pass through to the SPA.
-  if (RESERVED.has(firstSegment) || !firstSegment || firstSegment.includes('.')) {
-    return  // undefined return = pass through
-  }
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(firstSegment)) return
-
-  // 2. Need credentials — if not configured, fail open silently.
-  if (!SUPABASE_URL || !SUPABASE_KEY) return
-
-  // 3. Fetch the gym (only OG-relevant columns).
-  let gym = null
-  try {
-    const supabaseRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/gyms?slug=eq.${encodeURIComponent(firstSegment)}&select=name,city,description,logo_url,theme_color&limit=1`,
-      {
-        headers: {
-          apikey: SUPABASE_KEY,
-          authorization: `Bearer ${SUPABASE_KEY}`,
-        },
-      },
-    )
-    if (supabaseRes.ok) {
-      const rows = await supabaseRes.json()
-      gym = rows[0] || null
-    }
-  } catch {
-    return  // Network glitch — fail open with default Gymmobius HTML
-  }
-
-  if (!gym) return  // No matching gym; SPA's own redirect/404 takes over
-
-  // 4. Fetch the deployed index.html and rewrite its <head>.
+async function rewriteIndexHtml(originUrl, gym, requestUrl) {
   let html
   try {
-    const upstream = await fetch(`${url.origin}/index.html`, { headers: { accept: 'text/html' } })
-    if (!upstream.ok) return
+    const upstream = await fetch(`${originUrl}/index.html`, { headers: { accept: 'text/html' } })
+    if (!upstream.ok) return null
     html = await upstream.text()
   } catch {
-    return
+    return null
   }
 
-  const block = buildMetaBlock(gym, request.url)
+  if (!/<\/head>/i.test(html)) return null
 
-  // Strip the default SaaS head metadata then inject the gym block before </head>.
-  // Defensive: if no </head> match (corrupt file), we leave the file alone.
-  if (!/<\/head>/i.test(html)) return
-
-  const rewritten = html
+  const block = buildMetaBlock(gym, requestUrl)
+  return html
     .replace(/<title>[\s\S]*?<\/title>/i, '')
-    .replace(/<meta[^>]+(?:name|property)="(?:description|og:[^"]+|twitter:[^"]+|theme-color)"[^>]*>\s*/gi, '')
+    .replace(/<meta[^>]+(?:name|property)="(?:description|og:[^"]+|twitter:[^"]+|theme-color|keywords)"[^>]*>\s*/gi, '')
     .replace(/<link[^>]+rel="(?:icon|shortcut icon|apple-touch-icon)"[^>]*>\s*/gi, '')
     .replace(/<\/head>/i, `    ${block}\n  </head>`)
+}
 
-  return new Response(rewritten, {
+function htmlResponse(html, extraHeaders = {}) {
+  return new Response(html, {
     status: 200,
     headers: {
       'content-type': 'text/html; charset=utf-8',
-      // Edge cache 5min, browsers cache 1min, serve stale while revalidating up to 1d.
+      // Edge cache 5min, browsers cache 1min, serve stale up to 1d
       'cache-control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400',
+      ...extraHeaders,
     },
   })
+}
+
+// ─── Main middleware ────────────────────────────────────────────────────────
+
+export default async function middleware(request) {
+  const url       = new URL(request.url)
+  const origin    = url.origin
+  const path      = url.pathname
+  const hostInfo  = classifyHost(request.headers.get('host') || url.host)
+
+  // ── PATH B: subdomain ────────────────────────────────────────────────
+  if (hostInfo.kind === 'subdomain') {
+    const gym = await fetchGymBy('subdomain', hostInfo.subdomain)
+    if (!gym) return  // SPA will show the GymContext "not found" state
+
+    const html = await rewriteIndexHtml(origin, gym, request.url)
+    return html ? htmlResponse(html) : undefined
+  }
+
+  // ── PATH C: custom domain (Phase 2) ──────────────────────────────────
+  if (hostInfo.kind === 'custom') {
+    // Phase 2 will hit gyms.custom_domain here. Until then, pass through.
+    return
+  }
+
+  // ── PATH A: main domain ──────────────────────────────────────────────
+  const firstSegment = path.slice(1).split('/')[0] || ''
+  if (RESERVED.has(firstSegment) || !firstSegment || firstSegment.includes('.')) return
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(firstSegment)) return
+
+  const gym = await fetchGymBy('slug', firstSegment)
+  if (!gym) return  // SPA's GymContext handles the redirect-table lookup
+
+  // Redirect path-based access → subdomain (canonical URL) when claimed.
+  // Only when the gym has a subdomain set; otherwise serve as before.
+  if (gym.subdomain) {
+    const remainingPath = path.slice(firstSegment.length + 1) || ''  // strip "/iron-paradise"
+    const target = `https://${gym.subdomain}.${MAIN_DOMAIN}${remainingPath || '/'}${url.search || ''}`
+    return new Response(null, {
+      status: 301,
+      headers: {
+        location: target,
+        'cache-control': 'public, max-age=300, s-maxage=3600',
+      },
+    })
+  }
+
+  // No subdomain claimed → inject OG and serve the SPA inline.
+  const html = await rewriteIndexHtml(origin, gym, request.url)
+  return html ? htmlResponse(html) : undefined
 }

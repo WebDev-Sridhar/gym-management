@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGym } from '../../store/GymContext'
+import { getPublicBasePath } from '../../lib/host'
 
 export default function GymNavbar() {
   const { gym } = useGym()
@@ -18,7 +19,7 @@ export default function GymNavbar() {
   if (!gym) return null
 
   const isDark = (gym.theme_mode || 'dark') !== 'light'
-  const base = `/${gym.slug}`
+  const base = getPublicBasePath(typeof window !== 'undefined' ? window.location.hostname : '', gym.slug)
 
   // Home page has a full-height dark photo hero → transparent navbar with white text is fine.
   // All other pages have a light surface hero in light mode → navbar must be solid from the start.
@@ -66,7 +67,7 @@ export default function GymNavbar() {
       >
         <div className="max-w-6xl mx-auto px-6 h-18 flex items-center justify-between" style={{ height: '72px' }}>
           {/* Logo */}
-          <Link to={base} className="flex items-center gap-3 group">
+          <Link to={base || '/'} className="flex items-center gap-3 group">
             {gym.logo_url ? (
               <img src={gym.logo_url} alt={gym.name} className="w-9 h-9 rounded-xl object-cover" />
             ) : (

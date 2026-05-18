@@ -29,6 +29,13 @@ const FEATURE_RULES = {
   // ── Analytics tiers ────────────────────────────────────────────────────
   advanced_analytics:   ['pro', 'premium'],   // peak hours, churn, insights, pie breakdowns
   extended_date_range:  ['pro', 'premium'],   // 90D / 1Y range pickers (Starter capped at 30D)
+
+  // ── SEO & sharing ──────────────────────────────────────────────────────
+  custom_seo:           ['pro', 'premium'],   // override meta description, OG image, keywords
+
+  // ── Domains ────────────────────────────────────────────────────────────
+  custom_subdomain:     ['pro', 'premium'],   // iron-paradise.gymmobius.app  (Phase 1)
+  custom_domain:        ['premium'],          // ironparadise.com             (Phase 2)
 }
 
 /**

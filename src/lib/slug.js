@@ -24,8 +24,24 @@ export const RESERVED_SLUGS = new Set([
   'settings', 'account', 'subscription', 'analytics', 'members',
 ])
 
+// Hostname-style reserved words. A subdomain matching any of these would
+// shadow infrastructure / industry-standard hostnames or our own routes.
+// Superset of RESERVED_SLUGS plus DNS-flavour names.
+export const RESERVED_SUBDOMAINS = new Set([
+  ...RESERVED_SLUGS,
+  'cdn', 'mail', 'smtp', 'imap', 'pop', 'ftp', 'sftp',
+  'ns', 'ns1', 'ns2', 'mx', 'mx1', 'mx2', 'dns',
+  'staging', 'stage', 'dev', 'test', 'preview', 'beta', 'alpha',
+  'static', 'assets', 'cdn', 'media', 'img', 'images',
+  'dashboard', 'panel', 'console', 'portal',
+  'status', 'health', 'metrics', 'ping',
+  'webhook', 'webhooks', 'callback',
+  'auth', 'oauth', 'sso', 'login', 'logout',
+])
+
 const MIN_LEN = 3
 const MAX_LEN = 40
+const SUB_MAX_LEN = 30   // DNS-friendlier cap for subdomains
 
 /** Normalise an arbitrary string into a slug — lowercase, hyphens, alphanumeric. */
 export function slugify(input) {
@@ -102,4 +118,24 @@ export function validateSlug(slug) {
 export function getGymPublicUrl(slug) {
   if (typeof window === 'undefined') return `/${slug}`
   return `${window.location.origin}/${slug}`
+}
+
+/**
+ * Validate a subdomain candidate. Same character rules as slug, plus:
+ *   - max 30 chars (DNS-friendly, also avoids 63-char label hard limit)
+ *   - cannot start/end with hyphen
+ *   - cannot match RESERVED_SUBDOMAINS (DNS-flavour reserved words)
+ *
+ * Returns null on success, error string on failure.
+ */
+export function validateSubdomain(sub) {
+  if (!sub) return 'Subdomain is required'
+  if (sub.length < MIN_LEN) return `Use at least ${MIN_LEN} characters`
+  if (sub.length > SUB_MAX_LEN) return `Maximum ${SUB_MAX_LEN} characters`
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(sub)) {
+    return 'Use lowercase letters, numbers, and hyphens only'
+  }
+  if (sub.includes('--')) return 'Avoid consecutive hyphens'
+  if (RESERVED_SUBDOMAINS.has(sub)) return 'This subdomain is reserved — pick another'
+  return null
 }

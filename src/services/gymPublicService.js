@@ -15,6 +15,22 @@ export async function fetchGymBySlug(slug) {
 }
 
 /**
+ * Fetch gym by subdomain (Pro+ feature) — used when the visitor lands on
+ * iron-paradise.gymmobius.app. Same column projection as fetchGymBySlug
+ * so the rest of the page treats the result identically.
+ */
+export async function fetchGymBySubdomain(subdomain) {
+  const { data, error } = await supabaseAnon
+    .from('gyms')
+.select('id, name, slug, subdomain, logo_url, theme_color, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, description, city, phone, email, address, lat, lng, hero_style, social_links, working_hours, payment_mode, razorpay_enabled, upi_id')
+    .eq('subdomain', subdomain)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
+/**
  * Resolve an old slug → current slug via gym_slug_redirects.
  * Returns the current slug string, or null if no redirect exists.
  *

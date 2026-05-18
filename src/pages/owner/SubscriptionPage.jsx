@@ -49,7 +49,7 @@ const PLANS = [
     ],
     notIncluded: [
       'Multi-branch support',
-      'custom braning',
+      'custom Domain',
     ],
   },
   {
@@ -63,8 +63,8 @@ const PLANS = [
       'Unlimited members',
       'Everything in Pro',
       'Multi-branch support',
-      'Custom branding',
-      'API access',
+      'Custom Domain',
+      'Advance SEO',
       'Dedicated support',
     ],
     notIncluded: [],

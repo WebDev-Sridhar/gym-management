@@ -5,6 +5,7 @@ import GymNavbar from './GymNavbar'
 import { getFullThemeCSSVars, getFontStack } from '../../lib/gymTheme'
 import { SocialIcon } from '../../lib/socialPlatforms.jsx'
 import { useDocumentHead } from '../../hooks/useDocumentHead'
+import { getPublicBasePath } from '../../lib/host'
 
 export default function GymLayout() {
   return (
@@ -81,7 +82,8 @@ function GymLayoutInner() {
   }
 
   const themeVars = getFullThemeCSSVars(gym)
-  const base = `/${gym.slug}`
+  // Host-aware base path: prefix slug on main domain, empty on subdomain / custom domain
+  const base = getPublicBasePath(typeof window !== 'undefined' ? window.location.hostname : '', gym.slug)
 
   return (
     <div
@@ -143,7 +145,7 @@ function GymLayoutInner() {
               <h4 className="text-xs tracking-[0.2em] uppercase mb-5 font-sans font-bold" style={{ color: 'var(--gym-text-muted)' }}>Navigate</h4>
               <ul className="space-y-3">
                 {[
-                  { to: base, label: 'Home' },
+                  { to: base || '/', label: 'Home' },
                   { to: `${base}/about`, label: 'About' },
                   { to: `${base}/pricing`, label: 'Pricing' },
                   { to: `${base}/trainers`, label: 'Trainers' },

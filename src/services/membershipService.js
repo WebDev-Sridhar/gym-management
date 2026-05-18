@@ -402,7 +402,7 @@ export async function fetchGymDetails(gymId) {
   return data
 }
 
-export async function updateGymDetails({ gymId, name, city, description, logo_url, theme_color, phone, email, address, lat, lng, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, hero_style, social_links, working_hours, payment_mode, upi_id }) {
+export async function updateGymDetails({ gymId, name, city, description, logo_url, theme_color, phone, email, address, lat, lng, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, hero_style, social_links, working_hours, payment_mode, upi_id, seo_description, seo_og_image, seo_keywords }) {
   const updates = {}
   if (name !== undefined) updates.name = name
   if (city !== undefined) updates.city = city
@@ -427,6 +427,9 @@ export async function updateGymDetails({ gymId, name, city, description, logo_ur
   if (working_hours !== undefined) updates.working_hours = working_hours
   if (payment_mode !== undefined) updates.payment_mode = payment_mode
   if (upi_id !== undefined) updates.upi_id = upi_id
+  if (seo_description !== undefined) updates.seo_description = seo_description
+  if (seo_og_image    !== undefined) updates.seo_og_image    = seo_og_image
+  if (seo_keywords    !== undefined) updates.seo_keywords    = seo_keywords
 
   const { data, error } = await supabase
     .from('gyms')
@@ -499,6 +502,71 @@ export async function updateGymSlug({ gymId, currentSlug, newSlug }) {
       .upsert({ old_slug: currentSlug, gym_id: gymId }, { onConflict: 'old_slug' })
       .then(({ error }) => {
         if (error) console.warn('[updateGymSlug] redirect insert failed:', error.message)
+      })
+  }
+
+  return updated
+}
+
+// ─── Subdomain management (Pro+) ─────────────────────────────────────────────
+
+/**
+ * Returns true if a subdomain is free to claim. Checks gyms.subdomain AND
+ * gyms.slug AND gym_slug_redirects.old_slug so a former slug or another
+ * gym's claim can't collide.
+ */
+export async function checkSubdomainAvailable(subdomain) {
+  if (!subdomain) return false
+  const [{ data: subHit }, { data: slugHit }, { data: redirHit }] = await Promise.all([
+    supabase.from('gyms').select('id').eq('subdomain', subdomain).maybeSingle(),
+    supabase.from('gyms').select('id').eq('slug',      subdomain).maybeSingle(),
+    supabase.from('gym_slug_redirects').select('old_slug').eq('old_slug', subdomain).maybeSingle(),
+  ])
+  return !subHit && !slugHit && !redirHit
+}
+
+/**
+ * Claim / change a gym's subdomain. Writes the previous subdomain into
+ * gym_slug_redirects so cached external links keep working — the middleware
+ * resolves either a slug OR an old subdomain through the same redirect path.
+ */
+export async function updateGymSubdomain({ gymId, currentSubdomain, newSubdomain }) {
+  if (!gymId) throw new Error('gymId is required')
+  const next = newSubdomain ? String(newSubdomain).toLowerCase().trim() : null
+
+  if (next === (currentSubdomain || null)) {
+    const { data, error } = await supabase.from('gyms').select('*').eq('id', gymId).single()
+    if (error) throw error
+    return data
+  }
+
+  if (next) {
+    const free = await checkSubdomainAvailable(next)
+    if (!free) throw new Error('That subdomain is already taken — try another.')
+  }
+
+  const { data: updated, error: upErr } = await supabase
+    .from('gyms')
+    .update({ subdomain: next })
+    .eq('id', gymId)
+    .select('*')
+    .single()
+
+  if (upErr) {
+    if (upErr.code === '23505' || /duplicate/i.test(upErr.message || '')) {
+      throw new Error('That subdomain was just taken — try another.')
+    }
+    throw upErr
+  }
+
+  // Best-effort redirect entry for the old subdomain (so old shared links
+  // keep working). Same redirect table that slug renames use.
+  if (currentSubdomain) {
+    await supabase
+      .from('gym_slug_redirects')
+      .upsert({ old_slug: currentSubdomain, gym_id: gymId }, { onConflict: 'old_slug' })
+      .then(({ error }) => {
+        if (error) console.warn('[updateGymSubdomain] redirect insert failed:', error.message)
       })
   }
 

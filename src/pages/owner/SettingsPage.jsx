@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { updateUserProfile } from '../../services/userService'
-import { fetchGymDetails, updateGymDetails, updateGymSlug, checkSlugAvailable } from '../../services/membershipService'
-import { slugify, validateSlug, getGymPublicUrl } from '../../lib/slug'
+import { fetchGymDetails, updateGymDetails, updateGymSlug, checkSlugAvailable, updateGymSubdomain, checkSubdomainAvailable } from '../../services/membershipService'
+import { slugify, validateSlug, validateSubdomain, getGymPublicUrl } from '../../lib/slug'
+import { MAIN_DOMAIN } from '../../lib/host'
+import { canAccess } from '../../lib/featureGates'
 import { useDebounce } from '../../hooks/useDebounce'
 import { supabase } from '../../services/supabaseClient'
 import { Sk } from '../../components/ui/Skeleton'
@@ -162,7 +164,9 @@ export default function SettingsPage() {
   const [signingOut, setSigningOut]   = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showSlugModal, setShowSlugModal] = useState(false)
+  const [showSubdomainModal, setShowSubdomainModal] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const [copiedSubUrl, setCopiedSubUrl] = useState(false)
   const [copiedGymId, setCopiedGymId] = useState(false)
 
   // ── personal info ──
@@ -614,40 +618,94 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Public URL — always visible; never auto-changes with gym name */}
+            {/* Public URLs — stacked list of every URL the gym is reachable at */}
             {gym?.slug && (
-              <div className="mt-5 pt-5 border-t border-gray-100">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-500">Public URL</p>
-                    <p className="text-sm font-mono text-gray-800 truncate mt-1" title={getGymPublicUrl(gym.slug)}>
-                      {getGymPublicUrl(gym.slug)}
-                    </p>
-                    <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
-                      Shared with members on WhatsApp, posters and the gym landing page. Old URLs keep working after a change.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(getGymPublicUrl(gym.slug))
-                        setCopiedUrl(true)
-                        setTimeout(() => setCopiedUrl(false), 1500)
-                      }}
-                      className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:border-gray-300 cursor-pointer flex items-center gap-1.5"
-                    >
-                      {copiedUrl ? <><Check size={12} className="text-green-500" />Copied</> : <><Copy size={12} />Copy</>}
-                    </button>
+              <div className="mt-5 pt-5 border-t border-gray-100 space-y-3">
+                <p className="text-xs font-medium text-gray-500">Public URLs</p>
+
+                {/* Row 1: Path-based — always shown */}
+                <PublicUrlRow
+                  url={getGymPublicUrl(gym.slug)}
+                  badge={canAccess('custom_subdomain', subscription?.plan_name) && gym.subdomain ? null : 'Primary'}
+                  copied={copiedUrl}
+                  onCopy={() => {
+                    navigator.clipboard.writeText(getGymPublicUrl(gym.slug))
+                    setCopiedUrl(true)
+                    setTimeout(() => setCopiedUrl(false), 1500)
+                  }}
+                  rightAction={
                     <button
                       type="button"
                       onClick={() => setShowSlugModal(true)}
                       className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:border-indigo-300 hover:text-indigo-700 cursor-pointer flex items-center gap-1.5"
                     >
-                      <Pencil size={11} />Change URL
+                      <Pencil size={11} />Change
                     </button>
-                  </div>
-                </div>
+                  }
+                />
+
+                {/* Row 2: Subdomain (Pro+) */}
+                {canAccess('custom_subdomain', subscription?.plan_name) ? (
+                  gym.subdomain ? (
+                    <PublicUrlRow
+                      url={`https://${gym.subdomain}.${MAIN_DOMAIN}`}
+                      badge="Primary"
+                      copied={copiedSubUrl}
+                      onCopy={() => {
+                        navigator.clipboard.writeText(`https://${gym.subdomain}.${MAIN_DOMAIN}`)
+                        setCopiedSubUrl(true)
+                        setTimeout(() => setCopiedSubUrl(false), 1500)
+                      }}
+                      rightAction={
+                        <button
+                          type="button"
+                          onClick={() => setShowSubdomainModal(true)}
+                          className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:border-indigo-300 hover:text-indigo-700 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Pencil size={11} />Change
+                        </button>
+                      }
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowSubdomainModal(true)}
+                      className="w-full flex items-center gap-3 px-4 py-3 border border-dashed border-indigo-200 bg-indigo-50/40 hover:bg-indigo-50 rounded-xl text-left transition-colors cursor-pointer group"
+                    >
+                      <Globe size={15} className="text-indigo-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-indigo-900">Claim your subdomain</p>
+                        <p className="text-[11px] text-indigo-700/80 mt-0.5">
+                          Use <span className="font-mono">{gym.slug}.{MAIN_DOMAIN}</span> for cleaner branding.
+                        </p>
+                      </div>
+                      <ChevronRight size={13} className="text-indigo-400 group-hover:text-indigo-600 shrink-0" />
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/owner-dashboard/subscription')}
+                    className="w-full flex items-center gap-3 px-4 py-3 border border-gray-200 bg-gray-50 hover:bg-white hover:border-indigo-200 rounded-xl text-left transition-colors cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-white border border-gray-200 flex items-center justify-center shrink-0">
+                      <Globe size={13} className="text-gray-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-700">
+                        Subdomain <span className="text-[10px] font-bold ml-1 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded uppercase tracking-wide">Pro</span>
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Get <span className="font-mono">{gym.slug}.{MAIN_DOMAIN}</span> on the Pro plan.
+                      </p>
+                    </div>
+                    <ChevronRight size={13} className="text-gray-300 group-hover:text-indigo-500 shrink-0" />
+                  </button>
+                )}
+
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Old URLs keep working after a rename — visitors are auto-redirected.
+                </p>
               </div>
             )}
 
@@ -855,6 +913,19 @@ export default function SettingsPage() {
           onSaved={(updated) => {
             setGym(updated)
             setShowSlugModal(false)
+          }}
+        />
+      )}
+
+      {showSubdomainModal && gym && (
+        <SubdomainModal
+          gymId={gymId}
+          gymSlug={gym.slug}
+          currentSubdomain={gym.subdomain}
+          onClose={() => setShowSubdomainModal(false)}
+          onSaved={(updated) => {
+            setGym(updated)
+            setShowSubdomainModal(false)
           }}
         />
       )}
@@ -1135,6 +1206,219 @@ function ChangeUrlModal({ gymId, currentSlug, onClose, onSaved }) {
           >
             {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
             {saving ? 'Saving…' : 'Save new URL'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Public URL row — compact list item used in the Settings URL stack ───────
+function PublicUrlRow({ url, badge, copied, onCopy, rightAction }) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl">
+      <Globe size={14} className="text-gray-400 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-mono text-gray-800 truncate" title={url}>{url}</p>
+          {badge && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded uppercase tracking-wide shrink-0">
+              {badge}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          type="button"
+          onClick={onCopy}
+          className="px-2.5 py-1.5 border border-gray-200 bg-white rounded-lg text-xs font-medium text-gray-600 hover:border-gray-300 cursor-pointer flex items-center gap-1.5"
+        >
+          {copied ? <><Check size={12} className="text-green-500" />Copied</> : <><Copy size={12} />Copy</>}
+        </button>
+        {rightAction}
+      </div>
+    </div>
+  )
+}
+
+// ── Subdomain claim/change modal ────────────────────────────────────────────
+// Mirrors ChangeUrlModal: live availability check, validation, reserved
+// hostname check, save → updateGymSubdomain (writes redirect entry on rename).
+function SubdomainModal({ gymId, gymSlug, currentSubdomain, onClose, onSaved }) {
+  // Default the input to gym.slug for first-time claim — most owners want
+  // their subdomain to match their slug for consistency.
+  const initial = currentSubdomain || gymSlug || ''
+  const [draft, setDraft]       = useState(initial)
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
+  const [available, setAvailable] = useState(null)
+  const [checking, setChecking] = useState(false)
+
+  function onInput(value) {
+    setError('')
+    setAvailable(null)
+    const normalised = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    setDraft(normalised)
+  }
+
+  const debouncedDraft = useDebounce(draft, 350)
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [onClose])
+
+  useEffect(() => {
+    const trimmed = (debouncedDraft || '').trim()
+    if (!trimmed || trimmed === currentSubdomain) {
+      setAvailable(null)
+      return
+    }
+    if (validateSubdomain(trimmed)) {
+      setAvailable(false)
+      return
+    }
+    let cancelled = false
+    setChecking(true)
+    checkSubdomainAvailable(trimmed)
+      .then(ok => { if (!cancelled) setAvailable(ok) })
+      .catch(() => { if (!cancelled) setAvailable(null) })
+      .finally(() => { if (!cancelled) setChecking(false) })
+    return () => { cancelled = true }
+  }, [debouncedDraft, currentSubdomain])
+
+  async function handleSave() {
+    setError('')
+    const trimmed = draft.trim()
+
+    // Allow saving empty to "release" the subdomain (only if currently set)
+    if (!trimmed && currentSubdomain) {
+      setSaving(true)
+      try {
+        const updated = await updateGymSubdomain({ gymId, currentSubdomain, newSubdomain: null })
+        onSaved(updated)
+      } catch (err) {
+        setError(err.message || 'Failed to release subdomain')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
+    if (trimmed === currentSubdomain) return onClose()
+
+    const validationErr = validateSubdomain(trimmed)
+    if (validationErr) return setError(validationErr)
+    if (available === false) return setError('That subdomain is already taken.')
+
+    setSaving(true)
+    try {
+      const updated = await updateGymSubdomain({ gymId, currentSubdomain, newSubdomain: trimmed })
+      onSaved(updated)
+    } catch (err) {
+      setError(err.message || 'Failed to update subdomain')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const trimmed   = draft.trim()
+  const unchanged = trimmed === (currentSubdomain || '')
+  const showAvail = trimmed && !unchanged && !validateSubdomain(trimmed)
+  const canSave   = !saving && !unchanged && (available === true || (!trimmed && currentSubdomain))
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)' }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+          <h3 className="text-base font-bold text-gray-900">
+            {currentSubdomain ? 'Change subdomain' : 'Claim your subdomain'}
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Your gym becomes reachable at a clean branded URL. Old URLs keep working.
+          </p>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Subdomain</label>
+            <div className="flex items-center border border-gray-200 rounded-lg focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 overflow-hidden">
+              <input
+                value={draft}
+                onChange={e => onInput(e.target.value)}
+                placeholder="iron-paradise"
+                className="flex-1 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none font-mono"
+                autoFocus
+              />
+              <span className="text-xs text-gray-400 font-mono select-none pr-3 shrink-0">
+                .{MAIN_DOMAIN}
+              </span>
+              {showAvail && (
+                <span className="pr-3 shrink-0">
+                  {checking
+                    ? <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin block" />
+                    : available === true  ? <Check size={14} className="text-emerald-600" />
+                    : available === false ? <X size={14} className="text-red-500" />
+                    : null
+                  }
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+              Lowercase letters, numbers and hyphens. {trimmed.length}/30 characters.
+            </p>
+          </div>
+
+          {error && (
+            <p className="flex items-center gap-1.5 text-xs text-red-500 font-medium">
+              <AlertTriangle size={12} /> {error}
+            </p>
+          )}
+
+          {unchanged && trimmed && (
+            <p className="text-[11px] text-gray-400">This is your current subdomain.</p>
+          )}
+
+          {currentSubdomain && !trimmed && (
+            <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                <strong>Release subdomain?</strong> Your gym will only be reachable at the path-based URL until you claim a new subdomain.
+              </p>
+            </div>
+          )}
+
+          <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+            <p className="text-[11px] text-gray-600 leading-relaxed">
+              After save, <span className="font-mono">gymmobius.app/{gymSlug}</span> will redirect to your new subdomain. Existing posters / shared links keep working.
+            </p>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!canSave}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            {saving ? 'Saving…' : (currentSubdomain && !trimmed ? 'Release' : 'Save subdomain')}
           </button>
         </div>
       </div>

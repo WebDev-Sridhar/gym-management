@@ -45,6 +45,13 @@ import GymLoginPage from './pages/gym/GymLoginPage'
 import GymJoinPage from './pages/gym/GymJoinPage'
 import ScrollToTop from './ScrollToTop'
 import { ROUTES } from './lib/constants/routes'
+import { detectHost } from './lib/host'
+
+// Detect host kind once at app boot. Hostname can only change with a full
+// page reload, so this is stable for the entire React lifecycle.
+const HOST_KIND = typeof window !== 'undefined'
+  ? detectHost(window.location.hostname).kind
+  : 'main'
 
 // Lazy-load marketing & legal pages — they're public, not the hot path.
 const FeaturesPage = lazy(() => import('./pages/landing/FeaturesPage'))
@@ -74,8 +81,41 @@ function WebsitePageRouter() {
   return planName === 'Starter' ? <StarterWebsitePage /> : <WebsitePage />
 }
 
+// Gym public-page children — shared between main-domain (/:gymSlug/*) and
+// subdomain/custom-domain (/*) route mounts. Defined once to keep both
+// blocks in sync.
+const gymChildRoutes = (
+  <>
+    <Route index element={<GymHome />} />
+    <Route path="about" element={<GymAbout />} />
+    <Route path="pricing" element={<GymPricing />} />
+    <Route path="trainers" element={<GymTrainers />} />
+    <Route path="contact" element={<GymContact />} />
+    <Route path="login" element={<GymLoginPage />} />
+    <Route path="join" element={<GymJoinPage />} />
+    <Route path="privacy" element={<GymPrivacyPage />} />
+    <Route path="terms" element={<GymTermsPage />} />
+    <Route path="refund" element={<GymRefundPage />} />
+    <Route path="membership" element={<GymMembershipPage />} />
+    <Route path="waiver" element={<GymWaiverPage />} />
+  </>
+)
 
 
+
+
+// Minimal Routes block rendered when the visitor lands on a tenant host
+// (iron-paradise.gymmobius.app or a verified custom domain). The whole
+// app is "just this gym" — no marketing, auth, dashboard routes here.
+function TenantRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<GymLayout />}>
+        {gymChildRoutes}
+      </Route>
+    </Routes>
+  )
+}
 
 export default function App() {
   return (
@@ -85,6 +125,7 @@ export default function App() {
       <AuthProvider>
         <ThemeProvider>
         <Suspense fallback={null}>
+        {HOST_KIND !== 'main' ? <TenantRoutes /> : (
         <Routes>
           {/* Public routes */}
           <Route path={ROUTES.HOME} element={<LandingPage />} />
@@ -157,21 +198,10 @@ export default function App() {
           } />
           {/* Public gym pages — must be LAST (dynamic :gymSlug param) */}
           <Route path="/:gymSlug" element={<GymLayout />}>
-            <Route index element={<GymHome />} />
-            <Route path="about" element={<GymAbout />} />
-            <Route path="pricing" element={<GymPricing />} />
-            <Route path="trainers" element={<GymTrainers />} />
-            <Route path="contact" element={<GymContact />} />
-            <Route path="login" element={<GymLoginPage />} />
-            <Route path="join" element={<GymJoinPage />} />
-            {/* Per-gym legal pages (common templates, gym data injected at runtime) */}
-            <Route path="privacy" element={<GymPrivacyPage />} />
-            <Route path="terms" element={<GymTermsPage />} />
-            <Route path="refund" element={<GymRefundPage />} />
-            <Route path="membership" element={<GymMembershipPage />} />
-            <Route path="waiver" element={<GymWaiverPage />} />
+            {gymChildRoutes}
           </Route>
         </Routes>
+        )}
         </Suspense>
         </ThemeProvider>
       </AuthProvider>

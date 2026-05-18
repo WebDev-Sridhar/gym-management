@@ -6,11 +6,12 @@ import {
   UserPlus,
   ShieldCheck,
   ArrowRight,
-  Dumbbell,
+  ClipboardList,
   CheckCircle2,
   Sparkles,
   BellRing,
   LayoutDashboard,
+  UserCheck,
 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 
@@ -60,7 +61,7 @@ export default function HomePage() {
     {
       title: 'Add Trainer',
       desc: 'Onboard a new trainer',
-      icon: Dumbbell,
+      icon: UserCheck,
       link: '/owner-dashboard/trainers',
       iconBg: 'bg-blue-100',
       iconColor: 'text-blue-600',
@@ -68,7 +69,7 @@ export default function HomePage() {
     {
       title: 'Setup Plans',
       desc: 'Create membership plans',
-      icon: LayoutDashboard,
+      icon: ClipboardList,
       link: '/owner-dashboard/plans',
       iconBg: 'bg-indigo-100',
       iconColor: 'text-indigo-600',

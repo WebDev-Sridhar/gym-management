@@ -100,8 +100,9 @@ const PAGES = [
     label: 'Settings',
     minPlan: 'Starter',
     sections: [
-      { id: 'theme',  label: 'Theme',  desc: 'Colors & branding', minPlan: 'Starter' },
-      { id: 'design', label: 'Design', desc: 'Fonts & spacing',   minPlan: 'Pro' },
+      { id: 'theme',  label: 'Theme',  desc: 'Colors & branding',         minPlan: 'Starter' },
+      { id: 'design', label: 'Design', desc: 'Fonts & spacing',           minPlan: 'Pro' },
+      { id: 'seo',    label: 'SEO & Sharing', desc: 'Social previews & meta', minPlan: 'Pro' },
     ],
   },
   {
@@ -732,6 +733,164 @@ function DesignPanel({ gym, gymId, planName, onSave, setPreviewData }) {
         <SuccessMsg msg={success} />
       </div>
     </form>
+  )
+}
+
+// ─── SEO & Sharing Panel ────────────────────────────────────────────────────────
+// Lets Pro+ owners override the meta description, OG image, and keywords used
+// by the Vercel edge middleware when generating link-share previews
+// (WhatsApp, LinkedIn, Slack, Facebook, Twitter, iMessage).
+function SeoPanel({ gym, gymId, planName, onSave }) {
+  const [description, setDescription] = useState(gym?.seo_description || '')
+  const [keywords,    setKeywords]    = useState(gym?.seo_keywords    || '')
+  const ogImg = useCMSImage({ gymId, fieldKey: 'seo_og_image', section: 'seo', initialUrl: gym?.seo_og_image || '' })
+
+  const [saving,  setSaving]  = useState(false)
+  const [success, setSuccess] = useState('')
+
+  // Live preview values (with fallback chain matching middleware.js)
+  const effectiveDesc  = description.trim() ||
+    gym?.description ||
+    `Premium fitness facility${gym?.city ? ` in ${gym.city}` : ''}. Join ${gym?.name || 'us'} today.`
+  const effectiveImg   = ogImg.url || gym?.logo_url || '/logo.png'
+  const effectiveTitle = gym?.name ? `${gym.name} — Train with us` : 'Train with us'
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setSaving(true)
+    setSuccess('')
+    try {
+      // If a new OG image was uploaded to /temp, move it to a permanent path
+      let ogImageUrl = ogImg.url || null
+      if (ogImg.isPending) {
+        const movedUrl = await ogImg.commit?.()
+        ogImageUrl = movedUrl ?? ogImageUrl
+      }
+      const updated = await updateGymDetails({
+        gymId,
+        seo_description: description.trim() || null,
+        seo_keywords:    keywords.trim()    || null,
+        seo_og_image:    ogImageUrl,
+      })
+      onSave?.(updated)
+      setSuccess('SEO settings saved')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err) {
+      setSuccess('')
+      alert(err.message || 'Failed to save SEO settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <FeatureGate
+      feature="custom_seo"
+      planName={planName}
+      minHeight={460}
+      hint="Customise how your gym appears when shared on WhatsApp, LinkedIn and social media — available on Pro."
+    >
+      <form onSubmit={handleSave}>
+        <SectionHeader
+          title="SEO & Sharing"
+          description="Control the preview shown when someone shares your gym URL on WhatsApp, LinkedIn, Facebook, Twitter, Slack and iMessage. Updates appear after social platforms re-crawl your URL (usually within 24h)."
+        />
+
+        <div className="grid lg:grid-cols-5 gap-6">
+          {/* ── Left: form inputs ─────────────────────────────────────── */}
+          <div className="lg:col-span-3 space-y-5">
+            {/* OG image upload */}
+            <Field
+              label="Custom share image"
+              hint="Optional — defaults to your gym logo. PNG/JPG, ideally 1200×630."
+            >
+              <div className="flex items-center gap-3 flex-wrap">
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => e.target.files?.[0] && ogImg.handleFile(e.target.files[0])}
+                  />
+                  <span className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:border-indigo-300 hover:text-indigo-700 transition-colors">
+                    {ogImg.uploading ? 'Uploading…' : ogImg.url ? 'Replace image' : 'Upload image'}
+                  </span>
+                </label>
+                {ogImg.url && (
+                  <button
+                    type="button"
+                    onClick={() => ogImg.handleRemove?.()}
+                    className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                )}
+                {ogImg.error && <p className="text-xs text-red-500">{ogImg.error}</p>}
+              </div>
+            </Field>
+
+            {/* Description */}
+            <Field
+              label="Meta description"
+              hint={`${description.length}/160 characters. Shown under the title in search results and share previews.`}
+            >
+              <textarea
+                value={description}
+                onChange={e => setDescription(e.target.value.slice(0, 200))}
+                placeholder={gym?.description || 'A brief, compelling description of your gym (1–2 sentences).'}
+                rows={4}
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none"
+              />
+            </Field>
+
+            {/* Keywords */}
+            <Field
+              label="Keywords"
+              hint="Comma-separated. Helps search engines understand your gym (e.g. crossfit, gym mumbai, personal training)."
+            >
+              <input
+                type="text"
+                value={keywords}
+                onChange={e => setKeywords(e.target.value)}
+                placeholder="crossfit, weight training, hiit, mumbai"
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              />
+            </Field>
+
+            <div className="pt-2 flex items-center gap-3">
+              <SaveBtn saving={saving} />
+              <SuccessMsg msg={success} />
+            </div>
+          </div>
+
+          {/* ── Right: sticky live preview ────────────────────────────── */}
+          <div className="lg:col-span-2">
+            <div className="lg:sticky lg:top-4">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Live preview</p>
+              <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+                <div className="bg-gray-100 aspect-[1200/630] flex items-center justify-center overflow-hidden">
+                  {effectiveImg ? (
+                    <img src={effectiveImg} alt="OG preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-gray-400">No image</span>
+                  )}
+                </div>
+                <div className="px-4 py-3 border-t border-gray-100">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide truncate">
+                    {typeof window !== 'undefined' ? window.location.host : 'gymmobius.app'}
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900 mt-0.5 leading-snug line-clamp-2">{effectiveTitle}</p>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed line-clamp-3">{effectiveDesc}</p>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+                How your gym appears in WhatsApp / LinkedIn / Slack share cards. Image recommended at <span className="font-mono">1200 × 630</span>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </form>
+    </FeatureGate>
   )
 }
 
@@ -2481,6 +2640,7 @@ export default function WebsitePage() {
 
           {activeSection === 'theme'              && <ThemePanel gym={gym} gymId={gymId} onSave={setGym} setPreviewData={setPreviewData} />}
           {activeSection === 'design'             && <DesignPanel gym={gym} gymId={gymId} planName={planName} onSave={setGym} setPreviewData={setPreviewData} />}
+          {activeSection === 'seo'                && <SeoPanel gym={gym} gymId={gymId} planName={planName} onSave={setGym} />}
           {activeSection === 'hero'               && <HeroForm content={content} gym={gym} gymId={gymId} planName={planName} onSave={handleContentSave} onSaveGym={setGym} setPreviewData={setPreviewData} />}
           {activeSection === 'stats'              && <StatsPanel content={content} gymId={gymId} planName={planName} onSave={handleContentSave} setPreviewData={setPreviewData} />}
           {activeSection === 'about'              && (
