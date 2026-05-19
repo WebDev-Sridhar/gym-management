@@ -1,4 +1,5 @@
 import { supabaseData as supabase } from './supabaseClient'
+import { applyBranchFilter } from '../lib/branchQuery'
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
@@ -119,15 +120,28 @@ export async function archiveMemberPlan(id) {
 
 // ─── Trainer list (used by owner's MembersPage) ───────────────────────────────
 
-export async function fetchTrainers(gymId) {
-  const { data, error } = await supabase
+export async function fetchTrainers(gymId, branchId) {
+  let q = supabase
     .from('users')
-    .select('id, name, phone, email')
+    .select('id, name, phone, email, branch_id')
     .eq('gym_id', gymId)
     .eq('role', 'trainer')
     .order('name')
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
   if (error) throw error
   return data || []
+}
+
+export async function updateTrainerBranch({ trainerId, branchId }) {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ branch_id: branchId || null })
+    .eq('id', trainerId)
+    .select('id, name, phone, email, branch_id')
+    .single()
+  if (error) throw error
+  return data
 }
 
 export async function updateTrainer(id, { name, phone }) {

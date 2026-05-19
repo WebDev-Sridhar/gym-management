@@ -1,4 +1,5 @@
 import { supabaseData as supabase } from './supabaseClient'
+import { applyBranchFilter } from '../lib/branchQuery'
 
 // ─── Plans ───
 
@@ -63,19 +64,20 @@ export async function updatePlan(planId, { name, price, durationDays }) {
 
 // ─── Members ───
 
-export async function fetchMembers(gymId) {
-  const { data, error } = await supabase
+export async function fetchMembers(gymId, branchId) {
+  let q = supabase
     .from('members')
     .select('*, plan:plans(id, name, price, duration_days)')
     .eq('gym_id', gymId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
-
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
   if (error) throw error
   return data || []
 }
 
-export async function createMember({ gymId, name, phone, email }) {
+export async function createMember({ gymId, branchId, name, phone, email }) {
   // Check for a soft-deleted member with the same phone or email — revive instead of duplicate
   let existingId = null
   if (phone || email) {
@@ -87,19 +89,21 @@ export async function createMember({ gymId, name, phone, email }) {
   }
 
   if (existingId) {
-    // Revive: clear deleted_at, reset plan/expiry, update details
+    // Revive: clear deleted_at, reset plan/expiry, update details + re-pin branch
+    const update = {
+      name,
+      phone: phone || null,
+      email: email || null,
+      status: 'inactive',
+      plan_id: null,
+      expiry_date: null,
+      deleted_at: null,
+      join_date: new Date().toISOString().split('T')[0],
+    }
+    if (branchId) update.branch_id = branchId
     const { data, error } = await supabase
       .from('members')
-      .update({
-        name,
-        phone: phone || null,
-        email: email || null,
-        status: 'inactive',
-        plan_id: null,
-        expiry_date: null,
-        deleted_at: null,
-        join_date: new Date().toISOString().split('T')[0],
-      })
+      .update(update)
       .eq('id', existingId)
       .select('*, plan:plans(id, name, price, duration_days)')
       .single()
@@ -107,19 +111,33 @@ export async function createMember({ gymId, name, phone, email }) {
     return data
   }
 
+  const row = {
+    gym_id: gymId,
+    name,
+    phone: phone || null,
+    email: email || null,
+    status: 'inactive',
+    join_date: new Date().toISOString().split('T')[0],
+  }
+  if (branchId) row.branch_id = branchId
+
   const { data, error } = await supabase
     .from('members')
-    .insert({
-      gym_id: gymId,
-      name,
-      phone: phone || null,
-      email: email || null,
-      status: 'inactive',
-      join_date: new Date().toISOString().split('T')[0],
-    })
+    .insert(row)
     .select('*, plan:plans(id, name, price, duration_days)')
     .single()
 
+  if (error) throw error
+  return data
+}
+
+export async function updateMemberBranch({ memberId, branchId }) {
+  const { data, error } = await supabase
+    .from('members')
+    .update({ branch_id: branchId || null })
+    .eq('id', memberId)
+    .select('*, plan:plans(id, name, price, duration_days)')
+    .single()
   if (error) throw error
   return data
 }
@@ -177,17 +195,20 @@ export async function deleteMember(memberId) {
 
 // ─── Dashboard Stats ───
 
-export async function fetchDashboardStats(gymId) {
+export async function fetchDashboardStats(gymId, branchId) {
   const today = new Date().toISOString().split('T')[0]
   const fiveDaysFromNow = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
+  const totalMembersQ   = applyBranchFilter(supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).is('deleted_at', null), branchId)
+  const activeMembersQ  = applyBranchFilter(supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active').is('deleted_at', null), branchId)
+  const expiringQ       = applyBranchFilter(supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active').gte('expiry_date', today).lte('expiry_date', fiveDaysFromNow).is('deleted_at', null), branchId)
+  const revenueQ        = applyBranchFilter(supabase.from('payments').select('amount').eq('gym_id', gymId).eq('status', 'paid'), branchId)
+  const todayCheckinsQ  = applyBranchFilter(supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).gte('check_in', today), branchId)
+  // trainers table has no branch_id (legacy); users.role='trainer' does
+  const trainersQ       = applyBranchFilter(supabase.from('users').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('role', 'trainer'), branchId)
+
   const [membersRes, activeRes, expiringRes, revenueRes, todayCheckinsRes, trainersRes] = await Promise.all([
-    supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).is('deleted_at', null),
-    supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active').is('deleted_at', null),
-    supabase.from('members').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).eq('status', 'active').gte('expiry_date', today).lte('expiry_date', fiveDaysFromNow).is('deleted_at', null),
-    supabase.from('payments').select('amount').eq('gym_id', gymId).eq('status', 'paid'),
-    supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('gym_id', gymId).gte('check_in', today),
-    supabase.from('trainers').select('id', { count: 'exact', head: true }).eq('gym_id', gymId),
+    totalMembersQ, activeMembersQ, expiringQ, revenueQ, todayCheckinsQ, trainersQ,
   ])
 
   const totalRevenue = (revenueRes.data || []).reduce((sum, p) => sum + Number(p.amount || 0), 0)
@@ -202,15 +223,17 @@ export async function fetchDashboardStats(gymId) {
   }
 }
 
-export async function fetchRevenueByMonth(gymId) {
+export async function fetchRevenueByMonth(gymId, branchId) {
   const sixMonthsAgo = new Date()
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-  const { data } = await supabase
+  let q = supabase
     .from('payments')
     .select('amount, payment_date')
     .eq('gym_id', gymId)
     .eq('status', 'paid')
     .gte('payment_date', sixMonthsAgo.toISOString())
+  q = applyBranchFilter(q, branchId)
+  const { data } = await q
   const byMonth = {}
   for (const p of data || []) {
     const month = p.payment_date?.substring(0, 7)
@@ -219,12 +242,11 @@ export async function fetchRevenueByMonth(gymId) {
   return byMonth
 }
 
-export async function fetchRecentActivity(gymId) {
-  const [recentMembers, recentPayments, recentCheckins] = await Promise.all([
-    supabase.from('members').select('id, name, created_at').eq('gym_id', gymId).is('deleted_at', null).order('created_at', { ascending: false }).limit(5),
-    supabase.from('payments').select('id, amount, status, paid_at, member:members(name)').eq('gym_id', gymId).eq('status', 'paid').order('paid_at', { ascending: false }).limit(5),
-    supabase.from('attendance').select('id, check_in, member:members(name)').eq('gym_id', gymId).order('check_in', { ascending: false }).limit(5),
-  ])
+export async function fetchRecentActivity(gymId, branchId) {
+  const membersQ  = applyBranchFilter(supabase.from('members').select('id, name, created_at').eq('gym_id', gymId).is('deleted_at', null).order('created_at', { ascending: false }).limit(5), branchId)
+  const paymentsQ = applyBranchFilter(supabase.from('payments').select('id, amount, status, paid_at, member:members(name)').eq('gym_id', gymId).eq('status', 'paid').order('paid_at', { ascending: false }).limit(5), branchId)
+  const checkinsQ = applyBranchFilter(supabase.from('attendance').select('id, check_in, member:members(name)').eq('gym_id', gymId).order('check_in', { ascending: false }).limit(5), branchId)
+  const [recentMembers, recentPayments, recentCheckins] = await Promise.all([membersQ, paymentsQ, checkinsQ])
 
   const activities = []
 
@@ -247,31 +269,33 @@ export async function fetchRecentActivity(gymId) {
 
 // ─── Attendance ───
 
-export async function fetchAttendance(gymId, date) {
+export async function fetchAttendance(gymId, date, branchId) {
   const startOfDay = `${date}T00:00:00`
   const endOfDay = `${date}T23:59:59`
 
-  const { data, error } = await supabase
+  let q = supabase
     .from('attendance')
     .select('id, check_in, member:members(id, name, phone)')
     .eq('gym_id', gymId)
     .gte('check_in', startOfDay)
     .lte('check_in', endOfDay)
     .order('check_in', { ascending: false })
-
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
   if (error) throw error
   return data || []
 }
 
-export async function fetchAttendanceSummary(gymId, days = 7) {
+export async function fetchAttendanceSummary(gymId, days = 7, branchId) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data, error } = await supabase
+  let q = supabase
     .from('attendance')
     .select('check_in')
     .eq('gym_id', gymId)
     .gte('check_in', since)
-
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
   if (error) throw error
 
   // Group by date
@@ -284,9 +308,15 @@ export async function fetchAttendanceSummary(gymId, days = 7) {
 }
 
 export async function manualCheckin({ gymId, memberId }) {
+  // Inherit branch_id from the member so the checkin lands in the right branch.
+  const { data: m } = await supabase
+    .from('members').select('branch_id').eq('id', memberId).maybeSingle()
+  const row = { gym_id: gymId, member_id: memberId }
+  if (m?.branch_id) row.branch_id = m.branch_id
+
   const { data, error } = await supabase
     .from('attendance')
-    .insert({ gym_id: gymId, member_id: memberId })
+    .insert(row)
     .select('id, check_in, member:members(id, name, phone)')
     .single()
 
@@ -300,21 +330,24 @@ export async function manualCheckin({ gymId, memberId }) {
 
 // ─── Trainer Invites ───
 
-export async function fetchTrainerInvites(gymId) {
-  const { data, error } = await supabase
+export async function fetchTrainerInvites(gymId, branchId) {
+  let q = supabase
     .from('trainer_invites')
     .select('*')
     .eq('gym_id', gymId)
     .order('created_at', { ascending: false })
-
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
   if (error) throw error
   return data || []
 }
 
-export async function createTrainerInvite({ gymId, name, phone, email }) {
+export async function createTrainerInvite({ gymId, branchId, name, phone, email }) {
+  const row = { gym_id: gymId, name, phone: phone || null, email: email || null }
+  if (branchId) row.branch_id = branchId
   const { data, error } = await supabase
     .from('trainer_invites')
-    .insert({ gym_id: gymId, name, phone: phone || null, email: email || null })
+    .insert(row)
     .select('*')
     .single()
 
@@ -333,16 +366,15 @@ export async function deleteTrainerInvite(inviteId) {
 
 // ─── Analytics ───
 
-export async function fetchAnalytics(gymId) {
+export async function fetchAnalytics(gymId, branchId) {
   const sixMonthsAgo = new Date()
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
   const since = sixMonthsAgo.toISOString()
 
-  const [membersRes, paymentsRes, attendanceRes] = await Promise.all([
-    supabase.from('members').select('id, status, created_at, expiry_date').eq('gym_id', gymId),
-    supabase.from('payments').select('amount, status, payment_date').eq('gym_id', gymId).eq('status', 'paid').gte('payment_date', since),
-    supabase.from('attendance').select('check_in').eq('gym_id', gymId).gte('check_in', since),
-  ])
+  const membersQ    = applyBranchFilter(supabase.from('members').select('id, status, created_at, expiry_date').eq('gym_id', gymId), branchId)
+  const paymentsQ   = applyBranchFilter(supabase.from('payments').select('amount, status, payment_date').eq('gym_id', gymId).eq('status', 'paid').gte('payment_date', since), branchId)
+  const attendanceQ = applyBranchFilter(supabase.from('attendance').select('check_in').eq('gym_id', gymId).gte('check_in', since), branchId)
+  const [membersRes, paymentsRes, attendanceRes] = await Promise.all([membersQ, paymentsQ, attendanceQ])
 
   const members = membersRes.data || []
   const payments = paymentsRes.data || []

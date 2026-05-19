@@ -30,7 +30,7 @@ export const ROUTES = {
 export const SITE = {
   NAME: 'Gymmobius',
   TAGLINE: 'The operating system for modern gyms',
-  URL: 'https://gymmobius.com',
+  URL: 'https://gymmobius.vercel.app',
   SUPPORT_EMAIL: 'support@gymmobius.com',
   SALES_EMAIL: 'sales@gymmobius.com',
 }

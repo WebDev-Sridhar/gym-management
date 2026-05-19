@@ -1,4 +1,5 @@
 import { supabaseData as supabase } from './supabaseClient'
+import { applyBranchFilter } from '../lib/branchQuery'
 
 // ─── Per-gym communication preferences ────────────────────────────────────
 
@@ -29,7 +30,7 @@ export async function updateGymCommSettings(gymId, prefs) {
 
 // ─── Notification log ─────────────────────────────────────────────────────
 
-export async function fetchNotifications(gymId, { type = null, status = null, limit = 50 } = {}) {
+export async function fetchNotifications(gymId, { type = null, status = null, limit = 50, branchId = null } = {}) {
   let q = supabase
     .from('notifications')
     .select('id, type, channels, status, metadata, channel_results, triggered_by, created_at, sent_at, member:members(id, name, phone, email)')
@@ -39,6 +40,7 @@ export async function fetchNotifications(gymId, { type = null, status = null, li
 
   if (type)   q = q.eq('type', type)
   if (status) q = q.eq('status', status)
+  q = applyBranchFilter(q, branchId)
 
   const { data, error } = await q
   if (error) throw error

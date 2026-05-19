@@ -1,5 +1,6 @@
 import { supabaseAnon } from './supabaseClient'
 import { supabaseData } from './supabaseClient'
+import { applyBranchFilter } from '../lib/branchQuery'
 
 // Public: submitted by unauthenticated website visitors
 export async function submitContactMessage({ gymId, name, email, phone, message }) {
@@ -9,13 +10,15 @@ export async function submitContactMessage({ gymId, name, email, phone, message 
   if (error) throw error
 }
 
-// Owner: fetch all enquiries for their gym
-export async function fetchContactMessages(gymId) {
-  const { data, error } = await supabaseData
+// Owner: fetch all enquiries for their gym (optionally scoped to one branch)
+export async function fetchContactMessages(gymId, branchId) {
+  let q = supabaseData
     .from('contact_messages')
     .select('*')
     .eq('gym_id', gymId)
     .order('created_at', { ascending: false })
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
   if (error) throw error
   return data || []
 }

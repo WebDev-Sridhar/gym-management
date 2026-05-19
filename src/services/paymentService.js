@@ -1,4 +1,5 @@
 import { supabaseData as supabase } from './supabaseClient'
+import { applyBranchFilter } from '../lib/branchQuery'
 
 /**
  * Create a Razorpay payment link for a member via edge function.
@@ -35,13 +36,14 @@ export async function createPaymentLink({
 /**
  * Fetch all payments for a gym, with member and plan details.
  */
-export async function fetchPayments(gymId) {
-  const { data, error } = await supabase
+export async function fetchPayments(gymId, branchId) {
+  let q = supabase
     .from('payments')
     .select('*, member:members(id, name, phone, email), plan:plans(id, name, price, duration_days)')
     .eq('gym_id', gymId)
     .order('created_at', { ascending: false })
-
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
   if (error) throw error
   return data || []
 }

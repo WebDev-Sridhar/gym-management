@@ -36,6 +36,9 @@ const FEATURE_RULES = {
   // ── Domains ────────────────────────────────────────────────────────────
   custom_subdomain:     ['pro', 'premium'],   // iron-paradise.gymmobius.app  (Phase 1)
   custom_domain:        ['premium'],          // ironparadise.com             (Phase 2)
+
+  // ── Multi-branch (gym chains) ──────────────────────────────────────────
+  multi_branch:         ['premium'],          // Enterprise: branches CRUD + switcher
 }
 
 /**

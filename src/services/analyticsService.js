@@ -1,28 +1,27 @@
 import { supabaseData as supabase } from './supabaseClient'
+import { applyBranchFilter } from '../lib/branchQuery'
 
 function toYYYYMM(iso)   { return iso?.substring(0, 7) }
 function toYYYYMMDD(iso) { return iso?.substring(0, 10) }
 
-export async function fetchRevenueAnalytics(gymId, startDate, endDate) {
-  const [paidRes, pendingRes, failedRes] = await Promise.all([
-    supabase
-      .from('payments')
-      .select('amount, payment_date, payment_method')
-      .eq('gym_id', gymId)
-      .eq('status', 'paid')
-      .gte('payment_date', startDate)
-      .lte('payment_date', endDate),
-    supabase
-      .from('payments')
-      .select('id', { count: 'exact', head: true })
-      .eq('gym_id', gymId)
-      .in('status', ['pending', 'verification_pending']),
-    supabase
-      .from('payments')
-      .select('id', { count: 'exact', head: true })
-      .eq('gym_id', gymId)
-      .eq('status', 'failed'),
-  ])
+export async function fetchRevenueAnalytics(gymId, startDate, endDate, branchId) {
+  const paidQ = applyBranchFilter(
+    supabase.from('payments').select('amount, payment_date, payment_method')
+      .eq('gym_id', gymId).eq('status', 'paid')
+      .gte('payment_date', startDate).lte('payment_date', endDate),
+    branchId
+  )
+  const pendingQ = applyBranchFilter(
+    supabase.from('payments').select('id', { count: 'exact', head: true })
+      .eq('gym_id', gymId).in('status', ['pending', 'verification_pending']),
+    branchId
+  )
+  const failedQ = applyBranchFilter(
+    supabase.from('payments').select('id', { count: 'exact', head: true })
+      .eq('gym_id', gymId).eq('status', 'failed'),
+    branchId
+  )
+  const [paidRes, pendingRes, failedRes] = await Promise.all([paidQ, pendingQ, failedQ])
 
   const paid = paidRes.data || []
   const byMonth = {}
@@ -52,26 +51,22 @@ export async function fetchRevenueAnalytics(gymId, startDate, endDate) {
   }
 }
 
-export async function fetchMembershipAnalytics(gymId, startDate, endDate) {
+export async function fetchMembershipAnalytics(gymId, startDate, endDate, branchId) {
   const todayStr = toYYYYMMDD(new Date().toISOString())
   const sevenDays = toYYYYMMDD(new Date(Date.now() + 7 * 86400000).toISOString())
 
-  const [membersRes, plansRes, paidRes] = await Promise.all([
-    supabase
-      .from('members')
-      .select('id, status, plan_id, created_at, expiry_date')
-      .eq('gym_id', gymId)
-      .is('deleted_at', null),
-    supabase
-      .from('plans')
-      .select('id, name, price')
-      .eq('gym_id', gymId),
-    supabase
-      .from('payments')
-      .select('amount, plan_id')
-      .eq('gym_id', gymId)
-      .eq('status', 'paid'),
-  ])
+  const membersQ = applyBranchFilter(
+    supabase.from('members').select('id, status, plan_id, created_at, expiry_date')
+      .eq('gym_id', gymId).is('deleted_at', null),
+    branchId
+  )
+  // plans are org-wide — no branch filter
+  const plansQ = supabase.from('plans').select('id, name, price').eq('gym_id', gymId)
+  const paidQ = applyBranchFilter(
+    supabase.from('payments').select('amount, plan_id').eq('gym_id', gymId).eq('status', 'paid'),
+    branchId
+  )
+  const [membersRes, plansRes, paidRes] = await Promise.all([membersQ, plansQ, paidQ])
 
   const members = membersRes.data || []
   const plans   = plansRes.data   || []
@@ -124,13 +119,15 @@ export async function fetchMembershipAnalytics(gymId, startDate, endDate) {
   }
 }
 
-export async function fetchAttendanceAnalytics(gymId, startDate, endDate) {
-  const { data } = await supabase
+export async function fetchAttendanceAnalytics(gymId, startDate, endDate, branchId) {
+  let q = supabase
     .from('attendance')
     .select('check_in, member_id')
     .eq('gym_id', gymId)
     .gte('check_in', startDate + 'T00:00:00')
     .lte('check_in', endDate   + 'T23:59:59')
+  q = applyBranchFilter(q, branchId)
+  const { data } = await q
 
   const records = data || []
   const byDay   = {}
@@ -164,25 +161,22 @@ export async function fetchAttendanceAnalytics(gymId, startDate, endDate) {
   }
 }
 
-export async function fetchInactiveMembers(gymId) {
+export async function fetchInactiveMembers(gymId, branchId) {
   const todayStr = toYYYYMMDD(new Date().toISOString())
   const sevenDays = toYYYYMMDD(new Date(Date.now() + 7 * 86400000).toISOString())
   const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString()
 
-  const [membersRes, attendRes] = await Promise.all([
-    supabase
-      .from('members')
-      .select('id, name, email, phone, expiry_date, status')
-      .eq('gym_id', gymId)
-      .is('deleted_at', null)
-      .neq('status', 'inactive'),
-    supabase
-      .from('attendance')
-      .select('member_id, check_in')
-      .eq('gym_id', gymId)
-      .gte('check_in', ninetyDaysAgo)
-      .order('check_in', { ascending: false }),
-  ])
+  const membersQ = applyBranchFilter(
+    supabase.from('members').select('id, name, email, phone, expiry_date, status')
+      .eq('gym_id', gymId).is('deleted_at', null).neq('status', 'inactive'),
+    branchId
+  )
+  const attendQ = applyBranchFilter(
+    supabase.from('attendance').select('member_id, check_in')
+      .eq('gym_id', gymId).gte('check_in', ninetyDaysAgo).order('check_in', { ascending: false }),
+    branchId
+  )
+  const [membersRes, attendRes] = await Promise.all([membersQ, attendQ])
 
   const members = membersRes.data || []
   const attendance = attendRes.data || []
@@ -225,21 +219,20 @@ export async function fetchInactiveMembers(gymId) {
   return result.sort((a, b) => b.daysInactive - a.daysInactive)
 }
 
-export async function fetchPaymentInsights(gymId, startDate, endDate) {
-  const [paidRes, pendingRes] = await Promise.all([
-    supabase
-      .from('payments')
+export async function fetchPaymentInsights(gymId, startDate, endDate, branchId) {
+  const paidQ = applyBranchFilter(
+    supabase.from('payments')
       .select('amount, plan_id, member_id, member:members(name), plan:plans(name)')
-      .eq('gym_id', gymId)
-      .eq('status', 'paid')
-      .gte('payment_date', startDate)
-      .lte('payment_date', endDate),
-    supabase
-      .from('payments')
-      .select('amount, member:members(name, phone)')
-      .eq('gym_id', gymId)
-      .in('status', ['pending', 'verification_pending']),
-  ])
+      .eq('gym_id', gymId).eq('status', 'paid')
+      .gte('payment_date', startDate).lte('payment_date', endDate),
+    branchId
+  )
+  const pendingQ = applyBranchFilter(
+    supabase.from('payments').select('amount, member:members(name, phone)')
+      .eq('gym_id', gymId).in('status', ['pending', 'verification_pending']),
+    branchId
+  )
+  const [paidRes, pendingRes] = await Promise.all([paidQ, pendingQ])
 
   const paid    = paidRes.data    || []
   const pending = pendingRes.data || []

@@ -159,6 +159,8 @@ export function AuthProvider({ children }) {
     role: profile?.role ?? null,
     gymId: profile?.gym_id ?? null,
     gymName: profile?.gym_name ?? null,
+    // Trainer's pinned branch (null for owners — they use BranchContext to switch)
+    branchId: profile?.branch_id ?? null,
     hasActiveSubscription: !!subscription && new Date(subscription.expires_at) > new Date(),
   }
 

@@ -1,22 +1,27 @@
 import { supabaseData as supabase } from './supabaseClient'
+import { applyBranchFilter } from '../lib/branchQuery'
 
 // ─── Workout Templates ────────────────────────────────────────────────────────
 // `exercises` column stores weekly days: [{ day, name, rest, exercises: [] }]
 
-export async function fetchWorkoutTemplates(gymId) {
-  const { data, error } = await supabase
+export async function fetchWorkoutTemplates(gymId, branchId) {
+  let q = supabase
     .from('workout_templates')
     .select('*')
     .eq('gym_id', gymId)
     .order('created_at', { ascending: false })
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
   if (error) throw error
   return data || []
 }
 
-export async function createWorkoutTemplate({ gymId, title, description, days }) {
+export async function createWorkoutTemplate({ gymId, branchId, title, description, days }) {
+  const row = { gym_id: gymId, title, description: description || null, exercises: days }
+  if (branchId) row.branch_id = branchId
   const { data, error } = await supabase
     .from('workout_templates')
-    .insert({ gym_id: gymId, title, description: description || null, exercises: days })
+    .insert(row)
     .select('*')
     .single()
   if (error) throw error
@@ -42,20 +47,24 @@ export async function deleteWorkoutTemplate(id) {
 // ─── Diet Templates ───────────────────────────────────────────────────────────
 // `meals` column stores weekly days: [{ day, name, rest, meals: [] }]
 
-export async function fetchDietTemplates(gymId) {
-  const { data, error } = await supabase
+export async function fetchDietTemplates(gymId, branchId) {
+  let q = supabase
     .from('diet_templates')
     .select('*')
     .eq('gym_id', gymId)
     .order('created_at', { ascending: false })
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
   if (error) throw error
   return data || []
 }
 
-export async function createDietTemplate({ gymId, title, description, days }) {
+export async function createDietTemplate({ gymId, branchId, title, description, days }) {
+  const row = { gym_id: gymId, title, description: description || null, meals: days }
+  if (branchId) row.branch_id = branchId
   const { data, error } = await supabase
     .from('diet_templates')
-    .insert({ gym_id: gymId, title, description: description || null, meals: days })
+    .insert(row)
     .select('*')
     .single()
   if (error) throw error
