@@ -134,16 +134,61 @@ After deploying with Path A or B, sanity-check:
 
 ---
 
-## ── Phase 2 preview — custom domains
+## ── Phase 2 — Custom domains (live)
 
-Coming next: gyms on the Premium tier can hook up their own domain
-(`ironparadise.com`) via the **SEO & Sharing → Custom Domain** panel in
-the Website Builder.
+Premium owners can claim their own domain (`ironparadise.com`) via the
+**Website Builder → Settings → Custom Domain** panel.
 
-Requires:
-- `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` env vars
-- Three serverless functions: `/api/domain/add`, `/verify`, `/remove`
-- DB migration adding `custom_domain`, `domain_status`, `domain_verified_at`
+Required env vars (Production + Preview):
 
-See [the plan file](C:\Users\sridh\.claude\plans\giggly-shimmying-patterson.md)
-for the Phase 2 + 3 specs.
+```
+SUPABASE_SERVICE_ROLE_KEY  = sbp_xxxxxxxxxxxxxx     # server-only, never expose to client
+VERCEL_API_TOKEN           = xxxxxxxxxxxxxxxxxxxx   # from vercel.com/account/tokens
+VERCEL_PROJECT_ID          = prj_xxxxxxxxxxxxxxxx   # Project → Settings → General
+VERCEL_TEAM_ID             = team_xxxxxxxxxxxxxxx   # (only if team-scoped)
+```
+
+How it works:
+
+1. Owner enters `ironparadise.com` → `POST /api/domain/add`
+2. Backend calls Vercel Domains API → Vercel returns DNS instructions
+3. **Auto-claims `www.ironparadise.com` at the same time** so visitors who
+   type with or without `www` both reach the gym (middleware
+   redirects `www` → apex for canonical URL)
+4. Owner adds the DNS records at their registrar:
+   - Apex `A` record → `76.76.21.21`
+   - `www` CNAME → `cname.vercel-dns.com`
+5. **Client auto-polls verification every 30s** for the first 5 min,
+   then every 2 min for the next hour — no need to click "Verify"
+   repeatedly. Once Vercel confirms DNS, status flips to ✓ Verified.
+6. Vercel auto-provisions Let's Encrypt SSL ~60s after verification.
+   "SSL active" pill appears in the dashboard.
+7. Visitors to `gymmobius.app/iron-paradise` get **301 redirected** to
+   `https://ironparadise.com` (canonical URL hierarchy).
+
+Removal cleans up both the apex and `www` from Vercel.
+
+---
+
+## ── Phase 3a additions (live)
+
+| Feature | What it does |
+|---|---|
+| **www auto-claim** | When apex is added, `www.{domain}` is added automatically. Failure is non-fatal (apex still works). |
+| **www → apex 301** | Middleware redirects `www.theirgym.com` → `theirgym.com` for canonical URL. |
+| **Client-side auto-poll** | While status is `pending`/`verifying`, the panel re-checks every 30s (5 min) then every 2 min (1 hour). Stops on `verified` / `failed`. |
+| **SSL status pill** | Surfaces "✓ SSL active" once Vercel has provisioned the cert. Includes "Open live site" CTA. |
+| **www indicator pill** | Shows "www included" badge after successful claim. If www add failed, shows an amber "www failed" pill with the error in the tooltip. |
+
+---
+
+## ── Phase 3b — still on the roadmap
+
+Not yet implemented. All require external setup:
+
+| Feature | Prerequisite |
+|---|---|
+| Server-side daily health check (cron) | **Vercel Pro plan** (cron schedules unsupported on free tier) |
+| Email notifications on status change | Email provider (Resend / Postmark) + API key |
+| Subscription-downgrade enforcement | Razorpay webhook + grace-period UX |
+| Edge cache invalidation on changes | Vercel cache-purge API setup |

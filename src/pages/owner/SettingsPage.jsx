@@ -167,6 +167,7 @@ export default function SettingsPage() {
   const [showSubdomainModal, setShowSubdomainModal] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [copiedSubUrl, setCopiedSubUrl] = useState(false)
+  const [copiedCustomUrl, setCopiedCustomUrl] = useState(false)
   const [copiedGymId, setCopiedGymId] = useState(false)
 
   // ── personal info ──
@@ -700,6 +701,81 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     <ChevronRight size={13} className="text-gray-300 group-hover:text-indigo-500 shrink-0" />
+                  </button>
+                )}
+
+                {/* Row 3: Custom domain (Premium) */}
+                {canAccess('custom_domain', subscription?.plan_name) ? (
+                  gym.custom_domain && gym.domain_status === 'verified' ? (
+                    <PublicUrlRow
+                      url={`https://${gym.custom_domain}`}
+                      badge="Primary"
+                      copied={copiedCustomUrl}
+                      onCopy={() => {
+                        navigator.clipboard.writeText(`https://${gym.custom_domain}`)
+                        setCopiedCustomUrl(true)
+                        setTimeout(() => setCopiedCustomUrl(false), 1500)
+                      }}
+                      rightAction={
+                        <button
+                          type="button"
+                          onClick={() => navigate('/owner-dashboard/website')}
+                          className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:border-indigo-300 hover:text-indigo-700 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Pencil size={11} />Manage
+                        </button>
+                      }
+                    />
+                  ) : gym.custom_domain ? (
+                    // Domain added but not verified yet → status pill row
+                    <button
+                      type="button"
+                      onClick={() => navigate('/owner-dashboard/website')}
+                      className="w-full flex items-center gap-3 px-4 py-3 border border-amber-200 bg-amber-50/60 hover:bg-amber-50 rounded-xl text-left transition-colors cursor-pointer group"
+                    >
+                      <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-amber-900 truncate">{gym.custom_domain}</p>
+                        <p className="text-[11px] text-amber-700/80 mt-0.5">
+                          {gym.domain_status === 'failed' ? 'DNS misconfigured — open Website Builder to fix' : 'Waiting for DNS — open Website Builder to verify'}
+                        </p>
+                      </div>
+                      <ChevronRight size={13} className="text-amber-400 group-hover:text-amber-600 shrink-0" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/owner-dashboard/website')}
+                      className="w-full flex items-center gap-3 px-4 py-3 border border-dashed border-violet-200 bg-violet-50/40 hover:bg-violet-50 rounded-xl text-left transition-colors cursor-pointer group"
+                    >
+                      <Globe size={15} className="text-violet-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-violet-900">Add your own domain</p>
+                        <p className="text-[11px] text-violet-700/80 mt-0.5">
+                          Use <span className="font-mono">yourgym.com</span> — auto SSL included.
+                        </p>
+                      </div>
+                      <ChevronRight size={13} className="text-violet-400 group-hover:text-violet-600 shrink-0" />
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/owner-dashboard/subscription')}
+                    className="w-full flex items-center gap-3 px-4 py-3 border border-gray-200 bg-gray-50 hover:bg-white hover:border-violet-200 rounded-xl text-left transition-colors cursor-pointer group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-white border border-gray-200 flex items-center justify-center shrink-0">
+                      <Globe size={13} className="text-gray-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-700">
+                        Custom domain <span className="text-[10px] font-bold ml-1 px-1.5 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded uppercase tracking-wide">Premium</span>
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Use <span className="font-mono">yourgym.com</span> on the Premium plan.
+                      </p>
+                    </div>
+                    <ChevronRight size={13} className="text-gray-300 group-hover:text-violet-500 shrink-0" />
                   </button>
                 )}
 

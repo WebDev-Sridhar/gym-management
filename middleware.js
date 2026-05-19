@@ -97,7 +97,7 @@ async function fetchGymBy(column, value) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/gyms?${column}=eq.${encodeURIComponent(value)}&select=name,slug,subdomain,custom_domain,city,description,logo_url,theme_color,seo_description,seo_og_image,seo_keywords&limit=1`,
+      `${SUPABASE_URL}/rest/v1/gyms?${column}=eq.${encodeURIComponent(value)}&select=name,slug,subdomain,custom_domain,domain_status,city,description,logo_url,theme_color,seo_description,seo_og_image,seo_keywords&limit=1`,
       {
         headers: {
           apikey: SUPABASE_KEY,
@@ -192,10 +192,42 @@ export default async function middleware(request) {
     return html ? htmlResponse(html) : undefined
   }
 
-  // ── PATH C: custom domain (Phase 2) ──────────────────────────────────
+  // ── PATH C: custom domain ────────────────────────────────────────────
   if (hostInfo.kind === 'custom') {
-    // Phase 2 will hit gyms.custom_domain here. Until then, pass through.
-    return
+    // Strip leading www. so foo.com and www.foo.com both resolve to the
+    // same gym row (Vercel auto-attaches www to the apex).
+    const lookupHost = normaliseHost(request.headers.get('host') || url.host)
+      .replace(/^www\./, '')
+
+    // Reject if the visitor reached us at www. and the gym only registered
+    // the apex — redirect www → apex to keep one canonical URL.
+    const rawHost = normaliseHost(request.headers.get('host') || url.host)
+    if (rawHost.startsWith('www.') && rawHost !== lookupHost) {
+      return new Response(null, {
+        status: 301,
+        headers: {
+          location: `https://${lookupHost}${path}${url.search || ''}`,
+          'cache-control': 'public, max-age=300, s-maxage=3600',
+        },
+      })
+    }
+
+    // Look up by custom_domain + only verified ones get served
+    let gym = null
+    if (SUPABASE_URL && SUPABASE_KEY) {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/gyms?custom_domain=eq.${encodeURIComponent(lookupHost)}&domain_status=eq.verified&select=name,slug,subdomain,custom_domain,domain_status,city,description,logo_url,theme_color,seo_description,seo_og_image,seo_keywords&limit=1`,
+          { headers: { apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}` } },
+        )
+        if (res.ok) gym = (await res.json())[0] || null
+      } catch { /* pass through */ }
+    }
+
+    if (!gym) return  // Unknown domain → SPA renders the "not found" screen
+
+    const html = await rewriteIndexHtml(origin, gym, request.url)
+    return html ? htmlResponse(html) : undefined
   }
 
   // ── PATH A: main domain ──────────────────────────────────────────────
@@ -206,10 +238,24 @@ export default async function middleware(request) {
   const gym = await fetchGymBy('slug', firstSegment)
   if (!gym) return  // SPA's GymContext handles the redirect-table lookup
 
-  // Redirect path-based access → subdomain (canonical URL) when claimed.
-  // Only when the gym has a subdomain set; otherwise serve as before.
+  // Canonical URL hierarchy: custom domain (verified) > subdomain > path.
+  // Strip "/iron-paradise" prefix; preserve any sub-path + query.
+  const remainingPath = path.slice(firstSegment.length + 1) || ''
+
+  // Custom domain wins if verified (Phase 2)
+  if (gym.custom_domain && (gym.domain_status === 'verified' || gym.domain_status === undefined)) {
+    const target = `https://${gym.custom_domain}${remainingPath || '/'}${url.search || ''}`
+    return new Response(null, {
+      status: 301,
+      headers: {
+        location: target,
+        'cache-control': 'public, max-age=300, s-maxage=3600',
+      },
+    })
+  }
+
+  // Subdomain wins next (Phase 1)
   if (gym.subdomain) {
-    const remainingPath = path.slice(firstSegment.length + 1) || ''  // strip "/iron-paradise"
     const target = `https://${gym.subdomain}.${MAIN_DOMAIN}${remainingPath || '/'}${url.search || ''}`
     return new Response(null, {
       status: 301,
@@ -220,7 +266,7 @@ export default async function middleware(request) {
     })
   }
 
-  // No subdomain claimed → inject OG and serve the SPA inline.
+  // No higher-tier URL → inject OG and serve the SPA inline.
   const html = await rewriteIndexHtml(origin, gym, request.url)
   return html ? htmlResponse(html) : undefined
 }

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { fetchGymBySlug, fetchGymBySubdomain, resolveSlugRedirect } from '../services/gymPublicService'
+import { fetchGymBySlug, fetchGymBySubdomain, fetchGymByCustomDomain, resolveSlugRedirect } from '../services/gymPublicService'
 import { detectHost } from '../lib/host'
 
 const GymContext = createContext(null)
@@ -32,8 +32,11 @@ export function GymProvider({ children }) {
     [],
   )
 
-  // What we're trying to resolve THIS render (subdomain string OR slug from URL)
-  const resolveKey = hostInfo.kind === 'subdomain' ? `sub:${hostInfo.subdomain}` : `slug:${gymSlug || ''}`
+  // What we're trying to resolve THIS render (subdomain / custom / slug-from-URL)
+  const resolveKey =
+    hostInfo.kind === 'subdomain' ? `sub:${hostInfo.subdomain}` :
+    hostInfo.kind === 'custom'    ? `custom:${hostInfo.host}` :
+                                    `slug:${gymSlug || ''}`
 
   useEffect(() => {
     // No identifier at all (e.g. main domain hit `/` with no slug) → 404
@@ -47,6 +50,9 @@ export function GymProvider({ children }) {
       if (hostInfo.kind === 'subdomain' && gym.subdomain === hostInfo.subdomain) {
         setLoading(false); return
       }
+      if (hostInfo.kind === 'custom' && gym.custom_domain === hostInfo.host) {
+        setLoading(false); return
+      }
       if (hostInfo.kind === 'main' && gym.slug === gymSlug) {
         setLoading(false); return
       }
@@ -57,9 +63,9 @@ export function GymProvider({ children }) {
 
     let cancelled = false
     const fetcher =
-      hostInfo.kind === 'subdomain'
-        ? fetchGymBySubdomain(hostInfo.subdomain)
-        : fetchGymBySlug(gymSlug)
+      hostInfo.kind === 'subdomain' ? fetchGymBySubdomain(hostInfo.subdomain) :
+      hostInfo.kind === 'custom'    ? fetchGymByCustomDomain(hostInfo.host) :
+                                      fetchGymBySlug(gymSlug)
 
     fetcher
       .then(async (data) => {

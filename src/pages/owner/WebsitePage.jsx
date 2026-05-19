@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react'
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, Copy, Check, AlertTriangle, RefreshCw, Trash2, Globe, ExternalLink } from 'lucide-react'
+import { addCustomDomain, verifyCustomDomain, removeCustomDomain } from '../../services/domainService'
 import { Sk } from '../../components/ui/Skeleton'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 
@@ -100,9 +101,10 @@ const PAGES = [
     label: 'Settings',
     minPlan: 'Starter',
     sections: [
-      { id: 'theme',  label: 'Theme',  desc: 'Colors & branding',         minPlan: 'Starter' },
-      { id: 'design', label: 'Design', desc: 'Fonts & spacing',           minPlan: 'Pro' },
-      { id: 'seo',    label: 'SEO & Sharing', desc: 'Social previews & meta', minPlan: 'Pro' },
+      { id: 'theme',  label: 'Theme',  desc: 'Colors & branding',          minPlan: 'Starter' },
+      { id: 'design', label: 'Design', desc: 'Fonts & spacing',            minPlan: 'Pro' },
+      { id: 'seo',    label: 'SEO & Sharing',  desc: 'Social previews & meta', minPlan: 'Pro' },
+      { id: 'domain', label: 'Custom Domain',  desc: 'Use your own .com',   minPlan: 'Premium' },
     ],
   },
   {
@@ -208,7 +210,11 @@ const CTA_DEFAULTS = {
 
 function canAccessPage(minPlan, planName) {
   if (minPlan === 'Starter') return true
-  if (minPlan === 'Pro') return planName === 'Pro' || planName === 'Enterprise'
+  if (minPlan === 'Pro')      return planName === 'Pro' || planName === 'Enterprise' || planName === 'Premium'
+  // "Premium" minPlan label === Enterprise tier in featureGates.PLAN_TIERS
+  if (minPlan === 'Premium' || minPlan === 'Enterprise') {
+    return planName === 'Enterprise' || planName === 'Premium'
+  }
   return false
 }
 
@@ -891,6 +897,369 @@ function SeoPanel({ gym, gymId, planName, onSave }) {
         </div>
       </form>
     </FeatureGate>
+  )
+}
+
+// ─── Custom Domain Panel (Premium) ──────────────────────────────────────────────
+// Owner enters their domain → we call Vercel Domains API → Vercel returns
+// verification challenges → owner adds CNAME at registrar → "Verify" polls
+// Vercel until verified. Auto-SSL is provisioned by Vercel after verification.
+function CustomDomainPanel({ gym, planName, onSave }) {
+  const dialog = useDialog()
+  const [input,       setInput]       = useState('')
+  const [adding,      setAdding]      = useState(false)
+  const [verifying,   setVerifying]   = useState(false)
+  const [error,       setError]       = useState('')
+  const [copiedField, setCopiedField] = useState('')
+
+  const domain   = gym?.custom_domain || null
+  const status   = gym?.domain_status || 'none'
+  const verData  = gym?.domain_verification_data || {}
+
+  // Live status pill colour + label
+  const statusUi = {
+    none:      { label: 'No domain',          bg: 'bg-gray-100',     dot: 'bg-gray-400',    text: 'text-gray-600'    },
+    pending:   { label: 'Waiting for DNS',    bg: 'bg-amber-50',     dot: 'bg-amber-500 animate-pulse',   text: 'text-amber-800'   },
+    verifying: { label: 'Checking DNS…',      bg: 'bg-amber-50',     dot: 'bg-amber-500 animate-pulse',   text: 'text-amber-800'   },
+    verified:  { label: 'Verified',           bg: 'bg-emerald-50',   dot: 'bg-emerald-500', text: 'text-emerald-800' },
+    failed:    { label: 'DNS misconfigured',  bg: 'bg-red-50',       dot: 'bg-red-500',     text: 'text-red-800'     },
+  }[status] || { label: 'No domain', bg: 'bg-gray-100', dot: 'bg-gray-400', text: 'text-gray-600' }
+
+  // SSL is auto-provisioned by Vercel within ~60s of DNS verification. We
+  // surface it as a separate pill so owners can see the cert is live.
+  const sslProvisioned = status === 'verified'
+  const wwwClaimed     = !!verData.www_claimed
+  const wwwError       = verData.www_error
+
+  function copy(value, key) {
+    navigator.clipboard.writeText(value)
+    setCopiedField(key)
+    setTimeout(() => setCopiedField(''), 1500)
+  }
+
+  async function handleAdd(e) {
+    e?.preventDefault?.()
+    setError('')
+    if (!input.trim()) return setError('Enter your domain (e.g. ironparadise.com)')
+
+    setAdding(true)
+    try {
+      const res = await addCustomDomain(input.trim())
+      onSave?.({ ...gym, custom_domain: res.domain, domain_status: res.status, domain_verification_data: res.verification })
+      setInput('')
+    } catch (err) {
+      setError(err.message || 'Failed to add domain')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function handleVerify() {
+    setError('')
+    setVerifying(true)
+    try {
+      const res = await verifyCustomDomain()
+      onSave?.({
+        ...gym,
+        domain_status: res.status,
+        domain_verified_at: res.verified ? new Date().toISOString() : gym.domain_verified_at,
+        domain_verification_data: {
+          ...(gym.domain_verification_data || {}),
+          verification: res.verification,
+          last_checked_at: new Date().toISOString(),
+        },
+      })
+    } catch (err) {
+      setError(err.message || 'Verification check failed')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  async function handleRemove() {
+    if (!await dialog.confirm(`Remove ${domain}? Your gym will fall back to its subdomain / path URL.`)) return
+    try {
+      await removeCustomDomain()
+      onSave?.({
+        ...gym,
+        custom_domain: null,
+        domain_status: 'none',
+        domain_verified_at: null,
+        domain_verification_data: null,
+      })
+    } catch (err) {
+      dialog.alert(err.message || 'Failed to remove domain')
+    }
+  }
+
+  // ── Auto-poll verification while pending/verifying ───────────────────
+  // Schedule:
+  //   first 5 min  → every 30s
+  //   next 55 min  → every 2 min
+  //   after 1h     → stop (owner can still click Verify manually)
+  useEffect(() => {
+    if (!domain) return
+    if (status !== 'pending' && status !== 'verifying') return
+
+    let cancelled = false
+    let timeoutId = null
+    let elapsed = 0
+
+    function schedule() {
+      if (cancelled) return
+      const delayMs = elapsed < 5 * 60_000 ? 30_000 : 120_000
+      timeoutId = setTimeout(async () => {
+        if (cancelled) return
+        try {
+          const res = await verifyCustomDomain()
+          if (cancelled) return
+          onSave?.({
+            ...gym,
+            domain_status: res.status,
+            domain_verified_at: res.verified ? new Date().toISOString() : gym.domain_verified_at,
+            domain_verification_data: {
+              ...(gym.domain_verification_data || {}),
+              verification: res.verification,
+              last_checked_at: new Date().toISOString(),
+            },
+          })
+          // If verified, the next render will skip this effect (status changed).
+        } catch { /* swallow — next tick will retry */ }
+        elapsed += delayMs
+        if (elapsed < 60 * 60_000) schedule()
+      }, delayMs)
+    }
+
+    schedule()
+    return () => { cancelled = true; if (timeoutId) clearTimeout(timeoutId) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domain, status])
+
+  return (
+    <FeatureGate
+      feature="custom_domain"
+      planName={planName}
+      minHeight={520}
+      hint="Bring your own .com — available on the Premium plan. We handle SSL automatically."
+    >
+      <SectionHeader
+        title="Custom Domain"
+        description="Replace gymmobius.app with your own domain. We auto-provision SSL once your DNS resolves. Visitors to the old URL are 301-redirected to your custom domain."
+      />
+
+      <div className="grid lg:grid-cols-5 gap-6">
+        {/* ── Left: form + DNS instructions ─────────────────────────── */}
+        <div className="lg:col-span-3 space-y-5">
+          {!domain ? (
+            <form onSubmit={handleAdd}>
+              <Field label="Your domain" hint="Enter without https:// or www. We'll guide you through DNS setup next.">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    placeholder="ironparadise.com"
+                    className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={adding}
+                    className="px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                  >
+                    {adding && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                    {adding ? 'Adding…' : 'Add Domain'}
+                  </button>
+                </div>
+              </Field>
+              {error && <p className="text-xs text-red-500 mt-2 flex items-center gap-1.5"><AlertTriangle size={12} />{error}</p>}
+            </form>
+          ) : (
+            <>
+              <Field label="Domain">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 font-mono truncate">
+                    {domain}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemove}
+                    title="Remove domain"
+                    className="px-3 py-2.5 border border-gray-200 text-red-500 hover:text-red-700 hover:border-red-200 rounded-lg cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </Field>
+
+              {/* DNS instructions */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-gray-900 mb-1">DNS records to add at your registrar</p>
+                <p className="text-xs text-gray-500 mb-4">
+                  Sign into your domain provider (GoDaddy / Namecheap / Cloudflare) and add the records below. DNS can take 5–30 minutes to propagate.
+                </p>
+
+                {/* Apex A record */}
+                <DnsRow
+                  type="A"
+                  host="@  (apex)"
+                  value={(verData.apex_a && verData.apex_a[0]) || '76.76.21.21'}
+                  onCopy={(v) => copy(v, 'apex')}
+                  copied={copiedField === 'apex'}
+                />
+
+                {/* www CNAME */}
+                <DnsRow
+                  type="CNAME"
+                  host="www"
+                  value={verData.cname_target || 'cname.vercel-dns.com'}
+                  onCopy={(v) => copy(v, 'cname')}
+                  copied={copiedField === 'cname'}
+                />
+
+                {/* Verification TXT (only if Vercel returned one) */}
+                {Array.isArray(verData.verification) && verData.verification.map((v, i) => (
+                  <DnsRow
+                    key={i}
+                    type={v.type}
+                    host={v.domain}
+                    value={v.value}
+                    onCopy={(val) => copy(val, `ver-${i}`)}
+                    copied={copiedField === `ver-${i}`}
+                  />
+                ))}
+
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={handleVerify}
+                    disabled={verifying || status === 'verified'}
+                    className="px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {verifying
+                      ? <><RefreshCw size={12} className="animate-spin" />Checking…</>
+                      : <><RefreshCw size={12} />Verify Domain</>
+                    }
+                  </button>
+                  <a
+                    href={`https://${domain}`}
+                    target="_blank" rel="noreferrer"
+                    className="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1"
+                  >
+                    Open <ExternalLink size={11} />
+                  </a>
+                </div>
+              </div>
+
+              {error && <p className="text-xs text-red-500 flex items-center gap-1.5"><AlertTriangle size={12} />{error}</p>}
+            </>
+          )}
+        </div>
+
+        {/* ── Right: sticky live status card ────────────────────────── */}
+        <div className="lg:col-span-2">
+          <div className="lg:sticky lg:top-4 space-y-3">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</p>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${statusUi.dot}`} />
+                <span className={`text-xs font-bold uppercase tracking-wide ${statusUi.text}`}>{statusUi.label}</span>
+              </div>
+
+              {domain ? (
+                <>
+                  <p className="text-base font-bold text-gray-900 font-mono truncate" title={domain}>{domain}</p>
+
+                  {/* Indicator stack: SSL, www, status flags */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {sslProvisioned && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-100 text-emerald-800">
+                        <Check size={9} strokeWidth={3} /> SSL active
+                      </span>
+                    )}
+                    {wwwClaimed && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700">
+                        www included
+                      </span>
+                    )}
+                    {wwwError && !wwwClaimed && (
+                      <span
+                        title={wwwError}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700"
+                      >
+                        <AlertTriangle size={9} /> www failed
+                      </span>
+                    )}
+                  </div>
+
+                  {(status === 'pending' || status === 'verifying') && (
+                    <div className="flex items-center gap-1.5 pt-1 text-[11px] text-gray-500">
+                      <RefreshCw size={11} className="animate-spin" />
+                      Auto-checking every 30s — no need to click Verify.
+                    </div>
+                  )}
+
+                  {gym?.domain_verified_at && (
+                    <p className="text-[11px] text-gray-400">
+                      Verified {new Date(gym.domain_verified_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  )}
+                  {verData.last_checked_at && (
+                    <p className="text-[11px] text-gray-400">
+                      Last checked {new Date(verData.last_checked_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                    </p>
+                  )}
+
+                  {sslProvisioned && (
+                    <a
+                      href={`https://${domain}`}
+                      target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 w-full justify-center px-3 py-2 mt-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
+                    >
+                      Open live site <ExternalLink size={11} />
+                    </a>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">No domain yet. Add one to begin.</p>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-2 text-[11px] text-gray-600 leading-relaxed">
+              <p className="font-semibold text-gray-800 text-xs flex items-center gap-1.5">
+                <Globe size={12} className="text-indigo-600" /> What this gives you
+              </p>
+              <ul className="space-y-1 list-disc list-inside marker:text-indigo-400">
+                <li>Visitors reach your gym at your own domain — no Gymmobius branding in the URL</li>
+                <li>HTTPS / SSL provisioned automatically by Vercel</li>
+                <li>Old <span className="font-mono">gymmobius.app/{gym?.slug}</span> links 301-redirect to your domain</li>
+                <li>Better SEO — your gym's domain authority is independent</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </FeatureGate>
+  )
+}
+
+function DnsRow({ type, host, value, onCopy, copied }) {
+  return (
+    <div className="grid grid-cols-12 gap-2 items-center py-2 border-b border-gray-50 last:border-0">
+      <span className="col-span-2 text-[10px] font-bold text-gray-500 uppercase tracking-wide font-mono">{type}</span>
+      <span className="col-span-3 text-xs text-gray-700 font-mono truncate">{host}</span>
+      <div className="col-span-7 flex items-center gap-2 min-w-0">
+        <span className="flex-1 text-xs text-gray-900 font-mono truncate" title={value}>{value}</span>
+        <button
+          type="button"
+          onClick={() => onCopy(value)}
+          className="shrink-0 px-2 py-1 border border-gray-200 rounded text-[10px] font-medium text-gray-600 hover:border-gray-300 cursor-pointer flex items-center gap-1"
+        >
+          {copied ? <><Check size={10} className="text-green-500" />Copied</> : <><Copy size={10} />Copy</>}
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -2641,6 +3010,7 @@ export default function WebsitePage() {
           {activeSection === 'theme'              && <ThemePanel gym={gym} gymId={gymId} onSave={setGym} setPreviewData={setPreviewData} />}
           {activeSection === 'design'             && <DesignPanel gym={gym} gymId={gymId} planName={planName} onSave={setGym} setPreviewData={setPreviewData} />}
           {activeSection === 'seo'                && <SeoPanel gym={gym} gymId={gymId} planName={planName} onSave={setGym} />}
+          {activeSection === 'domain'             && <CustomDomainPanel gym={gym} planName={planName} onSave={setGym} />}
           {activeSection === 'hero'               && <HeroForm content={content} gym={gym} gymId={gymId} planName={planName} onSave={handleContentSave} onSaveGym={setGym} setPreviewData={setPreviewData} />}
           {activeSection === 'stats'              && <StatsPanel content={content} gymId={gymId} planName={planName} onSave={handleContentSave} setPreviewData={setPreviewData} />}
           {activeSection === 'about'              && (
