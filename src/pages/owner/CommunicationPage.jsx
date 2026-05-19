@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import {
   fetchGymCommSettings, updateGymCommSettings,
   fetchNotifications, sendTestNotification,
@@ -95,6 +96,7 @@ function formatRelative(iso) {
 export default function CommunicationPage() {
   const dialog = useDialog()
   const { gymId } = useAuth()
+  const { selectedBranchId } = useBranch()
 
   const [prefs, setPrefs] = useState(null)
   const [notifs, setNotifs] = useState([])
@@ -112,13 +114,13 @@ export default function CommunicationPage() {
     setLoading(true)
     Promise.all([
       fetchGymCommSettings(gymId),
-      fetchNotifications(gymId, { limit: 50 }),
+      fetchNotifications(gymId, { limit: 50, branchId: selectedBranchId }),
     ])
       .then(([p, n]) => { if (!cancelled) { setPrefs(p); setNotifs(n) } })
       .catch((err) => console.error('Failed to load comm settings:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [gymId])
+  }, [gymId, selectedBranchId])
 
   const notifTotalPages = Math.max(1, Math.ceil(notifs.length / PAGE_SIZE))
   const safeNotifPage = Math.min(notifPage, notifTotalPages)
@@ -130,6 +132,7 @@ export default function CommunicationPage() {
         type: filterType || null,
         status: filterStatus || null,
         limit: 50,
+        branchId: selectedBranchId,
       })
       setNotifs(n)
     } catch (err) {

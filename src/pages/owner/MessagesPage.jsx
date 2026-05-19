@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import { fetchContactMessages, markMessageRead, deleteContactMessage, clearAllMessages } from '../../services/contactService'
 import { useDialog } from '../../components/ui/Dialog'
 import Pagination from '../../components/ui/Pagination'
@@ -45,6 +46,7 @@ function formatRelative(iso) {
 export default function MessagesPage() {
   const dialog = useDialog()
   const { gymId } = useAuth()
+  const { selectedBranchId } = useBranch()
 
   const [enquiries, setEnquiries] = useState([])
   const [expandedId, setExpandedId] = useState(null)
@@ -56,12 +58,12 @@ export default function MessagesPage() {
     if (!gymId) { setLoading(false); return }
     let cancelled = false
     setLoading(true)
-    fetchContactMessages(gymId)
+    fetchContactMessages(gymId, selectedBranchId)
       .then((e) => { if (!cancelled) setEnquiries(e) })
       .catch((err) => console.error('Failed to load messages:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [gymId])
+  }, [gymId, selectedBranchId])
 
   async function handleMarkRead(id) {
     await markMessageRead(id).catch(() => {})

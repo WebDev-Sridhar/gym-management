@@ -1,8 +1,10 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import { fetchTrainerInvites, createTrainerInvite, deleteTrainerInvite } from '../../services/membershipService'
 import { fetchTrainers, updateTrainer, removeTrainer } from '../../services/trainerService'
 import { useDialog } from '../../components/ui/Dialog'
+import CustomSelect from '../../components/ui/CustomSelect'
 import { Sk } from '../../components/ui/Skeleton'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 
@@ -37,6 +39,7 @@ function TrainersSkeleton() {
 export default function TrainersPage() {
   const dialog = useDialog()
   const { gymId } = useAuth()
+  const { selectedBranchId, branches, isAllBranches } = useBranch()
 
   const [trainers, setTrainers]   = useState([])   // active: from users table
   const [invites, setInvites]     = useState([])   // pending: from trainer_invites WHERE claimed=false
@@ -48,6 +51,14 @@ export default function TrainersPage() {
   const [name, setName]   = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [branchId, setBranchId] = useState('')
+
+  useEffect(() => {
+    if (!showForm) return
+    if (branchId) return
+    if (!isAllBranches) setBranchId(selectedBranchId)
+    else if (branches.length > 0) setBranchId(branches.find(b => b.is_main)?.id || branches[0].id)
+  }, [showForm, isAllBranches, selectedBranchId, branches, branchId])
 
   // Edit active trainer
   const [editingTrainer, setEditingTrainer] = useState(null) // { id, name, phone, email }
@@ -94,7 +105,10 @@ export default function TrainersPage() {
     let cancelled = false
     setLoading(true)
 
-    Promise.all([fetchTrainers(gymId), fetchTrainerInvites(gymId)])
+    Promise.all([
+      fetchTrainers(gymId, selectedBranchId),
+      fetchTrainerInvites(gymId, selectedBranchId),
+    ])
       .then(([t, inv]) => {
         if (cancelled) return
         setTrainers(t)
@@ -105,7 +119,7 @@ export default function TrainersPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [gymId])
+  }, [gymId, selectedBranchId])
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -115,9 +129,13 @@ export default function TrainersPage() {
 
     setSubmitting(true)
     try {
-      const invite = await createTrainerInvite({ gymId, name: name.trim(), phone: phone.trim(), email: email.trim() })
+      const invite = await createTrainerInvite({
+        gymId,
+        branchId: branchId || (isAllBranches ? null : selectedBranchId),
+        name: name.trim(), phone: phone.trim(), email: email.trim(),
+      })
       setInvites(prev => [invite, ...prev])
-      setName(''); setPhone(''); setEmail('')
+      setName(''); setPhone(''); setEmail(''); setBranchId('')
       setShowForm(false)
     } catch (err) {
       setError(err.message || 'Failed to add trainer')
@@ -185,6 +203,22 @@ export default function TrainersPage() {
                   className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                 <p className="text-xs text-gray-400 mt-1">The trainer signs up at your gym's login page with this email — their account is automatically set up.</p>
               </div>
+              {branches.length > 1 && (
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Branch <span className="text-red-500">*</span>
+                  </label>
+                  <CustomSelect
+                    value={branchId}
+                    onChange={setBranchId}
+                    placeholder="Choose branch..."
+                    options={branches.map(b => ({
+                      value: b.id,
+                      label: b.is_main ? `${b.name} · Main` : (b.city ? `${b.name} · ${b.city}` : b.name),
+                    }))}
+                  />
+                </div>
+              )}
             </div>
             {error && <p className="text-red-500 text-xs">{error}</p>}
             <button type="submit" disabled={submitting}

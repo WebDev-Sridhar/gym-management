@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom'
 import MemberDrawer from '../../components/ui/MemberDrawer'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import { canAccess } from '../../lib/featureGates'
 import FeatureGate from './cms/components/FeatureGate'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
@@ -243,6 +244,7 @@ function generateInsights(revenue, membership, attend, inactive, payIns) {
 export default function AnalyticsPage() {
   const navigate  = useNavigate()
   const { gymId, subscription } = useAuth()
+  const { selectedBranchId } = useBranch()
   const planName    = subscription?.plan_name || 'Starter'
   const hasAdvanced = canAccess('advanced_analytics', planName)
   const hasExtendedRange = canAccess('extended_date_range', planName)
@@ -268,13 +270,13 @@ export default function AnalyticsPage() {
     const { startDate, endDate } = getDateRange(range)
 
     Promise.all([
-      fetchRevenueAnalytics(gymId, startDate, endDate),
-      fetchMembershipAnalytics(gymId, startDate, endDate),
-      fetchAttendanceAnalytics(gymId, startDate, endDate),
+      fetchRevenueAnalytics(gymId, startDate, endDate, selectedBranchId),
+      fetchMembershipAnalytics(gymId, startDate, endDate, selectedBranchId),
+      fetchAttendanceAnalytics(gymId, startDate, endDate, selectedBranchId),
       // Skip the expensive 90-day attendance scan on Starter — the at-risk
       // section is gated anyway, so no point spending the query.
-      hasAdvanced ? fetchInactiveMembers(gymId) : Promise.resolve([]),
-      fetchPaymentInsights(gymId, startDate, endDate),
+      hasAdvanced ? fetchInactiveMembers(gymId, selectedBranchId) : Promise.resolve([]),
+      fetchPaymentInsights(gymId, startDate, endDate, selectedBranchId),
     ]).then(([r, m, a, i, p]) => {
       if (cancelled) return
       setRevenue(r); setMembership(m); setAttend(a); setInactive(i); setPayIns(p)
@@ -282,7 +284,7 @@ export default function AnalyticsPage() {
       .finally(() => { if (!cancelled) { setLoading(false); setSpinning(false) } })
 
     return () => { cancelled = true }
-  }, [gymId, range, refreshKey, hasAdvanced])
+  }, [gymId, range, refreshKey, hasAdvanced, selectedBranchId])
 
   function handleRefresh() { setSpinning(true); setRefreshKey(k => k + 1) }
 

@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import { fetchAttendance, fetchAttendanceSummary, manualCheckin, fetchMembers, fetchGymDetails } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
@@ -45,6 +46,7 @@ function parseTS(ts) {
 export default function AttendancePage() {
   const dialog = useDialog()
   const { gymId } = useAuth()
+  const { selectedBranchId } = useBranch()
   const [checkins, setCheckins] = useState([])
   const [members, setMembers] = useState([])
   const [summary, setSummary] = useState({})
@@ -70,9 +72,9 @@ export default function AttendancePage() {
     fetchGymDetails(gymId).then(g => { if (!cancelled && g) { setGymName(g.name || ''); setGymLogo(g.logo_url || '') } }).catch(() => {})
 
     Promise.all([
-      fetchAttendance(gymId, selectedDate),
-      fetchAttendanceSummary(gymId, 7),
-      fetchMembers(gymId),
+      fetchAttendance(gymId, selectedDate, selectedBranchId),
+      fetchAttendanceSummary(gymId, 7, selectedBranchId),
+      fetchMembers(gymId, selectedBranchId),
     ])
       .then(([att, sum, mem]) => {
         if (cancelled) return
@@ -84,7 +86,7 @@ export default function AttendancePage() {
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [gymId, selectedDate])
+  }, [gymId, selectedDate, selectedBranchId])
 
   async function handleManualCheckin(e) {
     e.preventDefault()

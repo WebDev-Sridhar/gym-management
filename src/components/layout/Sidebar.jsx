@@ -3,7 +3,9 @@ import { useAuth } from '../../store/AuthContext'
 import {
   LayoutDashboard, Users, UserCheck, QrCode, ClipboardList, CreditCard,
   BarChart2, Megaphone, MessageSquare, Settings, HelpCircle, Gem, Dumbbell,
+  MapPin,
 } from 'lucide-react'
+import { canAccess } from '../../lib/featureGates'
 
 const sections = [
   {
@@ -27,6 +29,7 @@ const sections = [
       { to: '/owner-dashboard/programs',  label: 'Programs',  Icon: Dumbbell },
       { to: '/owner-dashboard/payments',  label: 'Payments',  Icon: CreditCard },
       { to: '/owner-dashboard/analytics', label: 'Analytics', Icon: BarChart2 },
+      { to: '/owner-dashboard/branches',  label: 'Branches',  Icon: MapPin, feature: 'multi_branch' },
     ],
   },
   {
@@ -89,18 +92,22 @@ export default function Sidebar() {
     >
       {/* Nav sections */}
       <nav style={{ flex: 1, padding: '16px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
-        {sections.map(({ label, links }) => (
-          <div key={label}>
-            <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--shell-faint)', letterSpacing: '0.1em', textTransform: 'uppercase', paddingLeft: 12, marginBottom: 6 }}>
-              {label}
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {links.map(link => (
-                <SidebarLink key={link.label} {...link} />
-              ))}
+        {sections.map(({ label, links }) => {
+          const visible = links.filter(l => !l.feature || canAccess(l.feature, planName))
+          if (visible.length === 0) return null
+          return (
+            <div key={label}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--shell-faint)', letterSpacing: '0.1em', textTransform: 'uppercase', paddingLeft: 12, marginBottom: 6 }}>
+                {label}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {visible.map(link => (
+                  <SidebarLink key={link.label} {...link} />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* Premium card */}

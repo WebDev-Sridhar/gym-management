@@ -31,6 +31,7 @@ import ProgramsPage from './pages/owner/ProgramsPage'
 import SubscriptionPage from './pages/owner/SubscriptionPage'
 import SupportPage from './pages/owner/SupportPage'
 import StarterWebsitePage from './pages/owner/StarterWebsitePage'
+import BranchesPage from './pages/owner/BranchesPage'
 import TrainerLayout from './components/layout/TrainerLayout'
 import MemberLayout from './components/layout/MemberLayout'
 import CheckinPage from './pages/checkin/CheckinPage'
@@ -181,6 +182,7 @@ export default function App() {
             <Route path="programs" element={<ProgramsPage />} />
             <Route path="subscription" element={<SubscriptionPage />} />
             <Route path="help" element={<SupportPage />} />
+            <Route path="branches" element={<BranchesPage />} />
           </Route>
 
           {/* Trainer dashboard — keep-alive layout handles all sub-routes internally */}

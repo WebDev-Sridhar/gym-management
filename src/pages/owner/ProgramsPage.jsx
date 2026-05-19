@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import { useDialog } from '../../components/ui/Dialog'
 import FormModal from '../../components/ui/FormModal'
 import {
@@ -456,6 +457,7 @@ function TemplateCard({ template, type, onEdit, onDelete, onAssign }) {
 // ─── ProgramsPage ─────────────────────────────────────────────────────────────
 export default function ProgramsPage() {
   const { gymId } = useAuth()
+  const { selectedBranchId, isAllBranches } = useBranch()
   const dialog    = useDialog()
 
   const [activeTab, setActiveTab]             = useState('workout')
@@ -470,21 +472,26 @@ export default function ProgramsPage() {
     if (!gymId) { setLoading(false); return }
     let cancelled = false
     setLoading(true)
-    Promise.all([fetchWorkoutTemplates(gymId), fetchDietTemplates(gymId)])
+    Promise.all([
+      fetchWorkoutTemplates(gymId, selectedBranchId),
+      fetchDietTemplates(gymId, selectedBranchId),
+    ])
       .then(([w, d]) => { if (!cancelled) { setWorkout(w); setDiet(d) } })
       .catch(err => console.error(err))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [gymId])
+  }, [gymId, selectedBranchId])
 
   const templates = activeTab === 'workout' ? workoutTemplates : dietTemplates
 
   async function handleCreate({ title, description, days }) {
+    // New templates attach to the active branch (or stay org-wide if "All branches" is selected).
+    const branchId = isAllBranches ? null : selectedBranchId
     if (activeTab === 'workout') {
-      const t = await createWorkoutTemplate({ gymId, title, description, days })
+      const t = await createWorkoutTemplate({ gymId, branchId, title, description, days })
       setWorkout(prev => [t, ...prev])
     } else {
-      const t = await createDietTemplate({ gymId, title, description, days })
+      const t = await createDietTemplate({ gymId, branchId, title, description, days })
       setDiet(prev => [t, ...prev])
     }
     setShowCreate(false)

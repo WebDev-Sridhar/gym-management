@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import { fetchMembers, createMember, assignPlan, fetchPlans } from '../../services/membershipService'
 import { fetchTrainers } from '../../services/trainerService'
 import CustomSelect from '../../components/ui/CustomSelect'
@@ -39,6 +40,7 @@ function MembersSkeleton() {
 
 export default function MembersPage() {
   const { gymId } = useAuth()
+  const { selectedBranchId, branches, isAllBranches } = useBranch()
   const [members, setMembers] = useState([])
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
@@ -55,7 +57,16 @@ export default function MembersPage() {
   const [newPhone, setNewPhone]   = useState('')
   const [newEmail, setNewEmail]   = useState('')
   const [newPlanId, setNewPlanId] = useState('')
+  const [newBranchId, setNewBranchId] = useState('')
   const [trainers, setTrainers]   = useState([])
+
+  // Default the add-member branch to the active view, or first branch if "all"
+  useEffect(() => {
+    if (!showAddForm) return
+    if (newBranchId) return
+    if (!isAllBranches) setNewBranchId(selectedBranchId)
+    else if (branches.length > 0) setNewBranchId(branches.find(b => b.is_main)?.id || branches[0].id)
+  }, [showAddForm, isAllBranches, selectedBranchId, branches, newBranchId])
 
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
@@ -63,7 +74,11 @@ export default function MembersPage() {
     setLoading(true)
     let cancelled = false
 
-    Promise.all([fetchMembers(gymId), fetchPlans(gymId), fetchTrainers(gymId)])
+    Promise.all([
+      fetchMembers(gymId, selectedBranchId),
+      fetchPlans(gymId),
+      fetchTrainers(gymId, selectedBranchId),
+    ])
       .then(([m, p, t]) => {
         if (cancelled) return
         setMembers(m)
@@ -74,7 +89,7 @@ export default function MembersPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [gymId])
+  }, [gymId, selectedBranchId])
 
   async function handleAddMember(e) {
     e.preventDefault()
@@ -85,6 +100,7 @@ export default function MembersPage() {
     try {
       let member = await createMember({
         gymId,
+        branchId: newBranchId || (isAllBranches ? null : selectedBranchId),
         name: newName.trim(),
         phone: newPhone.trim(),
         email: newEmail.trim(),
@@ -191,6 +207,22 @@ export default function MembersPage() {
                   }))}
                 />
               </div>
+              {branches.length > 1 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Branch <span className="text-red-500">*</span>
+                  </label>
+                  <CustomSelect
+                    value={newBranchId}
+                    onChange={setNewBranchId}
+                    placeholder="Choose branch..."
+                    options={branches.map(b => ({
+                      value: b.id,
+                      label: b.is_main ? `${b.name} · Main` : (b.city ? `${b.name} · ${b.city}` : b.name),
+                    }))}
+                  />
+                </div>
+              )}
             </div>
             {error && !editingId && <p className="text-red-500 text-xs">{error}</p>}
             <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2">

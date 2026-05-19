@@ -4,12 +4,15 @@ import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import EmailRequiredGuard from '../auth/EmailRequiredGuard'
 import SupportWidget from '../support/SupportWidget'
+import { BranchProvider } from '../../store/BranchContext'
 import {
   X, Home, LayoutDashboard, CreditCard, Globe,
   Users, UserCheck, QrCode, ClipboardList, BarChart2,
-  Megaphone, Settings, UserCircle, Gem, MessageSquare, HelpCircle, Dumbbell
+  Megaphone, Settings, UserCircle, Gem, MessageSquare, HelpCircle, Dumbbell,
+  MapPin,
 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
+import { canAccess } from '../../lib/featureGates'
 
 const SIDEBAR_BG = 'var(--shell-bg)'
 
@@ -38,6 +41,7 @@ const MOBILE_NAV_SECTIONS = [
       { to: '/owner-dashboard/programs',  label: 'Programs',  Icon: Dumbbell },
       { to: '/owner-dashboard/payments',  label: 'Payments',  Icon: CreditCard },
       { to: '/owner-dashboard/analytics', label: 'Analytics', Icon: BarChart2 },
+      { to: '/owner-dashboard/branches',  label: 'Branches',  Icon: MapPin, feature: 'multi_branch' },
     ],
   },
   {
@@ -65,6 +69,7 @@ export default function DashboardLayout() {
 
   return (
     <EmailRequiredGuard>
+      <BranchProvider>
       <div className="app-owner flex flex-col h-screen overflow-hidden" style={{ background: 'var(--app-canvas-bg)' }}>
 
         {/* Topbar — always full-width, no layout shift */}
@@ -118,7 +123,10 @@ export default function DashboardLayout() {
 
               {/* Nav sections */}
               <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-                {MOBILE_NAV_SECTIONS.map(({ label, links }) => (
+                {MOBILE_NAV_SECTIONS.map(({ label, links }) => {
+                  const visible = links.filter(l => !l.feature || canAccess(l.feature, planName))
+                  if (visible.length === 0) return null
+                  return (
                   <div key={label}>
                     <p style={{
                       fontSize: 10, fontWeight: 700,
@@ -129,7 +137,7 @@ export default function DashboardLayout() {
                       {label}
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      {links.map(({ to, label: lbl, Icon, end }) => (
+                      {visible.map(({ to, label: lbl, Icon, end }) => (
                         <NavLink
                           key={lbl}
                           to={to}
@@ -149,9 +157,10 @@ export default function DashboardLayout() {
                       ))}
                       
                     </div>
-                    
+
                   </div>
-                ))}
+                  )
+                })}
               </nav>
                {/* Premium card */}
                   <div style={{ padding: '12px 16px', borderTop: '1px solid var(--shell-border)', flexShrink: 0 }}>
@@ -186,6 +195,7 @@ export default function DashboardLayout() {
         <SupportWidget />
 
       </div>
+      </BranchProvider>
     </EmailRequiredGuard>
   )
 }

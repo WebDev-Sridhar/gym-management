@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import { useNavigate } from 'react-router-dom'
 import { fetchDashboardStats, fetchRecentActivity, fetchRevenueByMonth, fetchGymDetails } from '../../services/membershipService'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
@@ -154,6 +155,7 @@ function StatCard({ label, value, sub, Icon, iconBg, iconColor }) {
 
 export default function OwnerDashboard() {
   const { gymId, subscription } = useAuth()
+  const { selectedBranchId } = useBranch()
   const navigate = useNavigate()
   const [stats, setStats]               = useState(null)
   const [activities, setActivities]     = useState([])
@@ -170,27 +172,27 @@ export default function OwnerDashboard() {
     let cancelled = false
     setLoading(true)
     Promise.all([
-      fetchDashboardStats(gymId),
-      fetchRecentActivity(gymId),
-      fetchRevenueByMonth(gymId),
+      fetchDashboardStats(gymId, selectedBranchId),
+      fetchRecentActivity(gymId, selectedBranchId),
+      fetchRevenueByMonth(gymId, selectedBranchId),
       fetchGymDetails(gymId),
     ])
       .then(([s, a, r, g]) => { if (!cancelled) { setStats(s); setActivities(a); setRevenueByMonth(r); setGym(g) } })
       .catch(err => console.error('Dashboard load error:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [gymId])
+  }, [gymId, selectedBranchId])
 
   useEffect(() => {
     if (!gymId) return
     const onFocus = () => {
-      Promise.all([fetchDashboardStats(gymId), fetchRecentActivity(gymId), fetchRevenueByMonth(gymId)])
+      Promise.all([fetchDashboardStats(gymId, selectedBranchId), fetchRecentActivity(gymId, selectedBranchId), fetchRevenueByMonth(gymId, selectedBranchId)])
         .then(([s, a, r]) => { setStats(s); setActivities(a); setRevenueByMonth(r) })
         .catch(() => {})
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [gymId])
+  }, [gymId, selectedBranchId])
 
   if (loading) return <DashboardSkeleton />
 

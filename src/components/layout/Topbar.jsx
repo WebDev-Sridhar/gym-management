@@ -8,6 +8,7 @@ import {
   Sun, Moon,
 } from 'lucide-react'
 import { useTheme } from '../../store/ThemeContext'
+import BranchSwitcher from './BranchSwitcher'
 
 const NAV_LINKS = [
   { to: '/owner-dashboard/home',            label: 'Home',          Icon: Home },
@@ -121,7 +122,7 @@ export default function Topbar({ onMenuToggle }) {
         borderBottom: '1px solid var(--shell-border)',
       }}>
 
-        {/* Left — Hamburger (mobile) + Logo */}
+        {/* Left — Hamburger (mobile) + Logo + Branch switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 160 }}>
           <button
             className="flex md:hidden"
@@ -133,6 +134,11 @@ export default function Topbar({ onMenuToggle }) {
           <img src="/logo.png" alt="Logo" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none' }} />
           <span className="hidden sm:block" style={{ color: '#fff', fontWeight: 700, fontSize: 18, letterSpacing: '-0.4px' }}>Gymmobius</span>
+          {isOwner && (
+            <div className="hidden sm:flex" style={{ marginLeft: 8 }}>
+              <BranchSwitcher />
+            </div>
+          )}
         </div>
 
         {/* Center — Nav pills (hidden on mobile, shown md+) */}

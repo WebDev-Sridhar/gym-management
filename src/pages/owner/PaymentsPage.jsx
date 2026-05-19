@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import { fetchPayments } from '../../services/paymentService'
 import { fetchMembers, fetchPlans, fetchGymDetails } from '../../services/membershipService'
 
@@ -39,6 +40,7 @@ function PaymentsSkeleton() {
 
 export default function PaymentsPage() {
   const { gymId } = useAuth()
+  const { selectedBranchId } = useBranch()
   const [payments, setPayments] = useState([])
   const [members, setMembers] = useState([])
   const [plans, setPlans] = useState([])
@@ -68,8 +70,8 @@ export default function PaymentsPage() {
     setLoading(true)
     let cancelled = false
     Promise.all([
-      fetchPayments(gymId),
-      fetchMembers(gymId),
+      fetchPayments(gymId, selectedBranchId),
+      fetchMembers(gymId, selectedBranchId),
       fetchPlans(gymId),
       fetchGymDetails(gymId),
     ])
@@ -80,7 +82,7 @@ export default function PaymentsPage() {
       .catch((err) => console.error('Failed to load payments data:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [gymId])
+  }, [gymId, selectedBranchId])
 
   // Auto-select the member's current plan when a member is chosen
   useEffect(() => {
