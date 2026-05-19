@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MapPin, Building2, Crown, Edit3, Trash2 } from 'lucide-react'
+import { MapPin, Building2, Crown, Edit3, Trash2, TriangleAlert, UserCheck, Users, CreditCard, ScanLine, MessageSquare, Dumbbell, Bell, LifeBuoy } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import { useDialog } from '../../components/ui/Dialog'
@@ -7,6 +7,7 @@ import FormModal from '../../components/ui/FormModal'
 import { Sk } from '../../components/ui/Skeleton'
 import {
   createBranch, updateBranch, deleteBranch, setMainBranch, fetchBranchStats,
+  fetchBranchDeleteImpact,
 } from '../../services/branchService'
 import { canAccess } from '../../lib/featureGates'
 
@@ -128,6 +129,7 @@ export default function BranchesPage() {
   const { gymId } = useAuth()
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing]       = useState(null)
+  const [deleting, setDeleting]     = useState(null)   // branch row being confirmed for delete
   const [stats, setStats]           = useState({})
 
   const planName = subscription?.plan_name
@@ -167,7 +169,9 @@ export default function BranchesPage() {
     setEditing(null)
   }
 
-  async function handleDelete(branch) {
+  function handleDelete(branch) {
+    // Hard-block when the branch still has active members — they must be
+    // moved first. Otherwise open the detailed confirmation modal.
     const count = stats[branch.id]?.members || 0
     if (count > 0) {
       dialog.alert(
@@ -176,14 +180,14 @@ export default function BranchesPage() {
       )
       return
     }
-    if (!await dialog.confirm(`Delete branch "${branch.name}"? This cannot be undone.`)) return
-    try {
-      await deleteBranch(branch.id)
-      if (selectedBranchId === branch.id) selectBranch('all')
-      await reload()
-    } catch (err) {
-      dialog.alert(err.message || 'Failed to delete branch')
-    }
+    setDeleting(branch)
+  }
+
+  async function confirmDelete(branch) {
+    await deleteBranch(branch.id)
+    if (selectedBranchId === branch.id) selectBranch('all')
+    await reload()
+    setDeleting(null)
   }
 
   async function handleMakeMain(branch) {
@@ -280,19 +284,20 @@ export default function BranchesPage() {
                   </button>
                   {!b.is_main && (
                     <>
-                      <span className="text-gray-200">|</span>
-                      <button
-                        onClick={() => handleMakeMain(b)}
-                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 font-medium cursor-pointer"
-                      >
-                        <Crown size={12} strokeWidth={2} /> Make Main
-                      </button>
+
                       <span className="text-gray-200">|</span>
                       <button
                         onClick={() => handleDelete(b)}
                         className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer"
                       >
                         <Trash2 size={12} strokeWidth={2} /> Delete
+                      </button>
+                           <span className="text-gray-200">|</span>
+                      <button
+                        onClick={() => handleMakeMain(b)}
+                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 font-medium cursor-pointer"
+                      >
+                        <Crown size={12} strokeWidth={2} /> Make Main
                       </button>
                     </>
                   )}
@@ -302,6 +307,188 @@ export default function BranchesPage() {
           })}
         </div>
       )}
+
+      {deleting && (
+        <DeleteBranchModal
+          branch={deleting}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => confirmDelete(deleting)}
+        />
+      )}
     </div>
+  )
+}
+
+// ── Detailed delete confirmation ────────────────────────────────────────────
+// Sensitive action — surfaces what gets removed, what survives (with FK
+// SET NULL), which trainers become unassigned, and forces the owner to
+// retype the branch name before the destructive button enables. Loads the
+// impact stats on open via fetchBranchDeleteImpact (best-effort, never blocks).
+function DeleteBranchModal({ branch, onCancel, onConfirm }) {
+  const [impact, setImpact]     = useState(null)
+  const [loading, setLoading]   = useState(true)
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError]       = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetchBranchDeleteImpact(branch.id)
+      .then(d => { if (!cancelled) setImpact(d) })
+      .catch(() => { if (!cancelled) setImpact(null) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [branch.id])
+
+  // Case-insensitive, trimmed comparison so accidental whitespace doesn't
+  // lock the owner out of a legitimate delete.
+  const matchesName = confirmText.trim().toLowerCase() === branch.name.trim().toLowerCase()
+  const trainerCount = impact?.trainers ?? 0
+
+  // Items shown in the "what will happen" list — each pulled from the impact
+  // counts, all FK-SET-NULL on delete so they survive but go to "Unassigned".
+  const historicalRows = [
+    { Icon: CreditCard,    label: 'Payments',         count: impact?.payments      ?? 0 },
+    { Icon: ScanLine,      label: 'Check-ins',        count: impact?.attendance    ?? 0 },
+    { Icon: MessageSquare, label: 'Contact messages', count: impact?.contactMsgs   ?? 0 },
+    { Icon: Dumbbell,      label: 'Assigned plans',   count: impact?.assignedPlans ?? 0 },
+    { Icon: Bell,          label: 'Notifications',    count: impact?.notifications ?? 0 },
+    { Icon: LifeBuoy,      label: 'Support tickets',  count: impact?.supportTickets ?? 0 },
+  ].filter(r => r.count > 0)
+
+  async function handleClick() {
+    if (!matchesName) return
+    setDeleting(true); setError('')
+    try {
+      await onConfirm()
+    } catch (err) {
+      setError(err.message || 'Failed to delete branch')
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <FormModal title="Delete branch" onClose={onCancel} wide>
+      <div className="space-y-4">
+        {/* Heading banner */}
+        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+          <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+            <TriangleAlert size={18} className="text-red-600" strokeWidth={2} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-red-800 m-0">
+              You are about to permanently delete "{branch.name}".
+            </p>
+            <p className="text-xs text-red-700 mt-1 m-0">
+              This action cannot be undone. The branch row is removed and all linked
+              historical records get disassociated.
+            </p>
+          </div>
+        </div>
+
+        {/* What WILL happen */}
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">What will happen</p>
+          <ul className="space-y-2 text-xs text-gray-700">
+            <li className="flex items-start gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+              <span>The branch row is permanently removed from your organisation.</span>
+            </li>
+            {trainerCount > 0 && (
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                <span>
+                  <strong>{trainerCount} trainer{trainerCount !== 1 ? 's' : ''}</strong> pinned here
+                  will be unassigned. You'll need to re-pin them to another branch from <em>Trainers</em>.
+                </span>
+              </li>
+            )}
+            <li className="flex items-start gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+              <span>
+                All historical records below stay intact but lose their branch link — they'll appear
+                under <em>All branches</em>, not under any specific location.
+              </span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Affected historical records grid */}
+        {loading ? (
+          <div className="bg-gray-50 rounded-xl p-3">
+            <Sk h={14} w="40%" />
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {Array(6).fill(0).map((_, i) => <Sk key={i} h={42} r={8} />)}
+            </div>
+          </div>
+        ) : historicalRows.length > 0 ? (
+          <div className="bg-gray-50 rounded-xl p-3">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Records that will be unlinked
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {historicalRows.map(({ Icon, label, count }) => (
+                <div key={label} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-2">
+                  <Icon size={14} className="text-gray-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider truncate m-0">{label}</p>
+                    <p className="text-xs font-bold text-gray-900 m-0">{count.toLocaleString('en-IN')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 italic">No historical records are linked to this branch.</p>
+        )}
+
+        {/* What WON'T happen */}
+        <div className="rounded-xl border border-gray-200 bg-white p-3">
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Not affected</p>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            Members are protected — this delete is blocked while any member is still pinned to the branch.
+            Org-level settings (plans, programs, website, payment setup) are untouched.
+          </p>
+        </div>
+
+        {/* Type-to-confirm */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            Type <span className="font-mono font-semibold text-gray-900">{branch.name}</span> to confirm
+          </label>
+          <input
+            value={confirmText}
+            onChange={e => setConfirmText(e.target.value)}
+            placeholder={branch.name}
+            autoFocus
+            className={inputCls + ' font-mono'}
+          />
+        </div>
+
+        {error && <p className="text-red-500 text-xs">{error}</p>}
+
+        {/* Actions */}
+        <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={handleClick}
+            disabled={!matchesName || deleting}
+            className="px-5 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {deleting && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            {deleting ? 'Deleting…' : `Delete "${branch.name}" permanently`}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={deleting}
+            className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </FormModal>
   )
 }

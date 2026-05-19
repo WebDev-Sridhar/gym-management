@@ -392,14 +392,18 @@ html.lenis body {
 [data-theme="dark"] .app-owner .bg-indigo-50\/50       { background-color: rgba(99,102,241,0.10) !important; }
 [data-theme="dark"] .app-owner .bg-indigo-50\/60       { background-color: rgba(99,102,241,0.12) !important; }
 [data-theme="dark"] .app-owner .bg-indigo-100          { background-color: rgba(99,102,241,0.22) !important; }
+[data-theme="dark"] .app-owner .bg-indigo-200          { background-color: rgba(99,102,241,0.30) !important; }
 [data-theme="dark"] .app-owner .bg-violet-50           { background-color: rgba(139,92,246,0.14) !important; }
 [data-theme="dark"] .app-owner .bg-violet-100          { background-color: rgba(139,92,246,0.22) !important; }
+[data-theme="dark"] .app-owner .bg-violet-200          { background-color: rgba(139,92,246,0.30) !important; }
 [data-theme="dark"] .app-owner .bg-emerald-50          { background-color: rgba(16,185,129,0.14) !important; }
 [data-theme="dark"] .app-owner .bg-emerald-100         { background-color: rgba(16,185,129,0.22) !important; }
+[data-theme="dark"] .app-owner .bg-emerald-200         { background-color: rgba(16,185,129,0.30) !important; }
 [data-theme="dark"] .app-owner .bg-green-50            { background-color: rgba(16,185,129,0.14) !important; }
 [data-theme="dark"] .app-owner .bg-green-100           { background-color: rgba(16,185,129,0.22) !important; }
 [data-theme="dark"] .app-owner .bg-amber-50            { background-color: rgba(245,158,11,0.14) !important; }
 [data-theme="dark"] .app-owner .bg-amber-100           { background-color: rgba(245,158,11,0.22) !important; }
+[data-theme="dark"] .app-owner .bg-amber-200           { background-color: rgba(245,158,11,0.30) !important; }
 [data-theme="dark"] .app-owner .bg-red-50              { background-color: rgba(239,68,68,0.14) !important; }
 [data-theme="dark"] .app-owner .bg-red-100             { background-color: rgba(239,68,68,0.22) !important; }
 [data-theme="dark"] .app-owner .bg-sky-50              { background-color: rgba(14,165,233,0.14) !important; }
@@ -490,32 +494,69 @@ html.lenis body {
 [data-theme="dark"] .app-owner .text-gray-400         { color: var(--owner-text-6) !important; }
 [data-theme="dark"] .app-owner .text-gray-300         { color: var(--owner-text-7) !important; }
 
-/* Indigo accent text stays vivid but slightly lighter for contrast */
-[data-theme="dark"] .app-owner .text-indigo-600       { color: #a5b4fc !important; }
-[data-theme="dark"] .app-owner .text-indigo-700       { color: #c7d2fe !important; }
-[data-theme="dark"] .app-owner .text-indigo-800       { color: #e0e7ff !important; }
-[data-theme="dark"] .app-owner .text-indigo-900       { color: #eef2ff !important; }
-[data-theme="dark"] .app-owner .text-violet-600       { color: #c4b5fd !important; }
-[data-theme="dark"] .app-owner .text-violet-700       { color: #ddd6fe !important; }
-[data-theme="dark"] .app-owner .text-emerald-600      { color: #6ee7b7 !important; }
-[data-theme="dark"] .app-owner .text-emerald-700      { color: #a7f3d0 !important; }
-[data-theme="dark"] .app-owner .text-green-600        { color: #6ee7b7 !important; }
-[data-theme="dark"] .app-owner .text-green-700        { color: #a7f3d0 !important; }
-[data-theme="dark"] .app-owner .text-amber-600        { color: #fcd34d !important; }
-[data-theme="dark"] .app-owner .text-amber-700        { color: #fde68a !important; }
-[data-theme="dark"] .app-owner .text-amber-800        { color: #fef3c7 !important; }
-[data-theme="dark"] .app-owner .text-red-500          { color: #fca5a5 !important; }
-[data-theme="dark"] .app-owner .text-red-600          { color: #fca5a5 !important; }
-[data-theme="dark"] .app-owner .text-red-700          { color: #fecaca !important; }
-[data-theme="dark"] .app-owner .text-sky-600          { color: #7dd3fc !important; }
-[data-theme="dark"] .app-owner .text-rose-600         { color: #fda4af !important; }
-[data-theme="dark"] .app-owner .text-slate-600        { color: var(--owner-text-4) !important; }
-[data-theme="dark"] .app-owner .text-slate-700        { color: var(--owner-text-3) !important; }
+/* Accent text remaps — apply both inside the owner shell AND inside any
+   portal'd surface tagged with [data-theme-aware] (modals, dialogs, dropdowns
+   rendered into document.body via createPortal). Without the second selector
+   colored text inside FormModal etc. would fall back to the very dark
+   default Tailwind shade and become unreadable on the dark surface. */
+[data-theme="dark"] .app-owner .text-indigo-600,
+[data-theme="dark"] [data-theme-aware] .text-indigo-600 { color: #a5b4fc !important; }
+[data-theme="dark"] .app-owner .text-indigo-700,
+[data-theme="dark"] [data-theme-aware] .text-indigo-700 { color: #c7d2fe !important; }
+[data-theme="dark"] .app-owner .text-indigo-800,
+[data-theme="dark"] [data-theme-aware] .text-indigo-800 { color: #e0e7ff !important; }
+[data-theme="dark"] .app-owner .text-indigo-900,
+[data-theme="dark"] [data-theme-aware] .text-indigo-900 { color: #eef2ff !important; }
+[data-theme="dark"] .app-owner .text-violet-600,
+[data-theme="dark"] [data-theme-aware] .text-violet-600 { color: #c4b5fd !important; }
+[data-theme="dark"] .app-owner .text-violet-700,
+[data-theme="dark"] [data-theme-aware] .text-violet-700 { color: #ddd6fe !important; }
+[data-theme="dark"] .app-owner .text-emerald-600,
+[data-theme="dark"] [data-theme-aware] .text-emerald-600 { color: #6ee7b7 !important; }
+[data-theme="dark"] .app-owner .text-emerald-700,
+[data-theme="dark"] [data-theme-aware] .text-emerald-700 { color: #a7f3d0 !important; }
+[data-theme="dark"] .app-owner .text-green-600,
+[data-theme="dark"] [data-theme-aware] .text-green-600 { color: #6ee7b7 !important; }
+[data-theme="dark"] .app-owner .text-green-700,
+[data-theme="dark"] [data-theme-aware] .text-green-700 { color: #a7f3d0 !important; }
+[data-theme="dark"] .app-owner .text-amber-600,
+[data-theme="dark"] [data-theme-aware] .text-amber-600 { color: #fcd34d !important; }
+[data-theme="dark"] .app-owner .text-amber-700,
+[data-theme="dark"] [data-theme-aware] .text-amber-700 { color: #fde68a !important; }
+[data-theme="dark"] .app-owner .text-amber-800,
+[data-theme="dark"] [data-theme-aware] .text-amber-800 { color: #fef3c7 !important; }
+[data-theme="dark"] .app-owner .text-red-500,
+[data-theme="dark"] [data-theme-aware] .text-red-500 { color: #fca5a5 !important; }
+[data-theme="dark"] .app-owner .text-red-600,
+[data-theme="dark"] [data-theme-aware] .text-red-600 { color: #fca5a5 !important; }
+[data-theme="dark"] .app-owner .text-red-700,
+[data-theme="dark"] [data-theme-aware] .text-red-700 { color: #fecaca !important; }
+/* Vivid red for headline-weight warnings (e.g. branch delete confirmation) */
+[data-theme="dark"] .app-owner .text-red-800,
+[data-theme="dark"] [data-theme-aware] .text-red-800 { color: #f87171 !important; }
+[data-theme="dark"] .app-owner .text-sky-600,
+[data-theme="dark"] [data-theme-aware] .text-sky-600 { color: #7dd3fc !important; }
+[data-theme="dark"] .app-owner .text-rose-600,
+[data-theme="dark"] [data-theme-aware] .text-rose-600 { color: #fda4af !important; }
+[data-theme="dark"] .app-owner .text-slate-600,
+[data-theme="dark"] [data-theme-aware] .text-slate-600 { color: var(--owner-text-4) !important; }
+[data-theme="dark"] .app-owner .text-slate-700,
+[data-theme="dark"] [data-theme-aware] .text-slate-700 { color: var(--owner-text-3) !important; }
 
 /* ── Borders & dividers ────────────────────────────────────────────────── */
 [data-theme="dark"] .app-owner .border-gray-200       { border-color: var(--owner-border) !important; }
 [data-theme="dark"] .app-owner .border-gray-100       { border-color: var(--owner-border-subtle) !important; }
 [data-theme="dark"] .app-owner .border-gray-50        { border-color: var(--owner-border-faint) !important; }
+
+/* Accent borders — soft tinted to match the bg-{color}-50 surface remaps */
+[data-theme="dark"] .app-owner .border-indigo-200,
+[data-theme="dark"] .app-owner .border-indigo-300     { border-color: rgba(99,102,241,0.30)  !important; }
+[data-theme="dark"] .app-owner .border-violet-200,
+[data-theme="dark"] .app-owner .border-violet-300     { border-color: rgba(139,92,246,0.30)  !important; }
+[data-theme="dark"] .app-owner .border-amber-200,
+[data-theme="dark"] .app-owner .border-amber-300      { border-color: rgba(245,158,11,0.30)  !important; }
+[data-theme="dark"] .app-owner .border-red-200        { border-color: rgba(239,68,68,0.30)   !important; }
+[data-theme="dark"] .app-owner .border-emerald-200    { border-color: rgba(16,185,129,0.30)  !important; }
 
 /* Explicit per-side overrides — defensive against Tailwind v4 cascade layers
    that can outrank shorthand `border-color`. Covers tables (<tr>), thead

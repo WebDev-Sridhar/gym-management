@@ -154,6 +154,38 @@ export async function setMainBranch({ gymId, branchId }) {
 }
 
 /**
+ * One-off "what will deleting this branch affect" report, fetched on demand
+ * when the owner opens the delete confirmation modal. Stats are best-effort
+ * — any failed sub-query returns 0 rather than failing the whole report.
+ *
+ * All affected rows survive the delete (FKs are ON DELETE SET NULL) — these
+ * counts just describe what gets disassociated from the branch.
+ */
+export async function fetchBranchDeleteImpact(branchId) {
+  if (!branchId) return null
+  const head = { count: 'exact', head: true }
+
+  async function n(query) {
+    try { const { count } = await query; return count || 0 } catch { return 0 }
+  }
+
+  const [trainers, members, payments, attendance, contactMsgs, assignedPlans, supportTickets, notifications, reminders, trainerInvites] = await Promise.all([
+    n(supabase.from('users').select('id', head).eq('branch_id', branchId).eq('role', 'trainer')),
+    n(supabase.from('members').select('id', head).eq('branch_id', branchId).is('deleted_at', null)),
+    n(supabase.from('payments').select('id', head).eq('branch_id', branchId)),
+    n(supabase.from('attendance').select('id', head).eq('branch_id', branchId)),
+    n(supabase.from('contact_messages').select('id', head).eq('branch_id', branchId)),
+    n(supabase.from('assigned_plans').select('id', head).eq('branch_id', branchId)),
+    n(supabase.from('support_tickets').select('id', head).eq('branch_id', branchId)),
+    n(supabase.from('notifications').select('id', head).eq('branch_id', branchId)),
+    n(supabase.from('payment_reminders').select('id', head).eq('branch_id', branchId)),
+    n(supabase.from('trainer_invites').select('id', head).eq('branch_id', branchId)),
+  ])
+
+  return { trainers, members, payments, attendance, contactMsgs, assignedPlans, supportTickets, notifications, reminders, trainerInvites }
+}
+
+/**
  * Per-branch summary stats: active member count + total paid revenue.
  * Used to render context on the BranchesPage cards.
  */

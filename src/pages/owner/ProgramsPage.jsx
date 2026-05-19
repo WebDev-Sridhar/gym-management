@@ -502,25 +502,25 @@ function AssignModal({ template, planType, gymId, onClose, onAssigned }) {
 
             {/* Conflict warning */}
             {showConflict && selected && conflict && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-3">
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-3">
                 <div className="flex items-start gap-2.5">
                   <TriangleAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-xs font-bold text-amber-800 m-0">
                       {selected.name} already has a {planType} plan
                     </p>
-                    <p className="text-xs text-amber-700/80 mt-1 m-0">
+                    <p className="text-xs text-amber-700 mt-1 m-0">
                       "{conflict.title}" is currently active
                     </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => { setReplaceId(conflict.id); setShowConflict(false) }}
-                    className="flex-1 py-2 rounded-lg bg-amber-200/70 text-amber-800 text-xs font-bold cursor-pointer hover:bg-amber-200">
+                    className="flex-1 py-2 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold cursor-pointer hover:bg-amber-200 border border-amber-200">
                     Replace existing
                   </button>
                   <button type="button" onClick={() => { setReplaceId(null); setShowConflict(false) }}
-                    className="flex-1 py-2 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-bold cursor-pointer hover:bg-indigo-200">
+                    className="flex-1 py-2 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-bold cursor-pointer hover:bg-indigo-200 border border-indigo-200">
                     Add alongside
                   </button>
                 </div>

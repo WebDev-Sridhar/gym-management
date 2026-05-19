@@ -235,7 +235,7 @@ export default function Topbar({ onMenuToggle }) {
 
               return (
                 <div data-profile-dropdown style={{
-                  position: 'absolute', top: 'calc(100% + 14px)', right: -20,
+                  position: 'absolute', top: 'calc(100% + 14px)', right: -16,
                   width: 280, background: '#fff', borderRadius: 16,
                   boxShadow: '0 8px 40px rgba(0,0,0,0.18)', border: '1px solid #e5e7eb',
                   overflow: 'hidden', zIndex: 100,
@@ -374,7 +374,7 @@ export default function Topbar({ onMenuToggle }) {
                       onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}
                     >
-                      <LogOut size={15} strokeWidth={2} color="var(--c-danger)" />
+                      <LogOut size={15} strokeWidth={2} />
                       Sign out
                     </button>
                   </div>

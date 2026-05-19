@@ -291,12 +291,12 @@ export default function TrainersPage() {
                       </span>
                       <div className="flex items-center gap-2">
                         <button onClick={() => openEdit(trainer)}
-                          className="text-xs text-indigo-500 hover:text-indigo-700 font-medium cursor-pointer transition-colors">
+                          className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer transition-colors">
                           Edit
                         </button>
                         <span className="text-gray-200">|</span>
                         <button onClick={() => handleRemove(trainer)}
-                          className="text-xs text-red-400 hover:text-red-600 font-medium cursor-pointer transition-colors">
+                          className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer transition-colors">
                           Remove
                         </button>
                       </div>
@@ -331,7 +331,7 @@ export default function TrainersPage() {
                     Awaiting signup
                   </span>
                   <button onClick={() => handleDeleteInvite(invite.id)}
-                    className="text-xs text-red-400 hover:text-red-600 cursor-pointer transition-colors">
+                    className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer transition-colors">
                     Remove
                   </button>
                 </div>

@@ -78,13 +78,26 @@ export async function fetchMembers(gymId, branchId) {
 }
 
 export async function createMember({ gymId, branchId, name, phone, email }) {
-  // Check for a soft-deleted member with the same phone or email — revive instead of duplicate
+  const cleanPhone = phone?.trim() || null
+  const cleanEmail = email?.trim().toLowerCase() || null
+
+  // Find a soft-deleted member matching EITHER the phone OR email so we
+  // revive the original row instead of creating a duplicate. Email match is
+  // case-insensitive (ilike) — emails are case-insensitive per RFC.
   let existingId = null
-  if (phone || email) {
-    let q = supabase.from('members').select('id').eq('gym_id', gymId).not('deleted_at', 'is', null)
-    if (phone) q = q.eq('phone', phone)
-    else q = q.eq('email', email)
-    const { data: existing } = await q.limit(1).maybeSingle()
+  if (cleanPhone || cleanEmail) {
+    const conditions = []
+    if (cleanPhone) conditions.push(`phone.eq.${cleanPhone}`)
+    if (cleanEmail) conditions.push(`email.ilike.${cleanEmail}`)
+    const { data: existing } = await supabase
+      .from('members')
+      .select('id')
+      .eq('gym_id', gymId)
+      .not('deleted_at', 'is', null)
+      .or(conditions.join(','))
+      .order('deleted_at', { ascending: false })   // most-recent soft-delete wins on collisions
+      .limit(1)
+      .maybeSingle()
     existingId = existing?.id ?? null
   }
 
@@ -92,8 +105,8 @@ export async function createMember({ gymId, branchId, name, phone, email }) {
     // Revive: clear deleted_at, reset plan/expiry, update details + re-pin branch
     const update = {
       name,
-      phone: phone || null,
-      email: email || null,
+      phone: cleanPhone,
+      email: cleanEmail,
       status: 'inactive',
       plan_id: null,
       expiry_date: null,
@@ -114,8 +127,8 @@ export async function createMember({ gymId, branchId, name, phone, email }) {
   const row = {
     gym_id: gymId,
     name,
-    phone: phone || null,
-    email: email || null,
+    phone: cleanPhone,
+    email: cleanEmail,
     status: 'inactive',
     join_date: new Date().toISOString().split('T')[0],
   }

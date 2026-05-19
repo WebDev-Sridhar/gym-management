@@ -737,16 +737,16 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => setShowSubdomainModal(true)}
-                      className="w-full flex items-center gap-3 px-4 py-3 border border-dashed border-indigo-200 bg-indigo-50/40 hover:bg-indigo-50 rounded-xl text-left transition-colors cursor-pointer group"
+                      className="w-full flex items-center gap-3 px-4 py-3 border border-dashed border-indigo-300 bg-indigo-50 hover:bg-indigo-100/70 rounded-xl text-left transition-colors cursor-pointer group"
                     >
                       <Globe size={15} className="text-indigo-600 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-indigo-900">Claim your subdomain</p>
-                        <p className="text-[11px] text-indigo-700/80 mt-0.5">
+                        <p className="text-xs font-semibold text-indigo-800">Claim your subdomain</p>
+                        <p className="text-[11px] text-indigo-700 mt-0.5">
                           Use <span className="font-mono">{gym.slug}.{MAIN_DOMAIN}</span> for cleaner branding.
                         </p>
                       </div>
-                      <ChevronRight size={13} className="text-indigo-400 group-hover:text-indigo-600 shrink-0" />
+                      <ChevronRight size={13} className="text-indigo-500 group-hover:text-indigo-700 shrink-0" />
                     </button>
                   )
                 ) : (
@@ -797,31 +797,31 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => navigate('/owner-dashboard/website')}
-                      className="w-full flex items-center gap-3 px-4 py-3 border border-amber-200 bg-amber-50/60 hover:bg-amber-50 rounded-xl text-left transition-colors cursor-pointer group"
+                      className="w-full flex items-center gap-3 px-4 py-3 border border-amber-300 bg-amber-50 hover:bg-amber-100/70 rounded-xl text-left transition-colors cursor-pointer group"
                     >
                       <AlertTriangle size={15} className="text-amber-600 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-amber-900 truncate">{gym.custom_domain}</p>
-                        <p className="text-[11px] text-amber-700/80 mt-0.5">
+                        <p className="text-xs font-semibold text-amber-800 truncate">{gym.custom_domain}</p>
+                        <p className="text-[11px] text-amber-700 mt-0.5">
                           {gym.domain_status === 'failed' ? 'DNS misconfigured — open Website Builder to fix' : 'Waiting for DNS — open Website Builder to verify'}
                         </p>
                       </div>
-                      <ChevronRight size={13} className="text-amber-400 group-hover:text-amber-600 shrink-0" />
+                      <ChevronRight size={13} className="text-amber-600 group-hover:text-amber-700 shrink-0" />
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => navigate('/owner-dashboard/website')}
-                      className="w-full flex items-center gap-3 px-4 py-3 border border-dashed border-violet-200 bg-violet-50/40 hover:bg-violet-50 rounded-xl text-left transition-colors cursor-pointer group"
+                      className="w-full flex items-center gap-3 px-4 py-3 border border-dashed border-violet-300 bg-violet-50 hover:bg-violet-100/70 rounded-xl text-left transition-colors cursor-pointer group"
                     >
                       <Globe size={15} className="text-violet-600 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-violet-900">Add your own domain</p>
-                        <p className="text-[11px] text-violet-700/80 mt-0.5">
+                        <p className="text-xs font-semibold text-violet-700">Add your own domain</p>
+                        <p className="text-[11px] text-violet-600 mt-0.5">
                           Use <span className="font-mono">yourgym.com</span> — auto SSL included.
                         </p>
                       </div>
-                      <ChevronRight size={13} className="text-violet-400 group-hover:text-violet-600 shrink-0" />
+                      <ChevronRight size={13} className="text-violet-600 group-hover:text-violet-700 shrink-0" />
                     </button>
                   )
                 ) : (

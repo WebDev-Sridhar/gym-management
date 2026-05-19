@@ -396,14 +396,14 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
 // or Cancel.
 function DuplicateWarning({ kind, existing, onContinue, onCancel }) {
   return (
-    <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-3">
+    <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-3">
       <div className="flex items-start gap-2.5">
         <TriangleAlert size={14} className="text-amber-600 shrink-0 mt-0.5" />
         <div className="min-w-0">
           <p className="text-xs font-bold text-amber-800 m-0">
             Already has a {kind} plan
           </p>
-          <p className="text-[11px] text-amber-700/80 mt-1 m-0">
+          <p className="text-[11px] text-amber-700 mt-1 m-0">
             {existing
               ? <>"{existing.title}" is currently active. Adding another won't replace it — both will stay active.</>
               : <>This member already has an active {kind} plan. Adding another won't replace it — both will stay active.</>
@@ -413,7 +413,7 @@ function DuplicateWarning({ kind, existing, onContinue, onCancel }) {
       </div>
       <div className="flex gap-2">
         <button type="button" onClick={onCancel}
-          className="flex-1 py-1.5 rounded-lg border border-amber-200 bg-white text-amber-700 text-[11px] font-semibold cursor-pointer hover:bg-amber-100/60">
+          className="flex-1 py-1.5 rounded-lg border border-amber-300 bg-white text-amber-700 text-[11px] font-semibold cursor-pointer hover:bg-amber-100">
           Cancel
         </button>
         <button type="button" onClick={onContinue}
