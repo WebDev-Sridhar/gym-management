@@ -129,8 +129,8 @@ export default function PaymentsPage() {
       const result = await sendPaymentReminder({ memberId: member.id, planId: plan.id })
       setGeneratedLink(result.payLink)
       const [updated, reminders] = await Promise.all([
-        fetchPayments(gymId),
-        fetchLastReminders(gymId).catch(() => new Map()),
+        fetchPayments(gymId, selectedBranchId),
+        fetchLastReminders(gymId, selectedBranchId).catch(() => new Map()),
       ])
       setPayments(updated)
       setLastReminders(reminders)

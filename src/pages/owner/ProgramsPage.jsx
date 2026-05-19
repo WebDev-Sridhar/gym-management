@@ -1,19 +1,20 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
-import { useBranch } from '../../store/BranchContext'
 import { useDialog } from '../../components/ui/Dialog'
 import FormModal from '../../components/ui/FormModal'
 import {
   fetchWorkoutTemplates, createWorkoutTemplate, updateWorkoutTemplate, deleteWorkoutTemplate,
   fetchDietTemplates, createDietTemplate, updateDietTemplate, deleteDietTemplate,
-  assignPlan,
+  assignPlan, fetchAssignedPlans, archiveAssignedPlan,
 } from '../../services/programsService'
 import { fetchMembers } from '../../services/membershipService'
 import { EXERCISES } from '../../data/exercisesDb'
 import { MEALS } from '../../data/mealsDb'
 import { Sk } from '../../components/ui/Skeleton'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
-import { Dumbbell, Utensils } from 'lucide-react'
+import { Dumbbell, Utensils, TriangleAlert, Search, Plus, X, Loader2, Copy } from 'lucide-react'
+
+const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function ProgramsSkeleton() {
   return (
@@ -305,97 +306,408 @@ function TemplateForm({ type, initial, onSave, onCancel }) {
 }
 
 // ─── AssignModal ──────────────────────────────────────────────────────────────
+// Three-step flow:
+//   1. pick     — search/pick a member; loads their active plans on select.
+//   2. conflict — surfaced inline when the member already has an active plan
+//                 of the same type; owner picks Replace or Add alongside.
+//   3. customize — optional pre-assign editor (title + days + items) so the
+//                  assigned copy can drift from the catalog template without
+//                  mutating it.
 function AssignModal({ template, planType, gymId, onClose, onAssigned }) {
-  const [members, setMembers]   = useState([])
-  const [query, setQuery]       = useState('')
-  const [selected, setSelected] = useState(null)
-  const [loading, setLoading]   = useState(true)
-  const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState('')
+  const itemKey  = planType === 'workout' ? 'exercises' : 'meals'
+  const nameKey  = planType === 'workout' ? 'name'      : 'meal_name'
+  const db       = planType === 'workout' ? EXERCISES   : MEALS
+  const emptyItem = () => planType === 'workout'
+    ? { name: '', sets: '', reps: '', rest: '' }
+    : { time: '', meal_name: '', protein: '', calories: '' }
+  const emptyDay = () => ({ name: '', rest: false, [itemKey]: [] })
+
+  function templateToDays(t) {
+    const src = t.exercises ?? t.meals ?? []
+    return src.map(d => ({ ...d, [itemKey]: (d[itemKey] || []).map(i => ({ ...i })) }))
+  }
+
+  const [members, setMembers]       = useState([])
+  const [loadingMembers, setLoadingMembers] = useState(true)
+  const [query, setQuery]           = useState('')
+  const [selected, setSelected]     = useState(null)
+  const [memberPlans, setMemberPlans]       = useState([])
+  const [loadingPlans, setLoadingPlans]     = useState(false)
+  const [replaceId, setReplaceId]   = useState(null)
+  const [step, setStep]             = useState('pick')        // 'pick' | 'customize'
+  const [showConflict, setShowConflict] = useState(false)
+
+  // Customize-step state
+  const [customTitle, setCustomTitle]     = useState(template.title)
+  const [days, setDays]                   = useState(templateToDays(template))
+  const [activeDayIdx, setActiveDayIdx]   = useState(0)
+  const [daySearch, setDaySearch]         = useState('')
+
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState('')
 
   useEffect(() => {
-    fetchMembers(gymId).then(setMembers).catch(() => setError('Failed to load members')).finally(() => setLoading(false))
+    fetchMembers(gymId)
+      .then(setMembers)
+      .catch(() => setError('Failed to load members'))
+      .finally(() => setLoadingMembers(false))
   }, [gymId])
 
-  const filtered = members.filter(m => !query || m.name.toLowerCase().includes(query.toLowerCase()) || (m.phone || '').includes(query))
-  const days     = template.exercises ?? template.meals ?? []
-  const itemKey  = planType === 'workout' ? 'exercises' : 'meals'
+  const filtered = members.filter(m =>
+    !query
+      || m.name.toLowerCase().includes(query.toLowerCase())
+      || (m.phone || '').includes(query)
+  )
 
-  async function handleAssign() {
+  const conflict = memberPlans.find(p => p.plan_type === planType)
+
+  async function selectMember(m) {
+    setSelected(m); setReplaceId(null); setShowConflict(false); setError('')
+    setLoadingPlans(true)
+    try {
+      const plans = await fetchAssignedPlans(m.id)
+      const active = (plans || []).filter(p => p.status === 'active')
+      setMemberPlans(active)
+      if (active.find(p => p.plan_type === planType)) setShowConflict(true)
+    } catch { setMemberPlans([]) } finally {
+      setLoadingPlans(false)
+    }
+  }
+
+  async function doAssign(useCustom) {
     if (!selected) return
     setSaving(true); setError('')
     try {
-      await assignPlan({ gymId, memberId: selected.id, template, planType })
-      onAssigned()
+      if (replaceId) await archiveAssignedPlan(replaceId)
+      const payload = useCustom
+        ? { ...template, title: customTitle.trim() || template.title, [itemKey]: days }
+        : template
+      await assignPlan({ gymId, memberId: selected.id, template: payload, planType })
+      onAssigned(selected.name)
     } catch (err) {
       setError(err.message || 'Failed to assign plan')
       setSaving(false)
     }
   }
 
+  // Customize-step helpers
+  const safeIdx   = Math.min(activeDayIdx, Math.max(0, days.length - 1))
+  const activeDay = days[safeIdx]
+  const items     = activeDay?.[itemKey] || []
+  const dbResults = daySearch.trim()
+    ? db.filter(x => x[nameKey]?.toLowerCase().includes(daySearch.toLowerCase())).slice(0, 5)
+    : []
+
+  const addDay     = () => setDays(d => [...d, emptyDay()])
+  const removeDay  = (di) => setDays(d => d.filter((_, i) => i !== di))
+  const updateDay  = (di, patch) => setDays(d => d.map((day, i) => i === di ? { ...day, ...patch } : day))
+  const addItem    = (di) => setDays(d => d.map((day, i) => i !== di ? day : { ...day, [itemKey]: [...(day[itemKey] || []), emptyItem()] }))
+  const removeItem = (di, ii) => setDays(d => d.map((day, i) => i !== di ? day : { ...day, [itemKey]: (day[itemKey] || []).filter((_, j) => j !== ii) }))
+  const updateItem = (di, ii, patch) => setDays(d => d.map((day, i) => i !== di ? day : { ...day, [itemKey]: (day[itemKey] || []).map((item, j) => j !== ii ? item : { ...item, ...patch }) }))
+  const addFromDb  = (item) => {
+    setDays(d => d.map((day, i) => i !== safeIdx ? day : {
+      ...day,
+      [itemKey]: [...(day[itemKey] || []), {
+        ...item,
+        sets: String(item.sets ?? ''),
+        protein: String(item.protein ?? ''),
+        calories: String(item.calories ?? ''),
+      }],
+    }))
+    setDaySearch('')
+  }
+
+  const previewDays = template.exercises ?? template.meals ?? []
+  const lightInput = 'px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full placeholder:text-gray-400 text-gray-900'
+
   return (
-    <FormModal title={`Assign — ${template.title}`} onClose={onClose}>
+    <FormModal title={`Assign — ${template.title}`} onClose={onClose} wide>
       <div className="space-y-4">
-        {/* Plan preview */}
-        <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Weekly Schedule</p>
-          {days.map((d, i) => {
-            const count = (d[itemKey] || []).length
-            return (
-              <div key={i} className="flex items-center gap-2 text-xs">
-                <span className="w-16 font-semibold text-gray-500 shrink-0">{d.name?.slice(0, 3) || `Day ${d.day}`}</span>
-                {d.rest ? (
-                  <span className="text-gray-300 italic">Rest day</span>
+
+        {/* ── Step 1: Pick member ── */}
+        {step === 'pick' && (
+          <>
+            {/* Weekly preview mini-chart */}
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Weekly Plan Preview</p>
+              <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${Math.min(previewDays.length, 7)}, minmax(0,1fr))` }}>
+                {previewDays.map((d, i) => {
+                  const count = (d[itemKey] || []).length
+                  return (
+                    <div key={i}
+                      className={
+                        'rounded-lg py-1.5 text-center border ' +
+                        (d.rest ? 'bg-gray-100 border-gray-200'
+                          : count > 0 ? 'bg-indigo-50 border-indigo-200'
+                          : 'bg-gray-100 border-dashed border-gray-200')
+                      }
+                    >
+                      <p className="text-[10px] font-bold text-gray-400 m-0">{DAY_ABBR[i] || `D${i+1}`}</p>
+                      {d.rest
+                        ? <p className="text-[9px] text-gray-300 m-0 mt-0.5">Rest</p>
+                        : <p className="text-[10px] font-bold text-indigo-600 m-0 mt-0.5">{count}</p>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Member picker */}
+            <div>
+              <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Assign to Member
+              </label>
+              <div className="relative mb-2">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <input
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setSelected(null); setShowConflict(false); setReplaceId(null) }}
+                  placeholder="Search member by name or phone…"
+                  autoFocus
+                  className="w-full pl-8 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                />
+              </div>
+              <div className="max-h-44 overflow-y-auto space-y-1">
+                {loadingMembers ? (
+                  <div className="flex justify-center py-6">
+                    <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-6">No members found</p>
+                ) : filtered.map(m => (
+                  <button key={m.id} type="button" onClick={() => selectMember(m)}
+                    className={
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left cursor-pointer border transition-all ' +
+                      (selected?.id === m.id ? 'bg-indigo-50 border-indigo-200' : 'hover:bg-gray-50 border-transparent')
+                    }>
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-xs shrink-0">
+                      {m.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">{m.name}</p>
+                      {m.phone && <p className="text-xs text-gray-400">{m.phone}</p>}
+                    </div>
+                    {loadingPlans && selected?.id === m.id && (
+                      <Loader2 size={14} className="text-indigo-500 animate-spin shrink-0" />
+                    )}
+                    {!loadingPlans && selected?.id === m.id && (
+                      <svg className="w-4 h-4 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Conflict warning */}
+            {showConflict && selected && conflict && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <TriangleAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold text-amber-800 m-0">
+                      {selected.name} already has a {planType} plan
+                    </p>
+                    <p className="text-xs text-amber-700/80 mt-1 m-0">
+                      "{conflict.title}" is currently active
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => { setReplaceId(conflict.id); setShowConflict(false) }}
+                    className="flex-1 py-2 rounded-lg bg-amber-200/70 text-amber-800 text-xs font-bold cursor-pointer hover:bg-amber-200">
+                    Replace existing
+                  </button>
+                  <button type="button" onClick={() => { setReplaceId(null); setShowConflict(false) }}
+                    className="flex-1 py-2 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-bold cursor-pointer hover:bg-indigo-200">
+                    Add alongside
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {error && <p className="text-red-500 text-xs">{error}</p>}
+
+            {/* Action buttons — hidden while the conflict warning awaits a choice */}
+            {!showConflict && (
+              <div className="flex gap-3 pt-1 border-t border-gray-100 pt-3">
+                <button type="button" onClick={() => setStep('customize')}
+                  disabled={!selected || loadingPlans}
+                  className="flex-1 py-2.5 border border-indigo-300 text-indigo-700 text-sm font-semibold rounded-xl hover:bg-indigo-50 disabled:opacity-40 cursor-pointer">
+                  Customize & Assign
+                </button>
+                <button type="button" onClick={() => doAssign(false)}
+                  disabled={!selected || saving || loadingPlans}
+                  className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 cursor-pointer transition-all">
+                  {saving
+                    ? 'Assigning…'
+                    : selected
+                      ? (replaceId ? `Replace & Assign to ${selected.name}` : `Assign to ${selected.name}`)
+                      : 'Select a member'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Step 2: Customize ── */}
+        {step === 'customize' && (
+          <div className="space-y-3">
+            {/* Title */}
+            <input value={customTitle} onChange={e => setCustomTitle(e.target.value)}
+              placeholder="Plan title"
+              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+
+            {/* Day tabs */}
+            <div className="flex items-center gap-1.5">
+              <div className="flex gap-1 overflow-x-auto flex-1 pb-1 no-scrollbar">
+                {days.map((d, di) => (
+                  <button key={di} type="button" onClick={() => { setActiveDayIdx(di); setDaySearch('') }}
+                    className={
+                      'shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap cursor-pointer ' +
+                      (di === safeIdx
+                        ? 'bg-indigo-600 text-white'
+                        : d.rest
+                          ? 'bg-gray-100 text-gray-400'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200')
+                    }>
+                    {d.name?.trim() || DAY_ABBR[di] || `Day ${di + 1}`}
+                    {d.rest && <span className="ml-1 opacity-60">·rest</span>}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => { addDay(); setActiveDayIdx(days.length); setDaySearch('') }}
+                title="Add day"
+                className="shrink-0 px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-500 cursor-pointer hover:bg-gray-200">
+                <Plus size={14} />
+              </button>
+            </div>
+
+            {/* Active day editor */}
+            {activeDay && (
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Day {safeIdx + 1}</span>
+                  <input
+                    value={activeDay.name ?? ''}
+                    onChange={e => updateDay(safeIdx, { name: e.target.value })}
+                    placeholder={planType === 'workout' ? 'e.g. Push Day' : 'e.g. Monday'}
+                    className="flex-1 text-[11px] font-semibold text-gray-700 bg-transparent border-none outline-none min-w-0"
+                  />
+                  <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer shrink-0">
+                    <input type="checkbox" checked={!!activeDay.rest}
+                      onChange={e => updateDay(safeIdx, { rest: e.target.checked })}
+                      className="accent-indigo-600 w-3 h-3" />
+                    Rest day
+                  </label>
+                  <button type="button" onClick={() => { removeDay(safeIdx); setActiveDayIdx(Math.max(0, safeIdx - 1)) }}
+                    className="text-gray-300 cursor-pointer hover:text-gray-500 p-0 flex shrink-0" title="Remove day">
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {activeDay.rest ? (
+                  <p className="text-xs text-gray-400 text-center py-6 m-0">Rest day — no activities scheduled</p>
                 ) : (
-                  <span className="text-gray-600">{count} {planType === 'workout' ? 'exercise' : 'meal'}{count !== 1 ? 's' : ''}</span>
+                  <div className="p-3 flex flex-col gap-1.5">
+                    {items.length > 0 && (
+                      <div
+                        className="grid gap-1 pl-0.5"
+                        style={{ gridTemplateColumns: planType === 'workout' ? '1fr 38px 52px 48px 20px' : '56px 1fr 44px 48px 20px' }}
+                      >
+                        {(planType === 'workout' ? ['Exercise','Sets','Reps','Rest',''] : ['Time','Meal','Pro.','Cal','']).map(h => (
+                          <span key={h} className="text-[10px] font-bold text-gray-400 uppercase">{h}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {planType === 'workout'
+                      ? items.map((r, ii) => (
+                          <div key={ii} className="grid gap-1 items-center" style={{ gridTemplateColumns: '1fr 38px 52px 48px 20px' }}>
+                            <input value={r.name ?? ''} onChange={e => updateItem(safeIdx, ii, { name: e.target.value })} placeholder="Exercise" className={lightInput} />
+                            <input value={r.sets ?? ''} onChange={e => updateItem(safeIdx, ii, { sets: e.target.value })} placeholder="4" type="number" className={lightInput} />
+                            <input value={r.reps ?? ''} onChange={e => updateItem(safeIdx, ii, { reps: e.target.value })} placeholder="8-12" className={lightInput} />
+                            <input value={r.rest ?? ''} onChange={e => updateItem(safeIdx, ii, { rest: e.target.value })} placeholder="60s" className={lightInput} />
+                            <button type="button" onClick={() => removeItem(safeIdx, ii)} className="text-gray-300 hover:text-gray-500 cursor-pointer flex justify-center p-0">
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ))
+                      : items.map((r, ii) => (
+                          <div key={ii} className="grid gap-1 items-center" style={{ gridTemplateColumns: '56px 1fr 44px 48px 20px' }}>
+                            <input value={r.time ?? ''} onChange={e => updateItem(safeIdx, ii, { time: e.target.value })} placeholder="8 AM" className={lightInput} />
+                            <input value={r.meal_name ?? ''} onChange={e => updateItem(safeIdx, ii, { meal_name: e.target.value })} placeholder="Meal" className={lightInput} />
+                            <input value={r.protein ?? ''} onChange={e => updateItem(safeIdx, ii, { protein: e.target.value })} placeholder="30g" type="number" className={lightInput} />
+                            <input value={r.calories ?? ''} onChange={e => updateItem(safeIdx, ii, { calories: e.target.value })} placeholder="400" type="number" className={lightInput} />
+                            <button type="button" onClick={() => removeItem(safeIdx, ii)} className="text-gray-300 hover:text-gray-500 cursor-pointer flex justify-center p-0">
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ))
+                    }
+
+                    {/* Per-day DB search */}
+                    <div className="mt-1">
+                      <div className="relative">
+                        <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        <input value={daySearch} onChange={e => setDaySearch(e.target.value)}
+                          placeholder={`Search ${planType === 'workout' ? 'exercises' : 'meals'} to add…`}
+                          className="w-full pl-8 pr-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                      </div>
+                      {dbResults.length > 0 && (
+                        <div className="mt-1 bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                          {dbResults.map((item, i) => (
+                            <button key={i} type="button" onMouseDown={() => addFromDb(item)}
+                              className={
+                                'w-full flex items-center gap-2 px-3 py-2 border-0 text-left cursor-pointer hover:bg-gray-50 ' +
+                                (i < dbResults.length - 1 ? 'border-b border-gray-100' : '')
+                              }>
+                              <p className="text-xs font-semibold text-gray-800 flex-1 truncate m-0">{item[nameKey]}</p>
+                              <p className="text-[10px] text-gray-400 shrink-0 m-0">
+                                {planType === 'workout' ? `${item.sets}×${item.reps}` : `${item.calories}kcal`}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <button type="button" onClick={() => addItem(safeIdx)}
+                      className="flex items-center gap-1 text-[11px] text-indigo-600 font-semibold cursor-pointer p-0 bg-transparent border-0 mt-0.5">
+                      <Plus size={12} />
+                      Add {planType === 'workout' ? 'exercise' : 'meal'} manually
+                    </button>
+                  </div>
                 )}
               </div>
-            )
-          })}
-        </div>
+            )}
 
-        <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Assign to Member</label>
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name or phone…" autoFocus
-            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" />
-        </div>
+            {error && <p className="text-red-500 text-xs">{error}</p>}
 
-        <div className="max-h-52 overflow-y-auto space-y-1 -mx-1 px-1">
-          {loading ? (
-            <div className="flex justify-center py-6"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
-          ) : filtered.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">No members found</p>
-          ) : filtered.map(m => (
-            <button key={m.id} type="button" onClick={() => setSelected(m)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left cursor-pointer border transition-all ${selected?.id === m.id ? 'bg-indigo-50 border-indigo-200' : 'hover:bg-gray-50 border-transparent'}`}>
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-xs shrink-0">
-                {m.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-900 truncate">{m.name}</p>
-                {m.phone && <p className="text-xs text-gray-400">{m.phone}</p>}
-              </div>
-              {selected?.id === m.id && <svg className="w-4 h-4 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-            </button>
-          ))}
-        </div>
-
-        {error && <p className="text-red-500 text-xs">{error}</p>}
-
-        <div className="flex gap-3 pt-1">
-          <button type="button" onClick={handleAssign} disabled={!selected || saving}
-            className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-50 cursor-pointer transition-all">
-            {saving ? 'Assigning…' : selected ? `Assign to ${selected.name}` : 'Select a member'}
-          </button>
-          <button type="button" onClick={onClose} className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 cursor-pointer">Cancel</button>
-        </div>
+            <div className="flex gap-3 pt-3 border-t border-gray-100">
+              <button type="button" onClick={() => setStep('pick')}
+                className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 cursor-pointer">
+                Back
+              </button>
+              <button type="button" onClick={() => doAssign(true)} disabled={saving}
+                className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">
+                {saving
+                  ? 'Assigning…'
+                  : replaceId
+                    ? `Replace & Assign to ${selected?.name}`
+                    : `Assign to ${selected?.name}`}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </FormModal>
   )
 }
 
 // ─── TemplateCard ─────────────────────────────────────────────────────────────
-function TemplateCard({ template, type, onEdit, onDelete, onAssign }) {
+function TemplateCard({ template, type, onEdit, onDelete, onAssign, onDuplicate }) {
   const days    = (type === 'workout' ? template.exercises : template.meals) || []
   const itemKey = type === 'workout' ? 'exercises' : 'meals'
   const activeDays = days.filter(d => !d.rest)
@@ -408,9 +720,18 @@ function TemplateCard({ template, type, onEdit, onDelete, onAssign }) {
           <p className="font-semibold text-gray-900 truncate">{template.title}</p>
           {template.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{template.description}</p>}
         </div>
-        <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${type === 'workout' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
-          {type === 'workout' ? 'Workout' : 'Diet'}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${type === 'workout' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
+            {type === 'workout' ? 'Workout' : 'Diet'}
+          </span>
+          <button
+            onClick={() => onDuplicate(template)}
+            title="Duplicate as new template"
+            className="p-1 rounded-md text-gray-500 hover:text-indigo-700 hover:bg-gray-100 cursor-pointer transition-colors flex items-center"
+          >
+            <Copy size={13} strokeWidth={2} />
+          </button>
+        </div>
       </div>
 
       {/* Stats row */}
@@ -457,7 +778,6 @@ function TemplateCard({ template, type, onEdit, onDelete, onAssign }) {
 // ─── ProgramsPage ─────────────────────────────────────────────────────────────
 export default function ProgramsPage() {
   const { gymId } = useAuth()
-  const { selectedBranchId, isAllBranches } = useBranch()
   const dialog    = useDialog()
 
   const [activeTab, setActiveTab]             = useState('workout')
@@ -467,31 +787,34 @@ export default function ProgramsPage() {
   const [showCreate, setShowCreate]           = useState(false)
   const [editingTemplate, setEditing]         = useState(null)
   const [assigningTemplate, setAssigning]     = useState(null)
+  // Source template to fork from. When set, opens the create modal pre-filled
+  // with the source's title (with " (Copy)" appended) + days. Save creates a
+  // new row — the source is untouched.
+  const [duplicatingTemplate, setDuplicating] = useState(null)
 
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
     let cancelled = false
     setLoading(true)
     Promise.all([
-      fetchWorkoutTemplates(gymId, selectedBranchId),
-      fetchDietTemplates(gymId, selectedBranchId),
+      fetchWorkoutTemplates(gymId),
+      fetchDietTemplates(gymId),
     ])
       .then(([w, d]) => { if (!cancelled) { setWorkout(w); setDiet(d) } })
       .catch(err => console.error(err))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [gymId, selectedBranchId])
+  }, [gymId])
 
   const templates = activeTab === 'workout' ? workoutTemplates : dietTemplates
 
   async function handleCreate({ title, description, days }) {
-    // New templates attach to the active branch (or stay org-wide if "All branches" is selected).
-    const branchId = isAllBranches ? null : selectedBranchId
+    // Programs are org-wide — every branch sees them. (See programsService.js)
     if (activeTab === 'workout') {
-      const t = await createWorkoutTemplate({ gymId, branchId, title, description, days })
+      const t = await createWorkoutTemplate({ gymId, title, description, days })
       setWorkout(prev => [t, ...prev])
     } else {
-      const t = await createDietTemplate({ gymId, branchId, title, description, days })
+      const t = await createDietTemplate({ gymId, title, description, days })
       setDiet(prev => [t, ...prev])
     }
     setShowCreate(false)
@@ -578,7 +901,8 @@ export default function ProgramsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {templates.map(t => (
             <TemplateCard key={t.id} template={t} type={activeTab}
-              onEdit={setEditing} onDelete={handleDelete} onAssign={setAssigning} />
+              onEdit={setEditing} onDelete={handleDelete} onAssign={setAssigning}
+              onDuplicate={tpl => setDuplicating({ ...tpl, title: `${tpl.title} (Copy)`, id: undefined })} />
           ))}
         </div>
       )}
@@ -591,6 +915,16 @@ export default function ProgramsPage() {
       {editingTemplate && (
         <FormModal title="Edit Template" onClose={() => setEditing(null)} wide>
           <TemplateForm type={activeTab} initial={editingTemplate} onSave={handleUpdate} onCancel={() => setEditing(null)} />
+        </FormModal>
+      )}
+      {duplicatingTemplate && (
+        <FormModal title="Duplicate Template" onClose={() => setDuplicating(null)} wide>
+          <TemplateForm
+            type={activeTab}
+            initial={duplicatingTemplate}
+            onSave={async (fields) => { await handleCreate(fields); setDuplicating(null) }}
+            onCancel={() => setDuplicating(null)}
+          />
         </FormModal>
       )}
       {assigningTemplate && (

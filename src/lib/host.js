@@ -26,7 +26,29 @@ function normaliseHost(host) {
     .replace(/\.$/, '')
 }
 
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1'])
+
+/**
+ * True for hostnames that should be treated as "main domain" during local
+ * development — covers loopback, private LAN IPv4 ranges (so you can hit
+ * `npm run dev` from your phone via http://192.168.x.x:5173), link-local,
+ * and Bonjour/mDNS `.local` names. Without this the app misclassifies LAN
+ * IPs as a custom domain → "gym not found".
+ */
+function isLocalLikeHost(h) {
+  if (LOCAL_HOSTS.has(h)) return true
+  if (h.endsWith('.local')) return true                    // mDNS (mybox.local)
+  // IPv4 dotted-quad? cheap check before parsing
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/)
+  if (!m) return false
+  const a = +m[1], b = +m[2]
+  if (a === 10)                          return true       // 10.0.0.0/8
+  if (a === 192 && b === 168)            return true       // 192.168.0.0/16
+  if (a === 172 && b >= 16 && b <= 31)   return true       // 172.16.0.0/12
+  if (a === 169 && b === 254)            return true       // 169.254.0.0/16 link-local
+  if (a === 127)                         return true       // 127.0.0.0/8
+  return false
+}
 
 /**
  * detectHost(host) → { kind, subdomain?, host }
@@ -41,7 +63,7 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
 export function detectHost(host) {
   const h = normaliseHost(host)
 
-  if (!h || LOCAL_HOSTS.has(h)) return { kind: 'main', host: h }
+  if (!h || isLocalLikeHost(h)) return { kind: 'main', host: h }
   if (h === MAIN_DOMAIN || h === `www.${MAIN_DOMAIN}`) return { kind: 'main', host: h }
 
   if (h.endsWith(`.${MAIN_DOMAIN}`)) {

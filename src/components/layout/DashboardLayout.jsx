@@ -94,7 +94,7 @@ export default function DashboardLayout() {
 
             {/* Drawer panel */}
             <aside
-              className="relative flex flex-col overflow-y-auto"
+              className="relative flex flex-col overflow-y-auto no-scrollbar"
               style={{ width: 280, background: SIDEBAR_BG, height: '100%' }}
             >
               {/* Drawer header */}

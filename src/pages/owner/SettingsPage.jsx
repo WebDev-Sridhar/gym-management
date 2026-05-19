@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import { updateUserProfile } from '../../services/userService'
 import { fetchGymDetails, updateGymDetails, updateGymSlug, checkSlugAvailable, updateGymSubdomain, checkSubdomainAvailable } from '../../services/membershipService'
+import { updateBranch } from '../../services/branchService'
 import { slugify, validateSlug, validateSubdomain, getGymPublicUrl } from '../../lib/slug'
 import { MAIN_DOMAIN } from '../../lib/host'
 import { canAccess } from '../../lib/featureGates'
@@ -158,6 +160,14 @@ export default function SettingsPage() {
   const navigate    = useNavigate()
   const { user, profile, gymId, gymName, subscription, logout, refreshProfile } = useAuth()
   const { theme, setTheme } = useTheme()
+  const { selectedBranchId, isAllBranches, branches, reload: reloadBranches } = useBranch()
+
+  // The "Gym Details" card shows org-level data when viewing "All branches",
+  // otherwise it shows the active branch's contact details (name/city/address/
+  // phone/email) — those columns exist on both `gyms` and `gym_branches`.
+  // Public URLs (slug, subdomain, custom domain) stay org-level regardless.
+  const activeBranch = !isAllBranches ? branches.find(b => b.id === selectedBranchId) : null
+  const detailsSource = activeBranch || null   // null = use `gym` (org) state
 
   const [loading, setLoading]         = useState(true)
   const [gym, setGym]                 = useState(null)
@@ -208,15 +218,27 @@ export default function SettingsPage() {
     if (profile) { setPName(profile.name || ''); setPPhone(profile.phone || '') }
   }, [profile])
 
+  // Re-sync the Gym Details form fields whenever the active source flips
+  // (org ↔ branch). Editing is silently cancelled to avoid losing edits to
+  // one entity by saving them onto another.
+  useEffect(() => {
+    const src = detailsSource || gym
+    setGName(src?.name || ''); setGCity(src?.city || '')
+    setGPhone(src?.phone || ''); setGEmail(src?.email || '')
+    setGAddress(src?.address || '')
+    setEditGym(false); setGMsg({ text: '', type: 'success' })
+  }, [detailsSource, gym])
+
   function cancelProfile() {
     setPName(profile?.name || ''); setPPhone(profile?.phone || '')
     setEditProfile(false); setPMsg({ text: '', type: 'success' })
   }
 
   function cancelGym() {
-    setGName(gym?.name || ''); setGCity(gym?.city || '')
-    setGPhone(gym?.phone || ''); setGEmail(gym?.email || '')
-    setGAddress(gym?.address || '')
+    const src = detailsSource || gym
+    setGName(src?.name || ''); setGCity(src?.city || '')
+    setGPhone(src?.phone || ''); setGEmail(src?.email || '')
+    setGAddress(src?.address || '')
     setEditGym(false); setGMsg({ text: '', type: 'success' })
   }
 
@@ -238,13 +260,25 @@ export default function SettingsPage() {
   async function saveGym() {
     setSavingG(true); setGMsg({ text: '', type: 'success' })
     try {
-      const updated = await updateGymDetails({
-        gymId, name: gName.trim(), city: gCity.trim(),
-        phone: gPhone.trim(), email: gEmail.trim(), address: gAddress.trim(),
-      })
-      setGym(updated)
-      await refreshProfile()
-      setGMsg({ text: 'Gym details saved.', type: 'success' })
+      const fields = {
+        name:    gName.trim(),
+        city:    gCity.trim(),
+        phone:   gPhone.trim(),
+        email:   gEmail.trim(),
+        address: gAddress.trim(),
+      }
+      if (activeBranch) {
+        // Branch-scoped save — updates gym_branches row, then refreshes the
+        // shared branches list so other dashboard pages reflect the change.
+        await updateBranch(activeBranch.id, fields)
+        await reloadBranches()
+        setGMsg({ text: 'Branch details saved.', type: 'success' })
+      } else {
+        const updated = await updateGymDetails({ gymId, ...fields })
+        setGym(updated)
+        await refreshProfile()
+        setGMsg({ text: 'Gym details saved.', type: 'success' })
+      }
       setEditGym(false)
     } catch (err) {
       setGMsg({ text: err.message || 'Failed to save.', type: 'error' })
@@ -302,7 +336,7 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="max-w-[1100px] mx-auto">
+    <div className="max-w-[1100px] mx-auto min-w-0 overflow-x-hidden">
 
       {/* ── Page title ── */}
       <div className="mb-6">
@@ -350,7 +384,7 @@ export default function SettingsPage() {
       <div className="grid lg:grid-cols-5 gap-6 items-start">
 
         {/* ══ LEFT COLUMN ══════════════════════════════════════════════════════ */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-2 min-w-0 space-y-5">
 
           {/* Subscription */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -474,10 +508,37 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Notifications (placeholder — coming soon) */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <Bell size={15} className="text-indigo-600" />
+                <h2 className="text-sm font-semibold text-gray-900">Notifications</h2>
+              </div>
+              <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full uppercase tracking-wide">Coming soon</span>
+            </div>
+            <div className="space-y-4 opacity-40 pointer-events-none select-none">
+              {[
+                { label: 'Payment received alerts',    desc: 'Notify when a member payment is confirmed'  },
+                { label: 'Member expiry reminders',    desc: 'Daily digest of members expiring in 7 days' },
+                { label: 'New member alerts',          desc: 'Notify when a new member is added'          },
+                { label: 'Weekly performance summary', desc: 'Weekly email with key gym metrics'          },
+              ].map(({ label, desc }) => (
+                <div key={label} className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{label}</p>
+                    <p className="text-xs text-gray-400">{desc}</p>
+                  </div>
+                  <div className="w-9 h-5 bg-gray-200 rounded-full shrink-0" />
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>{/* end left col */}
 
         {/* ══ RIGHT COLUMN ═════════════════════════════════════════════════════ */}
-        <div className="lg:col-span-3 space-y-5">
+        <div className="lg:col-span-3 min-w-0 space-y-5">
 
           {/* Personal Information */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -545,21 +606,26 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Gym Details */}
+          {/* Gym / Branch Details — source flips with the branch switcher */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <CardHeader
               icon={Building2}
-              title="Gym Details"
+              title={activeBranch ? `Branch Details · ${activeBranch.name}` : 'Gym Details'}
               editing={editGym}
               onEdit={editGym ? cancelGym : () => setEditGym(true)}
             />
+            {activeBranch && (
+              <p className="text-[11px] text-gray-500 -mt-3 mb-4">
+                Editing the <span className="font-semibold text-gray-700">{activeBranch.name}</span> branch — switch to <span className="font-semibold text-gray-700">All branches</span> in the topbar to edit the organisation profile.
+              </p>
+            )}
 
             {editGym ? (
               <>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <FieldLabel>Gym Name</FieldLabel>
-                    <Input value={gName} onChange={e => setGName(e.target.value)} placeholder="Your gym name" />
+                    <FieldLabel>{activeBranch ? 'Branch Name' : 'Gym Name'}</FieldLabel>
+                    <Input value={gName} onChange={e => setGName(e.target.value)} placeholder={activeBranch ? 'e.g. Anna Nagar' : 'Your gym name'} />
                   </div>
                   <div>
                     <FieldLabel>City</FieldLabel>
@@ -611,15 +677,15 @@ export default function SettingsPage() {
               </>
             ) : (
               <div>
-                <ReadRow label="Gym Name"       value={gym?.name}    />
-                <ReadRow label="City"           value={gym?.city}    />
-                <ReadRow label="Contact Phone"  value={gym?.phone}   />
-                <ReadRow label="Contact Email"  value={gym?.email}   />
-                <ReadRow label="Address"        value={gym?.address} />
+                <ReadRow label={activeBranch ? 'Branch Name' : 'Gym Name'} value={detailsSource?.name    ?? gym?.name}    />
+                <ReadRow label="City"          value={detailsSource?.city    ?? gym?.city}    />
+                <ReadRow label="Contact Phone" value={detailsSource?.phone   ?? gym?.phone}   />
+                <ReadRow label="Contact Email" value={detailsSource?.email   ?? gym?.email}   />
+                <ReadRow label="Address"       value={detailsSource?.address ?? gym?.address} />
               </div>
             )}
 
-            {/* Public URLs — stacked list of every URL the gym is reachable at */}
+            {/* Public URLs — organisation-wide, always shown regardless of active branch */}
             {gym?.slug && (
               <div className="mt-5 pt-5 border-t border-gray-100 space-y-3">
                 <p className="text-xs font-medium text-gray-500">Public URLs</p>
@@ -902,33 +968,6 @@ export default function SettingsPage() {
                   </button>
                 )
               })}
-            </div>
-          </div>
-
-          {/* Notifications */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <Bell size={15} className="text-indigo-600" />
-                <h2 className="text-sm font-semibold text-gray-900">Notifications</h2>
-              </div>
-              <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full uppercase tracking-wide">Coming soon</span>
-            </div>
-            <div className="space-y-4 opacity-40 pointer-events-none select-none">
-              {[
-                { label: 'Payment received alerts',    desc: 'Notify when a member payment is confirmed'  },
-                { label: 'Member expiry reminders',    desc: 'Daily digest of members expiring in 7 days' },
-                { label: 'New member alerts',          desc: 'Notify when a new member is added'          },
-                { label: 'Weekly performance summary', desc: 'Weekly email with key gym metrics'          },
-              ].map(({ label, desc }) => (
-                <div key={label} className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{label}</p>
-                    <p className="text-xs text-gray-400">{desc}</p>
-                  </div>
-                  <div className="w-9 h-5 bg-gray-200 rounded-full shrink-0" />
-                </div>
-              ))}
             </div>
           </div>
 

@@ -78,10 +78,27 @@ function normaliseHost(host) {
   return String(host || '').toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '')
 }
 
+// Treat loopback, private LAN IPv4 ranges, and *.local mDNS as main-domain
+// dev hosts (mirrors src/lib/host.js#isLocalLikeHost). The middleware never
+// actually sees these on Vercel — defensive only, kept in sync.
+function isLocalLikeHost(h) {
+  if (h === 'localhost' || h === '0.0.0.0' || h === '::1') return true
+  if (h.endsWith('.local')) return true
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/)
+  if (!m) return false
+  const a = +m[1], b = +m[2]
+  if (a === 10) return true
+  if (a === 192 && b === 168) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 169 && b === 254) return true
+  if (a === 127) return true
+  return false
+}
+
 /** Returns { kind: 'main' | 'subdomain' | 'custom', subdomain? } */
 function classifyHost(host) {
   const h = normaliseHost(host)
-  if (!h || h === 'localhost' || h === '127.0.0.1') return { kind: 'main' }
+  if (!h || isLocalLikeHost(h)) return { kind: 'main' }
   if (h === MAIN_DOMAIN || h === `www.${MAIN_DOMAIN}`) return { kind: 'main' }
   if (h.endsWith(`.${MAIN_DOMAIN}`)) {
     const sub = h.slice(0, -(MAIN_DOMAIN.length + 1))

@@ -38,40 +38,44 @@ export default function BranchSwitcher() {
   const label = isAllBranches ? 'All branches' : (selected?.name || 'Select branch')
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative' }}>
+    <div ref={wrapRef} style={{ position: 'relative', minWidth: 0 }}>
       <button
         onClick={() => setOpen(v => !v)}
+        title={label}
+        className="branch-switcher-btn"
         style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '7px 12px', borderRadius: 999,
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 10px', borderRadius: 999,
           background: isAllBranches ? 'var(--shell-surface)' : 'var(--p-tint)',
           border: '1px solid ' + (isAllBranches ? 'var(--shell-border)' : 'var(--p-glow)'),
           color: '#fff',
           fontSize: 12, fontWeight: 600,
           cursor: 'pointer', fontFamily: 'inherit',
           whiteSpace: 'nowrap',
+          minWidth: 0,
           maxWidth: 200,
         }}
       >
-        <MapPin size={13} strokeWidth={2.2} color={isAllBranches ? 'var(--shell-muted)' : 'var(--p-pale)'} />
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+        <MapPin size={13} strokeWidth={2.2} color={isAllBranches ? 'var(--shell-muted)' : 'var(--p-pale)'} style={{ flexShrink: 0 }} />
+        <span className="branch-switcher-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{label}</span>
         <ChevronDown
           size={12}
           strokeWidth={2}
           color="var(--shell-faint)"
-          style={{ transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : 'rotate(0)' }}
+          style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : 'rotate(0)' }}
         />
       </button>
 
       {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 8px)', left: 0,
-          minWidth: 220, maxWidth: 280,
-          background: '#fff', borderRadius: 12,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.16)',
-          border: '1px solid #e5e7eb',
-          overflow: 'hidden', zIndex: 100,
-        }}>
+        <div
+          className="branch-switcher-menu bg-white border border-gray-200 shadow-xl"
+          style={{
+            position: 'absolute', top: 'calc(100% + 8px)', left: 0,
+            minWidth: 220, maxWidth: 'min(280px, calc(100vw - 24px))',
+            borderRadius: 12,
+            overflow: 'hidden', zIndex: 100,
+          }}
+        >
           <div style={{ padding: 4, maxHeight: 320, overflowY: 'auto' }}>
             <BranchOption
               icon={Building2}
@@ -80,7 +84,7 @@ export default function BranchSwitcher() {
               active={isAllBranches}
               onClick={() => { selectBranch('all'); setOpen(false) }}
             />
-            <div style={{ height: 1, background: '#f3f4f6', margin: '4px 0' }} />
+            <div className="bg-gray-100" style={{ height: 1, margin: '4px 0' }} />
             {branches.map(b => (
               <BranchOption
                 key={b.id}
@@ -95,6 +99,15 @@ export default function BranchSwitcher() {
           </div>
         </div>
       )}
+
+      {/* On very small screens, collapse the label so the pill stays compact
+          next to the hamburger. Dropdown still shows the full names. */}
+      <style>{`
+        @media (max-width: 380px) {
+          .branch-switcher-btn { padding: 6px 8px; }
+          .branch-switcher-label { display: none; }
+        }
+      `}</style>
     </div>
   )
 }
@@ -103,37 +116,34 @@ function BranchOption({ icon: Icon, label, hint, active, badge, onClick }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-        padding: '9px 10px', borderRadius: 8, border: 'none',
-        background: active ? '#eef2ff' : 'none',
-        cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-        transition: 'background 0.12s',
-      }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f9fafb' }}
-      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'none' }}
+      className={
+        'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg border-none cursor-pointer text-left transition-colors ' +
+        (active ? 'bg-indigo-50' : 'bg-transparent hover:bg-gray-50')
+      }
+      style={{ fontFamily: 'inherit' }}
     >
-      <Icon size={15} strokeWidth={1.9} color={active ? '#4f46e5' : '#9ca3af'} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{
-          margin: 0, fontSize: 13, fontWeight: 600,
-          color: active ? '#3730a3' : '#111827',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{label}</p>
+      <Icon
+        size={15}
+        strokeWidth={1.9}
+        className={active ? 'text-indigo-600 shrink-0' : 'text-gray-400 shrink-0'}
+      />
+      <div className="flex-1 min-w-0">
+        <p
+          className={
+            'm-0 text-[13px] font-semibold truncate ' +
+            (active ? 'text-indigo-700' : 'text-gray-900')
+          }
+        >{label}</p>
         {hint && (
-          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {hint}
-          </p>
+          <p className="mt-0.5 text-[11px] text-gray-500 truncate">{hint}</p>
         )}
       </div>
       {badge && (
-        <span style={{
-          fontSize: 9, fontWeight: 700, color: '#4f46e5',
-          background: '#eef2ff', padding: '2px 6px', borderRadius: 999,
-          textTransform: 'uppercase', letterSpacing: '0.05em',
-        }}>{badge}</span>
+        <span
+          className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0"
+        >{badge}</span>
       )}
-      {active && <Check size={14} color="#4f46e5" strokeWidth={2.5} />}
+      {active && <Check size={14} className="text-indigo-600 shrink-0" strokeWidth={2.5} />}
     </button>
   )
 }

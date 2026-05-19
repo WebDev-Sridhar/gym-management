@@ -135,7 +135,7 @@ export default function Topbar({ onMenuToggle }) {
             onError={e => { e.target.style.display = 'none' }} />
           <span className="hidden sm:block" style={{ color: '#fff', fontWeight: 700, fontSize: 18, letterSpacing: '-0.4px' }}>Gymmobius</span>
           {isOwner && (
-            <div className="hidden sm:flex" style={{ marginLeft: 8 }}>
+            <div className="flex" style={{ marginLeft: 8, minWidth: 0 }}>
               <BranchSwitcher />
             </div>
           )}

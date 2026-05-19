@@ -4,6 +4,7 @@ import { useDialog } from './Dialog'
 import {
   X, Pencil, Trash2, Phone, Mail, Calendar, Clock,
   Dumbbell, Utensils, CreditCard, User, Plus, Archive,
+  TriangleAlert,
 } from 'lucide-react'
 import {
   updateMember, deleteMember,
@@ -198,7 +199,8 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
   const [changingPlan, setChangingPlan] = useState(false)
   const [selPlanId, setSelPlanId]       = useState(member.plan_id || '')
   const [savingPlan, setSavingPlan]     = useState(false)
-  const [assignType, setAssignType]     = useState(null)
+  const [assignType, setAssignType]     = useState(null)   // 'workout' | 'diet' | null
+  const [needsConfirm, setNeedsConfirm] = useState(false)  // duplicate-plan warning visible
   const [templates, setTemplates]       = useState([])
   const [loadingTpl, setLoadingTpl]     = useState(false)
   const [savingTpl, setSavingTpl]       = useState(null)
@@ -222,8 +224,21 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
     finally { setSavingPlan(false) }
   }
 
+  // Opens the assign flow. If an active plan of this type already exists,
+  // pauses on an inline warning panel until the owner confirms; otherwise
+  // jumps straight to the template list.
   async function openAssign(type) {
     setAssignType(type)
+    const hasExisting = assigned.some(p => p.plan_type === type && p.status === 'active')
+    if (hasExisting) {
+      setNeedsConfirm(true)
+      return
+    }
+    setNeedsConfirm(false)
+    loadTemplates(type)
+  }
+
+  async function loadTemplates(type) {
     setLoadingTpl(true)
     try {
       const list = type === 'workout' ? await fetchWorkoutTemplates(gymId) : await fetchDietTemplates(gymId)
@@ -232,13 +247,18 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
     finally { setLoadingTpl(false) }
   }
 
+  function cancelAssign() {
+    setAssignType(null); setNeedsConfirm(false); setTemplates([])
+  }
+
   async function handleAssignTpl(tmpl) {
     setSavingTpl(tmpl.id)
     try {
+      // No archive — owner explicitly chose to add alongside the existing plan.
       await assignWorkoutDietPlan({ gymId, memberId: member.id, template: tmpl, planType: assignType })
       const fresh = await fetchAssignedPlans(member.id)
       setAssigned(fresh.filter(p => p.status === 'active'))
-      setAssignType(null)
+      cancelAssign()
     } catch (err) { dialog.alert(err.message || 'Failed') }
     finally { setSavingTpl(null) }
   }
@@ -315,9 +335,17 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
             </button>
           )}
         </div>
-        {assignType === 'workout' && (
+        {assignType === 'workout' && needsConfirm && (
+          <DuplicateWarning
+            kind="workout"
+            existing={workoutPlans[0]}
+            onContinue={() => { setNeedsConfirm(false); loadTemplates('workout') }}
+            onCancel={cancelAssign}
+          />
+        )}
+        {assignType === 'workout' && !needsConfirm && (
           <TemplateList templates={templates} loading={loadingTpl} savingId={savingTpl}
-            onSelect={handleAssignTpl} onCancel={() => setAssignType(null)} />
+            onSelect={handleAssignTpl} onCancel={cancelAssign} />
         )}
         {loadingPlans
           ? <p className="text-xs text-gray-400">Loading…</p>
@@ -341,14 +369,57 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
             </button>
           )}
         </div>
-        {assignType === 'diet' && (
+        {assignType === 'diet' && needsConfirm && (
+          <DuplicateWarning
+            kind="diet"
+            existing={dietPlans[0]}
+            onContinue={() => { setNeedsConfirm(false); loadTemplates('diet') }}
+            onCancel={cancelAssign}
+          />
+        )}
+        {assignType === 'diet' && !needsConfirm && (
           <TemplateList templates={templates} loading={loadingTpl} savingId={savingTpl}
-            onSelect={handleAssignTpl} onCancel={() => setAssignType(null)} />
+            onSelect={handleAssignTpl} onCancel={cancelAssign} />
         )}
         {dietPlans.length > 0
           ? <div className="space-y-2">{dietPlans.map(p => <PlanChip key={p.id} plan={p} onArchive={() => handleArchive(p.id)} />)}</div>
           : <p className="text-xs text-gray-400">No diet plan assigned</p>
         }
+      </div>
+    </div>
+  )
+}
+
+// Inline "duplicate plan" warning shown before the template list when the
+// member already has an active plan of the same type. Owner can Continue
+// (proceed to template picker — the new plan gets added alongside the old)
+// or Cancel.
+function DuplicateWarning({ kind, existing, onContinue, onCancel }) {
+  return (
+    <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-3">
+      <div className="flex items-start gap-2.5">
+        <TriangleAlert size={14} className="text-amber-600 shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-amber-800 m-0">
+            Already has a {kind} plan
+          </p>
+          <p className="text-[11px] text-amber-700/80 mt-1 m-0">
+            {existing
+              ? <>"{existing.title}" is currently active. Adding another won't replace it — both will stay active.</>
+              : <>This member already has an active {kind} plan. Adding another won't replace it — both will stay active.</>
+            }
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button type="button" onClick={onCancel}
+          className="flex-1 py-1.5 rounded-lg border border-amber-200 bg-white text-amber-700 text-[11px] font-semibold cursor-pointer hover:bg-amber-100/60">
+          Cancel
+        </button>
+        <button type="button" onClick={onContinue}
+          className="flex-1 py-1.5 rounded-lg bg-amber-600 text-white text-[11px] font-semibold cursor-pointer hover:bg-amber-700">
+          Continue & add another
+        </button>
       </div>
     </div>
   )

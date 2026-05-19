@@ -1,4 +1,5 @@
 import { supabaseData as supabase } from './supabaseClient'
+import { applyBranchFilter } from '../lib/branchQuery'
 
 /**
  * Send a WhatsApp payment reminder via Interakt.
@@ -27,11 +28,13 @@ export async function sendPaymentReminder({ paymentId, memberId, planId, dueDate
  * Fetch the last reminder for each payment in the gym (used for "Last sent 2h ago" indicator).
  * Returns a Map<paymentId, { last_sent_at, last_status, last_channel }>.
  */
-export async function fetchLastReminders(gymId) {
-  const { data, error } = await supabase
+export async function fetchLastReminders(gymId, branchId) {
+  let q = supabase
     .from('payment_last_reminder')
     .select('payment_id, last_sent_at, last_status, last_channel')
     .eq('gym_id', gymId)
+  q = applyBranchFilter(q, branchId)
+  const { data, error } = await q
 
   if (error) throw error
   const map = new Map()
