@@ -16,7 +16,7 @@ import { RESERVED_SUBDOMAINS } from './slug'
 
 // Set VITE_MAIN_DOMAIN=gymmobius.app in your .env.
 // Falls back to the production domain so prod works without the env var set.
-export const MAIN_DOMAIN = (import.meta.env?.VITE_MAIN_DOMAIN || 'gymmobius.app').toLowerCase()
+export const MAIN_DOMAIN = (import.meta.env?.VITE_MAIN_DOMAIN || 'gymmobius.vercel.app').toLowerCase()
 
 /** Normalise a host string: lowercase, strip port, strip trailing dot. */
 function normaliseHost(host) {
