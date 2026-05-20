@@ -35,7 +35,7 @@ export default function ResetPasswordPage() {
     setSuccess('')
 
     if (!isPasswordValid(password)) {
-      return setError('Password must include lowercase, uppercase letters and a number (min 6 chars).')
+      return setError('Password must include lowercase, uppercase letters and a number (min 8 chars).')
     }
     if (password !== confirm) {
       return setError('Passwords do not match')

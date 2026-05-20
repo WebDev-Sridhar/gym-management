@@ -1,8 +1,17 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
 import { signUpWithEmail } from '../../services/authService'
 import PasswordInput from '../../components/ui/PasswordInput'
+import { isPasswordValid, PASSWORD_MIN_LENGTH } from '../../components/ui/PasswordRequirements'
+
+// Mirror GymLoginPage's open-redirect guard.
+function safeReturnUrl(raw) {
+  if (!raw || typeof raw !== 'string') return null
+  if (!raw.startsWith('/')) return null
+  if (raw.startsWith('//') || raw.startsWith('/\\') || raw.includes('\\')) return null
+  return raw
+}
 
 const inputStyle = {
   width: '100%',
@@ -28,6 +37,8 @@ const labelStyle = {
 
 export default function GymJoinPage() {
   const { gym } = useGym()
+  const [searchParams] = useSearchParams()
+  const returnTo = safeReturnUrl(searchParams.get('return'))
 
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -38,6 +49,11 @@ export default function GymJoinPage() {
 
   if (!gym) return null
   const base = `/${gym.slug}`
+  // Forward the return URL through to the post-signup login link so the
+  // QR-code check-in flow comes full circle.
+  const loginHref = returnTo
+    ? `${base}/login?return=${encodeURIComponent(returnTo)}`
+    : `${base}/login`
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -46,12 +62,24 @@ export default function GymJoinPage() {
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return setError('Enter a valid email address')
     }
-    if (password.length < 6) return setError('Password must be at least 6 characters')
+    if (!isPasswordValid(password)) {
+      return setError(`Password must include lowercase, uppercase letters and a number (min ${PASSWORD_MIN_LENGTH} chars).`)
+    }
     if (password !== confirm) return setError('Passwords do not match')
 
     setLoading(true)
     try {
-      const { data, error: signUpError } = await signUpWithEmail(email.trim(), password)
+      // Tag the email confirmation redirect with this gym's slug so the
+      // post-verification AuthCallback can render a gym-aware "not a member"
+      // screen if the signup doesn't match any existing member/trainer row.
+      // Without the tag, strangers would be silently routed to /create-gym
+      // and prompted to start their own gym (wrong audience).
+      const redirectTo = `${window.location.origin}/auth/callback?gym=${encodeURIComponent(gym.slug)}`
+        + (returnTo ? `&return=${encodeURIComponent(returnTo)}` : '')
+
+      const { error: signUpError } = await signUpWithEmail(
+        email.trim(), password, { emailRedirectTo: redirectTo },
+      )
 
       if (signUpError) { setError(signUpError.message); return }
 
@@ -104,7 +132,7 @@ export default function GymJoinPage() {
               </p>
             </div>
             <Link
-              to={`${base}/login`}
+              to={loginHref}
               className="block w-full py-2.5 text-sm font-semibold text-center rounded-xl transition-opacity hover:opacity-80"
               style={{ background: 'var(--gym-gradient)', color: '#fff' }}
             >
@@ -182,7 +210,7 @@ export default function GymJoinPage() {
 
         <p className="text-center text-sm mt-6" style={{ color: 'var(--gym-text-secondary)' }}>
           {'Already have an account? '}
-          <Link to={`${base}/login`} className="font-semibold hover:opacity-80 transition-opacity"
+          <Link to={loginHref} className="font-semibold hover:opacity-80 transition-opacity"
             style={{ color: 'var(--gym-text)' }}>
             Sign in
           </Link>

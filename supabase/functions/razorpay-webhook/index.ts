@@ -221,7 +221,9 @@ async function handleSubscriptionPaymentFailed(
 async function handleSubscriptionLinkPaid(
   supabase: ReturnType<typeof getServiceClient>, gymId: string, payload: RazorpayWebhookPayload,
 ) {
-  // Backward compat: existing create-subscription-link flow uses Payment Links
+  // Handles `payment_link.paid` webhooks for any in-flight subscription Payment
+  // Links created before the Orders-API migration. Reads existing rows by id;
+  // does not depend on the (deleted) create-subscription-link edge function.
   const entity = payload.payload.payment_link?.entity
   if (!entity?.id) return
 

@@ -25,7 +25,7 @@ export default function SignupPage() {
       setError('Enter a valid email address'); return false
     }
     if (!isPasswordValid(password)) {
-      setError('Password must include lowercase, uppercase letters and a number (min 6 chars).')
+      setError('Password must include lowercase, uppercase letters and a number (min 8 chars).')
       return false
     }
     return true

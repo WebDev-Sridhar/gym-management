@@ -1,19 +1,6 @@
 import { supabaseData as supabase } from './supabaseClient'
 
 /**
- * LEGACY: creates a Razorpay Payment Link for SaaS subscriptions (redirect flow).
- * Kept for backward compat. New flow uses createSubscriptionOrder + Checkout modal.
- */
-export async function createSubscriptionLink({ gymId, planName, price, durationDays, callbackUrl }) {
-  const { data, error } = await supabase.functions.invoke('create-subscription-link', {
-    body: { gymId, planName, price, durationDays, callbackUrl },
-  })
-
-  if (error) throw error
-  return data
-}
-
-/**
  * Server-side: creates a Razorpay Order using the PLATFORM Razorpay account
  * (separate from per-gym member-payment keys). Returns the bits the frontend
  * needs to open Razorpay Checkout in-page.

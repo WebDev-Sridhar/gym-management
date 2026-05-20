@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
 import { signInWithEmail } from '../../services/authService'
 import { supabase, setAccessToken } from '../../services/supabaseClient'
@@ -35,9 +35,22 @@ const labelStyle = {
   marginBottom: '6px',
 }
 
+// Open-redirect guard. Only accept return URLs that are same-origin paths
+// starting with a single "/" — block "//evil.com", "\\evil", full URLs, etc.
+function safeReturnUrl(raw) {
+  if (!raw) return null
+  if (typeof raw !== 'string') return null
+  if (!raw.startsWith('/')) return null
+  if (raw.startsWith('//') || raw.startsWith('/\\')) return null
+  if (raw.includes('\\')) return null
+  return raw
+}
+
 export default function GymLoginPage() {
   const { gym } = useGym()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = safeReturnUrl(searchParams.get('return'))
 
   const [step, setStep]         = useState('email') // 'email' | 'password' | 'forgot'
   const [email, setEmail]       = useState('')
@@ -48,6 +61,8 @@ export default function GymLoginPage() {
 
   if (!gym) return null
   const base = `/${gym.slug}`
+  // Preserve the return URL when offering the "Create account" link.
+  const joinHref = returnTo ? `${base}/join?return=${encodeURIComponent(returnTo)}` : `${base}/join`
 
   function handleEmailContinue(e) {
     e.preventDefault()
@@ -106,13 +121,31 @@ export default function GymLoginPage() {
         }
       }
 
-      // ── 4. Route based on confirmed role ─────────────────────────────────
+      // ── 4. No profile + no member/trainer match = stranger on a gym site
+      // Don't silently route them into the owner-onboarding wizard (jarring
+      // UX — they thought they were joining THIS gym). Sign them out and
+      // tell them to either join via pricing or contact the gym owner.
+      if (!profile) {
+        await supabase.auth.signOut().catch(() => {})
+        setAccessToken(null)
+        setError(`We couldn't find you on ${gym.name}'s member list. Pick a plan from the pricing page to join, or ask the gym to add you.`)
+        return
+      }
+
+      // ── 5. Route based on confirmed role ─────────────────────────────────
+      // For members, honor a ?return= query param so flows like QR-code
+      // check-in can bounce the user back to where they were. Owners and
+      // trainers always go to their respective dashboards — return is only
+      // a member-side UX affordance.
       const roleRoutes = {
         owner:   '/owner-dashboard',
         trainer: '/trainer-dashboard',
         member:  '/member-app',
       }
-      navigate(roleRoutes[profile?.role] || '/create-gym', { replace: true })
+      const target = (profile.role === 'member' && returnTo)
+        ? returnTo
+        : (roleRoutes[profile.role] || '/owner-dashboard')
+      navigate(target, { replace: true })
     } catch (err) {
       setError(err.message === 'Invalid login credentials' ? 'Invalid email or password' : err.message)
     } finally {
@@ -263,7 +296,7 @@ export default function GymLoginPage() {
 
         <p className="text-center text-sm mt-6" style={{ color: 'var(--gym-text-secondary)' }}>
           {"Don't have an account? "}
-          <Link to={`${base}/join`} className="font-semibold hover:opacity-80 transition-opacity"
+          <Link to={joinHref} className="font-semibold hover:opacity-80 transition-opacity"
             style={{ color: 'var(--gym-text)' }}>
             Create one
           </Link>

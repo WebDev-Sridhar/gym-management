@@ -238,26 +238,56 @@ export async function fetchGym(gymId) {
 }
 
 // ─── Member / trainer auto-detection on first login ───────────────────────────
+//
+// Hardened lookups (post-audit):
+//   • Case-insensitive (`.ilike`) — owner can add "Foo@Bar.com" and the user
+//     can sign up with "foo@bar.com" and still get linked.
+//   • Soft-delete aware — `members.deleted_at IS NULL` filter so a deleted
+//     member can't silently re-link on next signup. (Owners should re-add via
+//     the Members page if they want the person back.)
+//   • Multi-row safe — uses `.limit(1)` + array indexing instead of
+//     `.maybeSingle()` (which throws on >1 matches). When the same email
+//     appears in multiple gyms' member tables, we deterministically pick
+//     the most recently created row + log a warning.
 
 export async function findMemberByEmail(email) {
+  if (!email) return null
+  const cleanEmail = email.trim().toLowerCase()
+  if (!cleanEmail) return null
+
   const { data, error } = await supabase
     .from('members')
     .select('id, gym_id, name, phone, email')
-    .eq('email', email)
-    .maybeSingle()
+    .ilike('email', cleanEmail)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(2)   // fetch 2 so we can detect collisions
   if (error) throw error
-  return data
+
+  if ((data?.length || 0) > 1) {
+    console.warn(`[findMemberByEmail] ${data.length}+ member rows match ${cleanEmail}; picking most recent (${data[0].id}).`)
+  }
+  return data?.[0] ?? null
 }
 
 export async function findTrainerInviteByEmail(email) {
+  if (!email) return null
+  const cleanEmail = email.trim().toLowerCase()
+  if (!cleanEmail) return null
+
   const { data, error } = await supabase
     .from('trainer_invites')
     .select('id, gym_id, name, phone, email')
-    .eq('email', email)
+    .ilike('email', cleanEmail)
     .eq('claimed', false)
-    .maybeSingle()
+    .order('created_at', { ascending: false })
+    .limit(2)
   if (error) throw error
-  return data
+
+  if ((data?.length || 0) > 1) {
+    console.warn(`[findTrainerInviteByEmail] ${data.length}+ unclaimed invites match ${cleanEmail}; picking most recent (${data[0].id}).`)
+  }
+  return data?.[0] ?? null
 }
 
 export async function claimTrainerInvite(inviteId) {

@@ -87,27 +87,65 @@ export default function CheckinPage() {
     )
   }
 
-  // Not logged in
+  // Not logged in — show a gym-branded lock screen and send them to the
+  // gym's OWN login/join pages (not the SaaS-level /login or /signup, which
+  // route owners through "Create your gym" — wrong audience for members).
+  // The `return` param brings them back to this exact check-in URL after auth.
   if (!isAuthenticated) {
+    const returnUrl = encodeURIComponent(`/checkin?gymId=${gymId}`)
+    const loginUrl  = gym.slug ? `/${gym.slug}/login?return=${returnUrl}` : '/login'
+    const joinUrl   = gym.slug ? `/${gym.slug}/join?return=${returnUrl}`  : '/signup'
+    const brand     = gym.theme_color || '#8B5CF6'
+
     return (
-      <StatusScreen
-        icon="lock"
-        title="Sign in Required"
-        message={`Sign in to check in at ${gym.name}.`}
-      >
-        <Link
-          to="/login"
-          className="inline-flex items-center justify-center w-full py-3 bg-gradient-to-r from-violet-600 to-blue-500 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity text-sm"
-        >
-          Sign In
-        </Link>
-        <Link
-          to="/signup"
-          className="block text-center text-sm text-violet-600 font-medium hover:text-violet-800 transition-colors mt-3"
-        >
-          Create an account
-        </Link>
-      </StatusScreen>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-sm text-center">
+          {/* Gym branding header (replaces the generic G logo) */}
+          {gym.logo_url ? (
+            <img
+              src={gym.logo_url}
+              alt={gym.name}
+              className="w-16 h-16 rounded-2xl object-cover mx-auto mb-6"
+            />
+          ) : (
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-6"
+              style={{ background: brand }}
+            >
+              {gym.name?.charAt(0).toUpperCase() || 'G'}
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div className="w-14 h-14 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8" style={{ color: brand }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Sign in to check in</h2>
+            <p className="text-sm text-gray-500 mb-5">at {gym.name}</p>
+
+            <Link
+              to={loginUrl}
+              className="inline-flex items-center justify-center w-full py-3 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity text-sm"
+              style={{ background: brand }}
+            >
+              Sign In
+            </Link>
+            <Link
+              to={joinUrl}
+              className="block text-center text-sm font-medium mt-3 hover:opacity-80 transition-opacity"
+              style={{ color: brand }}
+            >
+              New here? Create an account
+            </Link>
+          </div>
+
+          <p className="text-center text-xs text-gray-400 mt-6">
+            Powered by Gymmobius
+          </p>
+        </div>
+      </div>
     )
   }
 

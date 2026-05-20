@@ -1,5 +1,10 @@
 import { Check, X } from 'lucide-react'
 
+// Single source of truth for the minimum password length. Mirrors the
+// Supabase Auth setting (Authentication → Providers → Email → minimum
+// password length). When you change one, change the other.
+export const PASSWORD_MIN_LENGTH = 8
+
 /**
  * Live password requirements checklist.
  *
@@ -10,11 +15,11 @@ import { Check, X } from 'lucide-react'
  *
  * Props:
  *   value    — current password string
- *   minLen   — minimum length (default 6)
+ *   minLen   — minimum length (defaults to PASSWORD_MIN_LENGTH)
  *   visible  — controls whether the checklist renders (e.g. only on focus
  *              or when value is non-empty). Caller decides.
  */
-export default function PasswordRequirements({ value = '', minLen = 6, visible = true }) {
+export default function PasswordRequirements({ value = '', minLen = PASSWORD_MIN_LENGTH, visible = true }) {
   if (!visible) return null
 
   const checks = [
@@ -48,7 +53,7 @@ export default function PasswordRequirements({ value = '', minLen = 6, visible =
  * Convenience predicate — true when value satisfies all requirements.
  * Use in submit handlers to short-circuit the Supabase call.
  */
-export function isPasswordValid(value, minLen = 6) {
+export function isPasswordValid(value, minLen = PASSWORD_MIN_LENGTH) {
   if (!value || value.length < minLen) return false
   if (!/[a-z]/.test(value)) return false
   if (!/[A-Z]/.test(value)) return false
@@ -66,7 +71,7 @@ export function friendlyPasswordError(message = '') {
     return 'Password must include lowercase, uppercase letters and a number.'
   }
   if (m.includes('should be at least')) {
-    return 'Password is too short. Use at least 6 characters.'
+    return `Password is too short. Use at least ${PASSWORD_MIN_LENGTH} characters.`
   }
   if (m.includes('weak')) {
     return 'Password is too weak. Try a longer mix of letters and numbers.'

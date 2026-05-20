@@ -43,19 +43,27 @@ function restoreMetaContent(name, prev, attr = 'name') {
   else el.setAttribute('content', prev)
 }
 
+// index.html ships multiple icon links (.ico, .svg, .png, apple-touch-icon).
+// Browsers (esp. Chrome) prefer SVG when present, so updating only the first
+// link leaves the tab still showing the SaaS favicon. We update every icon
+// link element and snapshot each one so cleanup can restore them all.
+const ICON_SELECTOR = 'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'
+
 function setIcon(href) {
   if (!href) return null
-  const el = document.head.querySelector('link[rel="icon"]') ||
-             document.head.querySelector('link[rel="shortcut icon"]')
-  const prev = el ? el.getAttribute('href') : null
-  if (el) el.setAttribute('href', href)
-  return prev
+  const els = Array.from(document.head.querySelectorAll(ICON_SELECTOR))
+  if (els.length === 0) return null
+  // Snapshot original [element, href] pairs before mutating
+  const snapshot = els.map(el => ({ el, href: el.getAttribute('href') }))
+  for (const el of els) el.setAttribute('href', href)
+  return snapshot
 }
 
-function restoreIcon(prev) {
-  const el = document.head.querySelector('link[rel="icon"]') ||
-             document.head.querySelector('link[rel="shortcut icon"]')
-  if (el && prev != null) el.setAttribute('href', prev)
+function restoreIcon(snapshot) {
+  if (!Array.isArray(snapshot)) return
+  for (const { el, href } of snapshot) {
+    if (el && href != null) el.setAttribute('href', href)
+  }
 }
 
 export function useDocumentHead({

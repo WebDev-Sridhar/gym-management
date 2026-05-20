@@ -4,14 +4,21 @@ import { supabase } from './supabaseClient'
 
 /**
  * Sign up with email + password.
+ *
  * Supabase sends a confirmation email; user must click the link before signing in.
+ *
+ * `emailRedirectTo` lets callers add a context-bearing query string to the
+ * post-verification URL — e.g. gym-side join flows pass `?gym=<slug>` so
+ * AuthCallback can render a "not a member of {gym}" screen instead of
+ * silently routing a stranger to the owner-onboarding wizard.
  */
-export async function signUpWithEmail(email, password) {
+export async function signUpWithEmail(email, password, options = {}) {
+  const { emailRedirectTo } = options
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${window.location.origin}/auth/callback`,
+      emailRedirectTo: emailRedirectTo || `${window.location.origin}/auth/callback`,
     },
   })
   if (error) throw error
