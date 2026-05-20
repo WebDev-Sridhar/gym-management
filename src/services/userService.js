@@ -260,12 +260,47 @@ export async function findMemberByEmail(email) {
     .select('id, gym_id, name, phone, email')
     .ilike('email', cleanEmail)
     .is('deleted_at', null)
+    .neq('status', 'pending_payment')   // skip abandoned-checkout orphans (cleaned up 2h later)
     .order('created_at', { ascending: false })
     .limit(2)   // fetch 2 so we can detect collisions
   if (error) throw error
 
   if ((data?.length || 0) > 1) {
     console.warn(`[findMemberByEmail] ${data.length}+ member rows match ${cleanEmail}; picking most recent (${data[0].id}).`)
+  }
+  return data?.[0] ?? null
+}
+
+/**
+ * Phone-based fallback for auto-linking when email lookup misses.
+ * Used when an owner added a member with phone only (no email). Strips
+ * formatting (spaces, dashes, country-code prefix variations) so
+ * 6380614150, +91 6380614150, 91-6380614150, 06380614150 all match.
+ */
+export async function findMemberByPhone(phone) {
+  if (!phone) return null
+  const digits = String(phone).replace(/\D/g, '')
+  if (!digits) return null
+
+  // Build a list of common variants to look up
+  // 10-digit local, +91-prefixed, 91-prefixed, 0-prefixed
+  const variants = new Set([digits])
+  if (digits.length === 10)                       variants.add(`91${digits}`)
+  if (digits.length === 12 && digits.startsWith('91')) variants.add(digits.slice(2))
+  if (digits.length === 11 && digits.startsWith('0'))  variants.add(digits.slice(1))
+
+  const { data, error } = await supabase
+    .from('members')
+    .select('id, gym_id, name, phone, email')
+    .in('phone', Array.from(variants))
+    .is('deleted_at', null)
+    .neq('status', 'pending_payment')
+    .order('created_at', { ascending: false })
+    .limit(2)
+  if (error) throw error
+
+  if ((data?.length || 0) > 1) {
+    console.warn(`[findMemberByPhone] ${data.length}+ member rows match ${digits}; picking most recent (${data[0].id}).`)
   }
   return data?.[0] ?? null
 }

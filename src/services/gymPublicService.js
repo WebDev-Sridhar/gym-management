@@ -49,6 +49,22 @@ export async function fetchGymByCustomDomain(domain) {
 }
 
 /**
+ * Lightweight by-id lookup — used by the cross-gym mismatch screens to show
+ * "you're a member of {other gym}, not {this gym}" with a link to the
+ * correct portal. Slim projection (only the bits the screen needs).
+ */
+export async function fetchGymById(gymId) {
+  if (!gymId) return null
+  const { data, error } = await supabaseAnon
+    .from('gyms')
+    .select('id, name, slug, logo_url, theme_color')
+    .eq('id', gymId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/**
  * Resolve an old slug → current slug via gym_slug_redirects.
  * Returns the current slug string, or null if no redirect exists.
  *

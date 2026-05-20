@@ -193,6 +193,14 @@ export async function updateMember({ memberId, name, phone, email }) {
 }
 
 export async function deleteMember(memberId) {
+  // Look up the auth-linked user id BEFORE soft-deleting so we can also
+  // clean up the users-table profile. Without this, the member's session
+  // stays valid + their users row keeps pointing at a soft-deleted member
+  // row — they'd land in /member-app with empty data (queries filter on
+  // deleted_at IS NULL) and no clear "your membership ended" feedback.
+  const { data: memberRow } = await supabase
+    .from('members').select('user_id').eq('id', memberId).maybeSingle()
+
   const { error } = await supabase
     .from('members')
     .update({
@@ -204,6 +212,15 @@ export async function deleteMember(memberId) {
     .eq('id', memberId)
 
   if (error) throw error
+
+  // Best-effort users row cleanup. The auth.users row stays (Supabase Auth
+  // owns that table) but next login they hit AuthCallback fresh — and our
+  // hardened findMemberByEmail won't link them to the soft-deleted row, so
+  // they'll see the "not a member of {gym}" screen and route correctly.
+  if (memberRow?.user_id) {
+    await supabase.from('users').delete().eq('id', memberRow.user_id)
+      .then(({ error: e }) => { if (e) console.warn('deleteMember: users cleanup failed:', e.message) })
+  }
 }
 
 // ─── Dashboard Stats ───
@@ -356,7 +373,31 @@ export async function fetchTrainerInvites(gymId, branchId) {
 }
 
 export async function createTrainerInvite({ gymId, branchId, name, phone, email }) {
-  const row = { gym_id: gymId, name, phone: phone || null, email: email || null }
+  const cleanEmail = email?.trim().toLowerCase() || null
+  const cleanPhone = phone?.trim() || null
+
+  // Collision guard: if this email is already an active member of the gym,
+  // the auto-link at signup would route them as a member (checked first),
+  // and the trainer invite would stay unclaimed forever. Reject upfront with
+  // a clear message rather than silently creating an orphan invite.
+  if (cleanEmail) {
+    const { data: existingMember } = await supabase
+      .from('members')
+      .select('id, name')
+      .eq('gym_id', gymId)
+      .ilike('email', cleanEmail)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle()
+    if (existingMember) {
+      throw new Error(
+        `${cleanEmail} is already a member of this gym (${existingMember.name}). ` +
+        `Remove them as a member first, or use a different email for the trainer invite.`
+      )
+    }
+  }
+
+  const row = { gym_id: gymId, name, phone: cleanPhone, email: cleanEmail }
   if (branchId) row.branch_id = branchId
   const { data, error } = await supabase
     .from('trainer_invites')

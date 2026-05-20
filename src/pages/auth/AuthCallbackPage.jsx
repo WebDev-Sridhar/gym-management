@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../services/supabaseClient'
-import { fetchGymBySlug } from '../../services/gymPublicService'
+import { fetchGymBySlug, fetchGymById } from '../../services/gymPublicService'
 import {
   fetchUserProfile,
   createUserProfile,
   findMemberByEmail,
+  findMemberByPhone,
   findTrainerInviteByEmail,
   claimTrainerInvite,
   createTrainerRecord,
@@ -73,12 +74,40 @@ export default function AuthCallbackPage() {
         return returnTo
       })()
 
+      // Pre-resolve the gym they signed up FOR (if context tag present) so we
+      // can detect "member of a different gym" cases below.
+      let requestedGym = null
+      if (gymSlug) {
+        try { requestedGym = await fetchGymBySlug(gymSlug) } catch { /* ignore */ }
+      }
+
       if (!profile) {
         // ── Auto-detect member or trainer by email ──────────────────────────
         if (user.email) {
           // 1. Check if this email belongs to a gym member
           const memberRecord = await findMemberByEmail(user.email)
           if (memberRecord) {
+            // Cross-gym mismatch: they signed up at /{gymSlug}/join but their
+            // member row is in a different gym. Don't silently link to the
+            // wrong tenant — show a "you're a member of X, not Y" screen.
+            if (requestedGym && memberRecord.gym_id !== requestedGym.id) {
+              const actualGym = await fetchGymById(memberRecord.gym_id).catch(() => null)
+              if (actualGym) {
+                setUnknownGym({
+                  name: requestedGym.name,
+                  slug: requestedGym.slug,
+                  theme_color: requestedGym.theme_color || '#8B5CF6',
+                  logo_url: requestedGym.logo_url || null,
+                  // Extra hint: where they SHOULD log in
+                  belongsTo: { name: actualGym.name, slug: actualGym.slug },
+                })
+                setStatus('notMember')
+                return
+              }
+              // Fall through if the other gym lookup failed — better to link
+              // them somewhere than block them with no recourse.
+            }
+
             await createUserProfile({
               authId: user.id,
               name: memberRecord.name,
@@ -111,12 +140,55 @@ export default function AuthCallbackPage() {
             navigate('/trainer-dashboard', { replace: true })
             return
           }
+
+          // 2b. Phone-based fallback. Many Indian gyms add members by phone
+          //     only (no email on the member row). If GymJoinPage stashed a
+          //     phone in user_metadata, try matching that to a member row.
+          const metaPhone = user.user_metadata?.phone
+          if (metaPhone) {
+            const phoneMatch = await findMemberByPhone(metaPhone)
+            if (phoneMatch) {
+              // Cross-gym guard reused from email path.
+              if (requestedGym && phoneMatch.gym_id !== requestedGym.id) {
+                const actualGym = await fetchGymById(phoneMatch.gym_id).catch(() => null)
+                if (actualGym) {
+                  setUnknownGym({
+                    name: requestedGym.name,
+                    slug: requestedGym.slug,
+                    theme_color: requestedGym.theme_color || '#8B5CF6',
+                    logo_url: requestedGym.logo_url || null,
+                    belongsTo: { name: actualGym.name, slug: actualGym.slug },
+                  })
+                  setStatus('notMember')
+                  return
+                }
+              }
+              await createUserProfile({
+                authId: user.id,
+                name: phoneMatch.name,
+                email: user.email,
+                phone: phoneMatch.phone || metaPhone,
+                role: 'member',
+                gymId: phoneMatch.gym_id,
+              })
+              // Backfill the email onto the member row so the owner sees the
+              // newly-linked email next to the phone in MembersPage.
+              await supabase.from('members')
+                .update({ email: user.email })
+                .eq('id', phoneMatch.id)
+                .is('email', null)
+                .catch(() => {})
+              await refreshProfile()
+              navigate(safeReturn || '/member-app', { replace: true })
+              return
+            }
+          }
         }
 
-        // 3a. Email isn't a member or trainer-invite, AND they came from a
-        //     gym join page (?gym=<slug> in the URL). Show a friendly
-        //     "we couldn't find you" screen — don't silently route them
-        //     into the owner-onboarding wizard which would be jarring UX.
+        // 3a. Email/phone don't match any member or trainer-invite, AND they
+        //     came from a gym join page (?gym=<slug> in the URL). Show a
+        //     friendly "we couldn't find you" screen — don't silently route
+        //     them into the owner-onboarding wizard which would be jarring UX.
         if (gymSlug) {
           try {
             const gym = await fetchGymBySlug(gymSlug)
@@ -215,26 +287,51 @@ export default function AuthCallbackPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
             </div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">You're verified, but not a member yet</h2>
-            <p className="text-sm text-gray-500 mb-5">
-              We couldn't find you on <span className="font-semibold text-gray-700">{unknownGym.name}</span>'s member list.
-              Pick a plan to join, or ask the gym to add you manually.
-            </p>
 
-            <a
-              href={`/${unknownGym.slug}/pricing`}
-              className="inline-flex items-center justify-center w-full py-3 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity text-sm"
-              style={{ background: brand }}
-            >
-              View {unknownGym.name} plans
-            </a>
-            <a
-              href={`/${unknownGym.slug}/contact`}
-              className="block text-center text-sm font-medium mt-3 hover:opacity-80 transition-opacity"
-              style={{ color: brand }}
-            >
-              Contact the gym
-            </a>
+            {unknownGym.belongsTo ? (
+              <>
+                <h2 className="text-lg font-bold text-gray-900 mb-2">Wrong gym portal</h2>
+                <p className="text-sm text-gray-500 mb-5">
+                  Your email is registered as a member of <span className="font-semibold text-gray-700">{unknownGym.belongsTo.name}</span>, not <span className="font-semibold text-gray-700">{unknownGym.name}</span>.
+                </p>
+                <a
+                  href={`/${unknownGym.belongsTo.slug}/login`}
+                  className="inline-flex items-center justify-center w-full py-3 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity text-sm"
+                  style={{ background: brand }}
+                >
+                  Sign in to {unknownGym.belongsTo.name}
+                </a>
+                <a
+                  href={`/${unknownGym.slug}/pricing`}
+                  className="block text-center text-sm font-medium mt-3 hover:opacity-80 transition-opacity"
+                  style={{ color: brand }}
+                >
+                  Or join {unknownGym.name} instead
+                </a>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-bold text-gray-900 mb-2">You're verified, but not a member yet</h2>
+                <p className="text-sm text-gray-500 mb-5">
+                  We couldn't find you on <span className="font-semibold text-gray-700">{unknownGym.name}</span>'s member list.
+                  Pick a plan to join, or ask the gym to add you manually.
+                </p>
+                <a
+                  href={`/${unknownGym.slug}/pricing`}
+                  className="inline-flex items-center justify-center w-full py-3 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity text-sm"
+                  style={{ background: brand }}
+                >
+                  View {unknownGym.name} plans
+                </a>
+                <a
+                  href={`/${unknownGym.slug}/contact`}
+                  className="block text-center text-sm font-medium mt-3 hover:opacity-80 transition-opacity"
+                  style={{ color: brand }}
+                >
+                  Contact the gym
+                </a>
+              </>
+            )}
 
             <p className="text-[11px] text-gray-400 mt-5 pt-4 border-t border-gray-100">
               Looking to start your own gym instead?{' '}

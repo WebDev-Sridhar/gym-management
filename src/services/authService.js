@@ -13,12 +13,15 @@ import { supabase } from './supabaseClient'
  * silently routing a stranger to the owner-onboarding wizard.
  */
 export async function signUpWithEmail(email, password, options = {}) {
-  const { emailRedirectTo } = options
+  const { emailRedirectTo, metadata } = options
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: emailRedirectTo || `${window.location.origin}/auth/callback`,
+      // metadata lands in auth.users.user_metadata — read by AuthCallback to
+      // support phone-based member auto-link when the email lookup misses.
+      ...(metadata ? { data: metadata } : {}),
     },
   })
   if (error) throw error

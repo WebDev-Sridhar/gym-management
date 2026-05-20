@@ -12,6 +12,7 @@ import {
   claimTrainerInvite,
   createTrainerRecord,
 } from '../../services/userService'
+import { fetchGymById } from '../../services/gymPublicService'
 
 const inputStyle = {
   width: '100%',
@@ -93,6 +94,23 @@ export default function GymLoginPage() {
         // ── 2. No profile yet — try member auto-detection ──────────────────
         const memberRow = await findMemberByEmail(email.trim())
         if (memberRow) {
+          // Cross-gym guard: this email is a member elsewhere, NOT here.
+          // Don't silently link to the wrong tenant — sign them out and tell
+          // them which gym's portal they actually belong to.
+          if (memberRow.gym_id !== gym.id) {
+            await supabase.auth.signOut().catch(() => {})
+            setAccessToken(null)
+            const otherGym = await fetchGymById(memberRow.gym_id).catch(() => null)
+            const otherName = otherGym?.name || 'another gym'
+            const otherSlug = otherGym?.slug
+            setError(
+              `This email is registered as a member of ${otherName}, not ${gym.name}. ` +
+              (otherSlug
+                ? `Sign in at /${otherSlug}/login instead, or join ${gym.name} from the pricing page.`
+                : `Sign in at the correct gym's portal instead.`)
+            )
+            return
+          }
           profile = await createUserProfile({
             authId: user.id,
             name: memberRow.name,
@@ -105,6 +123,17 @@ export default function GymLoginPage() {
           // ── 3. Try trainer-invite detection ──────────────────────────────
           const invite = await findTrainerInviteByEmail(email.trim())
           if (invite) {
+            // Same cross-gym guard for trainers.
+            if (invite.gym_id !== gym.id) {
+              await supabase.auth.signOut().catch(() => {})
+              setAccessToken(null)
+              const otherGym = await fetchGymById(invite.gym_id).catch(() => null)
+              setError(
+                `Your trainer invite is for ${otherGym?.name || 'a different gym'}, not ${gym.name}. ` +
+                (otherGym?.slug ? `Sign in at /${otherGym.slug}/login instead.` : '')
+              )
+              return
+            }
             profile = await createUserProfile({
               authId: user.id,
               name: invite.name,

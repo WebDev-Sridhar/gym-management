@@ -723,6 +723,33 @@ Verdict legend: ✅ Fully Implemented · 🟡 Partially Implemented · 🔴 Not 
 
 ---
 
+## Known auth edge cases (intentionally deferred)
+
+The member auto-link flow (signup → `findMemberByEmail` / `findMemberByPhone` →
+auto-create `users` row) is hardened against the common cases but does **not**
+normalize Gmail-style address aliases:
+
+- `john.smith@gmail.com` and `johnsmith@gmail.com` are treated as different
+  emails by our lookup, even though Google routes both to the same inbox.
+- `john+gym@gmail.com` and `john@gmail.com` are also treated as different.
+
+Impact: an owner who adds a member as `johnsmith@gmail.com` and the member
+then signs in via Google as `john.smith@gmail.com` won't auto-link → they
+hit the "not a member of {gym}" screen (correct gym branding, just unhelpful
+in this specific case).
+
+**Mitigation while deferred:** in the Members page UX, prompt owners to ask
+members for the exact email they sign in with. Also recommend Google OAuth
+as the primary signup CTA — Google sign-in returns the canonical address
+form, so this case rarely occurs in practice.
+
+**Future fix** (when it becomes a real customer complaint): add a stored
+`email_normalized` column on `members` + `trainer_invites` populated by a
+trigger that strips dots and `+suffixes` from `@gmail.com` / `@googlemail.com`
+addresses. Index it. Switch `findMemberByEmail` to query the normalized column.
+
+---
+
 ## Current limitations summary
 
 - **Cannot self-serve onboard at scale** — every new gym still benefits from a manual setup call (payment keys, domain).

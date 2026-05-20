@@ -41,6 +41,7 @@ export default function GymJoinPage() {
   const returnTo = safeReturnUrl(searchParams.get('return'))
 
   const [email, setEmail]       = useState('')
+  const [phone, setPhone]       = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm]   = useState('')
   const [error, setError]       = useState('')
@@ -78,7 +79,13 @@ export default function GymJoinPage() {
         + (returnTo ? `&return=${encodeURIComponent(returnTo)}` : '')
 
       const { error: signUpError } = await signUpWithEmail(
-        email.trim(), password, { emailRedirectTo: redirectTo },
+        email.trim(), password,
+        {
+          emailRedirectTo: redirectTo,
+          // Phone gets stashed in user_metadata so AuthCallback can use it
+          // as a fallback for member auto-link when the email match misses.
+          metadata: phone.trim() ? { phone: phone.trim() } : undefined,
+        },
       )
 
       if (signUpError) { setError(signUpError.message); return }
@@ -169,13 +176,25 @@ export default function GymJoinPage() {
                   onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}
                   onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }} />
               </div>
+              {/* Optional phone — used as a fallback link to your member row
+                  when the gym added you by phone only (no email). */}
+              <div>
+                <label style={labelStyle}>
+                  Phone <span style={{ textTransform: 'none', opacity: 0.6, fontWeight: 500 }}>(optional)</span>
+                </label>
+                <input type="tel" value={phone}
+                  onChange={e => setPhone(e.target.value.replace(/[^\d+\s-]/g, ''))}
+                  placeholder="10-digit mobile" maxLength={15} style={inputStyle}
+                  onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}
+                  onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }} />
+              </div>
               <div>
                 <label style={labelStyle}>Password</label>
                 <PasswordInput
                   className=""
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
                   style={inputStyle}
                   iconColor="var(--gym-text-muted)"
                   onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}
@@ -188,7 +207,7 @@ export default function GymJoinPage() {
                   className=""
                   value={confirm}
                   onChange={e => setConfirm(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="••••••••••"
                   style={inputStyle}
                   iconColor="var(--gym-text-muted)"
                   onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}
