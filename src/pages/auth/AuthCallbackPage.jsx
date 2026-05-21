@@ -10,6 +10,7 @@ import {
   findTrainerInviteByEmail,
   claimTrainerInvite,
   createTrainerRecord,
+  linkMemberToAuthUser,
 } from '../../services/userService'
 import { useAuth } from '../../store/AuthContext'
 import BrandLoader from '../../components/ui/BrandLoader'
@@ -116,6 +117,9 @@ export default function AuthCallbackPage() {
               role: 'member',
               gymId: memberRecord.gym_id,
             })
+            // Backfill the link both directions so future deleteMember can
+            // find and clean up the auth profile cleanly.
+            await linkMemberToAuthUser({ memberId: memberRecord.id, userId: user.id })
             await refreshProfile()
             navigate(safeReturn || '/member-app', { replace: true })
             return
@@ -171,13 +175,14 @@ export default function AuthCallbackPage() {
                 role: 'member',
                 gymId: phoneMatch.gym_id,
               })
-              // Backfill the email onto the member row so the owner sees the
-              // newly-linked email next to the phone in MembersPage.
+              // Backfill the email AND user_id onto the member row so the
+              // owner sees the newly-linked email next to the phone in
+              // MembersPage, and so deleteMember can later find the user
+              // profile to clean up.
               await supabase.from('members')
-                .update({ email: user.email })
+                .update({ email: user.email, user_id: user.id })
                 .eq('id', phoneMatch.id)
-                .is('email', null)
-                .catch(() => {})
+                .then(({ error: e }) => { if (e) console.warn('phone-link backfill:', e.message) })
               await refreshProfile()
               navigate(safeReturn || '/member-app', { replace: true })
               return

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { LogOut, CreditCard, ChevronRight, AlertTriangle, Clock, Loader2 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
@@ -30,13 +31,24 @@ function StatBox({ value, label, accent }) {
 }
 
 export default function MemberProfilePage() {
-  const { profile, logout } = useAuth()
+  const { profile, logout, gymSlug } = useAuth()
+  const navigate = useNavigate()
   const { member, attendance, pending, isLoading } = useMemberData()
   const [loggingOut, setLoggingOut] = useState(false)
 
   async function handleLogout() {
     setLoggingOut(true)
-    try { await logout() } catch (e) { console.error(e); setLoggingOut(false) }
+    // Snapshot the gym slug BEFORE logout — `logout()` clears AuthContext
+    // so by the time we navigate, gymSlug would be null and we'd fall back
+    // to the SaaS /login. Falling back to / preserves the gym brand: the
+    // GymJoinPage / GymLoginPage are reachable from there.
+    const slug = gymSlug
+    try {
+      await logout()
+    } catch (e) {
+      console.error(e); setLoggingOut(false); return
+    }
+    navigate(slug ? `/${slug}/login` : '/login', { replace: true })
   }
 
   if (isLoading) return <ProfileSkeleton />

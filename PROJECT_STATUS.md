@@ -723,6 +723,18 @@ Verdict legend: ✅ Fully Implemented · 🟡 Partially Implemented · 🔴 Not 
 
 ---
 
+## Manual Supabase dashboard settings (verify before launch)
+
+These are configured in the Supabase dashboard, not in code:
+
+| Setting | Path | Required value | Why |
+|---|---|---|---|
+| Confirm email | Authentication → Providers → Email → **Confirm email** | **ON** | Without this, a user can sign up + immediately log in via the "Sign in instead" button without ever clicking the verification link in their inbox. The login page already handles the "Email not confirmed" error gracefully with a "Resend verification" button — but only when the setting is on. |
+| Minimum password length | Authentication → Providers → Email → **Min length** | **8** | Mirrors the frontend `PASSWORD_MIN_LENGTH` constant. |
+| Leaked password protection | Authentication → Providers → Email → **Leaked password protection** | (Pro plan only) | See "Known auth edge cases" — DIY HIBP via Edge Function is available on Free plan. |
+
+---
+
 ## Known auth edge cases (intentionally deferred)
 
 The member auto-link flow (signup → `findMemberByEmail` / `findMemberByPhone` →

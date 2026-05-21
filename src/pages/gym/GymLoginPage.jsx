@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
-import { signInWithEmail } from '../../services/authService'
+import { signInWithEmail, resendEmailVerification, isEmailNotConfirmedError } from '../../services/authService'
 import { supabase, setAccessToken } from '../../services/supabaseClient'
 import PasswordInput from '../../components/ui/PasswordInput'
+import { useAuth } from '../../store/AuthContext'
 import {
   fetchUserProfile,
   createUserProfile,
@@ -11,6 +12,7 @@ import {
   findTrainerInviteByEmail,
   claimTrainerInvite,
   createTrainerRecord,
+  linkMemberToAuthUser,
 } from '../../services/userService'
 import { fetchGymById } from '../../services/gymPublicService'
 
@@ -52,6 +54,7 @@ export default function GymLoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const returnTo = safeReturnUrl(searchParams.get('return'))
+  const { refreshProfile } = useAuth()
 
   const [step, setStep]         = useState('email') // 'email' | 'password' | 'forgot'
   const [email, setEmail]       = useState('')
@@ -59,6 +62,11 @@ export default function GymLoginPage() {
   const [error, setError]       = useState('')
   const [success, setSuccess]   = useState('')
   const [loading, setLoading]   = useState(false)
+  // When set, the password screen surfaces a "Resend verification email"
+  // button alongside the error message (Supabase rejected sign-in because
+  // the user hasn't confirmed their email yet).
+  const [needsVerification, setNeedsVerification] = useState(false)
+  const [resendBusy, setResendBusy] = useState(false)
 
   if (!gym) return null
   const base = `/${gym.slug}`
@@ -74,10 +82,26 @@ export default function GymLoginPage() {
     setStep('password')
   }
 
+  async function handleResendVerification() {
+    if (!email.trim() || resendBusy) return
+    setResendBusy(true); setError(''); setSuccess('')
+    try {
+      const redirectTo = `${window.location.origin}/auth/callback?gym=${encodeURIComponent(gym.slug)}`
+      await resendEmailVerification(email.trim(), { emailRedirectTo: redirectTo })
+      setSuccess(`Verification email re-sent to ${email}. Check your inbox (and spam folder).`)
+      setNeedsVerification(false)
+    } catch (err) {
+      setError(err.message || 'Failed to resend verification email')
+    } finally {
+      setResendBusy(false)
+    }
+  }
+
   async function handleLogin(e) {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setNeedsVerification(false)
     try {
       const { user, session } = await signInWithEmail(email.trim(), password)
 
@@ -119,6 +143,9 @@ export default function GymLoginPage() {
             role: 'member',
             gymId: memberRow.gym_id,
           })
+          // Backfill members.user_id so future deleteMember can find this
+          // profile to clean up cleanly.
+          await linkMemberToAuthUser({ memberId: memberRow.id, userId: user.id })
         } else {
           // ── 3. Try trainer-invite detection ──────────────────────────────
           const invite = await findTrainerInviteByEmail(email.trim())
@@ -161,7 +188,14 @@ export default function GymLoginPage() {
         return
       }
 
-      // ── 5. Route based on confirmed role ─────────────────────────────────
+      // ── 5. Sync AuthContext with the newly-created profile BEFORE we
+      // navigate. Without this, ProtectedRoute on /member-app reads a stale
+      // null profile (AuthContext's own SIGNED_IN loadProfile hasn't finished
+      // yet) and bounces the user to /create-gym. Page only renders correctly
+      // after a manual refresh. This explicit refresh closes the race.
+      await refreshProfile()
+
+      // ── 6. Route based on confirmed role ─────────────────────────────────
       // For members, honor a ?return= query param so flows like QR-code
       // check-in can bounce the user back to where they were. Owners and
       // trainers always go to their respective dashboards — return is only
@@ -176,7 +210,15 @@ export default function GymLoginPage() {
         : (roleRoutes[profile.role] || '/owner-dashboard')
       navigate(target, { replace: true })
     } catch (err) {
-      setError(err.message === 'Invalid login credentials' ? 'Invalid email or password' : err.message)
+      // Recognise Supabase's "Email not confirmed" rejection and switch
+      // the UI to the resend-verification affordance instead of a flat
+      // error string the user can't act on.
+      if (isEmailNotConfirmedError(err)) {
+        setNeedsVerification(true)
+        setError(`Please verify your email before signing in. We sent a confirmation link to ${email}.`)
+      } else {
+        setError(err.message === 'Invalid login credentials' ? 'Invalid email or password' : err.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -237,8 +279,19 @@ export default function GymLoginPage() {
           </div>
 
           {error && (
-            <div className="p-3 rounded-xl text-sm" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
-              {error}
+            <div className="p-3 rounded-xl text-sm space-y-2" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
+              <div>{error}</div>
+              {needsVerification && (
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendBusy}
+                  className="w-full py-2 mt-1 text-xs font-semibold rounded-lg transition-opacity hover:opacity-80 disabled:opacity-50"
+                  style={{ background: 'rgba(248,113,113,0.18)', border: '1px solid rgba(248,113,113,0.35)', color: '#fff' }}
+                >
+                  {resendBusy ? 'Sending…' : 'Resend verification email'}
+                </button>
+              )}
             </div>
           )}
           {success && (

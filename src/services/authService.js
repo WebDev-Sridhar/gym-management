@@ -50,6 +50,35 @@ export async function sendMagicLink(email) {
   if (error) throw error
 }
 
+/**
+ * Re-send the email verification link for a signup that hasn't been
+ * confirmed yet. Surfaced via the "Resend verification email" button on
+ * the gym login page when the user trips the "Email not confirmed" error.
+ *
+ * `emailRedirectTo` should mirror the original signup redirect so the post-
+ * verification flow lands in the same context (gym slug, return URL).
+ */
+export async function resendEmailVerification(email, { emailRedirectTo } = {}) {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: emailRedirectTo ? { emailRedirectTo } : undefined,
+  })
+  if (error) throw error
+}
+
+/**
+ * Heuristic to detect Supabase's "email not confirmed" errors across
+ * versions/messages. Returns true so callers can branch into the
+ * "Please verify your email" UX instead of just showing the raw error.
+ */
+export function isEmailNotConfirmedError(err) {
+  const msg = String(err?.message || err || '').toLowerCase()
+  return msg.includes('email not confirmed')
+      || msg.includes('email_not_confirmed')
+      || msg.includes('confirm your email')
+}
+
 // ─── Google OAuth ───
 
 /**

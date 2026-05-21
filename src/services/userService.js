@@ -7,7 +7,7 @@ import { supabaseData as supabase } from './supabaseClient'
 export async function fetchUserProfile(authId) {
   const { data, error } = await supabase
     .from('users')
-    .select('*, gym:gym_id(name, onboarding_step)')
+    .select('*, gym:gym_id(name, slug, onboarding_step)')
     .eq('id', authId)
     .maybeSingle()
 
@@ -15,6 +15,7 @@ export async function fetchUserProfile(authId) {
   if (data) {
     data.onboarding_step = data.gym?.onboarding_step ?? null
     data.gym_name = data.gym?.name ?? null
+    data.gym_slug = data.gym?.slug ?? null
     delete data.gym
   }
   return data
@@ -331,6 +332,24 @@ export async function claimTrainerInvite(inviteId) {
     .update({ claimed: true, status: 'accepted' })
     .eq('id', inviteId)
   if (error) throw error
+}
+
+/**
+ * Backfill `members.user_id` with the auth user's id once a member has
+ * successfully signed up and been auto-linked. Without this, every member
+ * row stays at user_id=null (createMember never sets it), and downstream
+ * cleanups like deleteMember can't find the linked auth profile to remove.
+ * Best-effort — silently ignores errors (e.g. RLS rejection) since the
+ * auto-link itself already succeeded; this is purely housekeeping.
+ */
+export async function linkMemberToAuthUser({ memberId, userId }) {
+  if (!memberId || !userId) return
+  await supabase
+    .from('members')
+    .update({ user_id: userId })
+    .eq('id', memberId)
+    .is('user_id', null)
+    .then(({ error }) => { if (error) console.warn('linkMemberToAuthUser:', error.message) })
 }
 
 // Insert a row into the legacy trainers table so existing queries still work

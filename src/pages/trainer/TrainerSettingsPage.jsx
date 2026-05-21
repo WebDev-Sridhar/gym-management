@@ -1,8 +1,17 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import SettingsSkeleton from '../../components/trainer/skeletons/SettingsSkeleton'
 
 export default function TrainerSettingsPage() {
-  const { profile, gymId, logout } = useAuth()
+  const { profile, gymId, gymSlug, logout } = useAuth()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    // Snapshot gymSlug BEFORE logout (it goes null when AuthContext clears).
+    const slug = gymSlug
+    try { await logout() } catch (e) { console.error(e); return }
+    navigate(slug ? `/${slug}/login` : '/login', { replace: true })
+  }
 
   if (!profile) return <SettingsSkeleton />
 
@@ -73,7 +82,7 @@ export default function TrainerSettingsPage() {
 
       {/* Sign out */}
       <button
-        onClick={logout}
+        onClick={handleLogout}
         style={{
           width: '100%', padding: '14px', border: '1px solid rgba(248,113,113,0.2)',
           borderRadius: 16, background: 'rgba(248,113,113,0.06)',
