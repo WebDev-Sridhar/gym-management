@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
-import { signUpWithEmail } from '../../services/authService'
+import { signUpWithEmail, resendEmailVerification } from '../../services/authService'
 import PasswordInput from '../../components/ui/PasswordInput'
 import { isPasswordValid, PASSWORD_MIN_LENGTH } from '../../components/ui/PasswordRequirements'
+
+const RESEND_COOLDOWN_SECONDS = 60
 
 // Mirror GymLoginPage's open-redirect guard.
 function safeReturnUrl(raw) {
@@ -47,6 +49,21 @@ export default function GymJoinPage() {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [done, setDone]         = useState(false)
+  // Resend cooldown — starts at RESEND_COOLDOWN_SECONDS the moment the
+  // confirmation email is sent, ticks down to 0, then the button becomes
+  // active. Prevents owners from spamming Supabase's email service.
+  const [resendIn, setResendIn] = useState(0)
+  const [resendBusy, setResendBusy] = useState(false)
+  const [resendMsg, setResendMsg] = useState('')
+  const [resendError, setResendError] = useState('')
+
+  // Tick the cooldown each second once the post-signup "done" screen is
+  // shown. Stops at 0 (or when leaving the screen).
+  useEffect(() => {
+    if (!done || resendIn <= 0) return
+    const id = setInterval(() => setResendIn(s => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(id)
+  }, [done, resendIn])
 
   if (!gym) return null
   const base = `/${gym.slug}`
@@ -91,10 +108,27 @@ export default function GymJoinPage() {
       if (signUpError) { setError(signUpError.message); return }
 
       setDone(true)
+      setResendIn(RESEND_COOLDOWN_SECONDS)   // arm the resend cooldown
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleResend() {
+    if (resendIn > 0 || resendBusy || !email.trim()) return
+    setResendBusy(true); setResendMsg(''); setResendError('')
+    try {
+      const redirectTo = `${window.location.origin}/auth/callback?gym=${encodeURIComponent(gym.slug)}`
+        + (returnTo ? `&return=${encodeURIComponent(returnTo)}` : '')
+      await resendEmailVerification(email.trim(), { emailRedirectTo: redirectTo })
+      setResendMsg('Verification email re-sent. Check your inbox (and spam folder).')
+      setResendIn(RESEND_COOLDOWN_SECONDS)   // re-arm the cooldown
+    } catch (err) {
+      setResendError(err.message || 'Failed to resend verification email.')
+    } finally {
+      setResendBusy(false)
     }
   }
 
@@ -138,15 +172,40 @@ export default function GymJoinPage() {
                 {" is new, a verification link is on its way. Click it to activate your account."}
               </p>
             </div>
-            <Link
-              to={loginHref}
-              className="block w-full py-2.5 text-sm font-semibold text-center rounded-xl transition-opacity hover:opacity-80"
+            {/* Resend with cooldown — replaces the old "Sign in instead"
+                affordance, which was misleading (it let unverified users
+                attempt sign-in even though Supabase rightly blocks them). */}
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendIn > 0 || resendBusy}
+              className="block w-full py-2.5 text-sm font-semibold text-center rounded-xl transition-opacity hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: 'var(--gym-gradient)', color: '#fff' }}
             >
-              Sign in instead
-            </Link>
+              {resendBusy
+                ? 'Sending…'
+                : resendIn > 0
+                  ? `Resend link in ${resendIn}s`
+                  : 'Resend verification email'}
+            </button>
+
+            {resendMsg && (
+              <p className="text-xs" style={{ color: '#4ade80' }}>{resendMsg}</p>
+            )}
+            {resendError && (
+              <p className="text-xs" style={{ color: '#f87171' }}>{resendError}</p>
+            )}
+
             <p className="text-xs" style={{ color: 'var(--gym-text-muted)' }}>
-              Already have an account? Use the button above.
+              Didn't get it? Check your spam folder. Once you click the link,
+              you'll be redirected to your account.
+            </p>
+
+            {/* Help for users who actually do already have an account — kept
+                small + secondary so it doesn't tempt fresh signups to skip
+                verification. */}
+            <p className="text-xs pt-2 border-t" style={{ color: 'var(--gym-text-muted)', borderColor: 'var(--gym-border)' }}>
+              Already verified earlier? <Link to={loginHref} className="font-semibold hover:opacity-80" style={{ color: 'var(--gym-text)' }}>Sign in</Link>
             </p>
           </div>
         ) : (

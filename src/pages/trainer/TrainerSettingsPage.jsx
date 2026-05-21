@@ -1,16 +1,17 @@
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import SettingsSkeleton from '../../components/trainer/skeletons/SettingsSkeleton'
 
 export default function TrainerSettingsPage() {
   const { profile, gymId, gymSlug, logout } = useAuth()
-  const navigate = useNavigate()
 
   async function handleLogout() {
-    // Snapshot gymSlug BEFORE logout (it goes null when AuthContext clears).
+    // Snapshot the slug BEFORE logout — AuthContext gets cleared.
     const slug = gymSlug
     try { await logout() } catch (e) { console.error(e); return }
-    navigate(slug ? `/${slug}/login` : '/login', { replace: true })
+    // HARD navigation. ProtectedRoute's <Navigate to="/login"/> fires
+    // during render the moment session clears and beats any imperative
+    // react-router navigate(). window.location.assign sidesteps the race.
+    window.location.assign(slug ? `/${slug}/login` : '/login')
   }
 
   if (!profile) return <SettingsSkeleton />

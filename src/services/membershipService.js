@@ -193,46 +193,23 @@ export async function updateMember({ memberId, name, phone, email }) {
 }
 
 export async function deleteMember(memberId) {
-  // Read enough of the member row BEFORE soft-deleting to find the linked
-  // auth profile. Two paths because `members.user_id` was historically
-  // never populated by createMember — legacy rows have it null.
-  const { data: memberRow } = await supabase
-    .from('members')
-    .select('user_id, gym_id, email')
-    .eq('id', memberId)
-    .maybeSingle()
-
-  const { error } = await supabase
-    .from('members')
-    .update({
-      deleted_at: new Date().toISOString(),
-      status: 'inactive',
-      plan_id: null,
-      expiry_date: null,
-    })
-    .eq('id', memberId)
-
+  // Calls a SECURITY DEFINER RPC that atomically:
+  //   1. Soft-deletes the members row
+  //   2. Hard-deletes the linked public.users row (by user_id OR by
+  //      gym_id+email fallback for legacy members where user_id is null)
+  //
+  // Doing this directly from the data client doesn't work — the users table
+  // has no DELETE policy permitting an owner to remove another user's row,
+  // so the cleanup silently failed and deleted members could still log in
+  // (their session + public.users row stayed alive, MemberLayout queries
+  // filtered out their soft-deleted member row → "profile not found" loop).
+  //
+  // The RPC verifies the caller is the gym's owner before touching anything,
+  // so SECURITY DEFINER doesn't widen the surface.
+  const { error } = await supabase.rpc('delete_member_with_cleanup', {
+    p_member_id: memberId,
+  })
   if (error) throw error
-
-  // Best-effort users-row cleanup. The auth.users row stays (Supabase Auth
-  // owns it), but the public users row is what role-routing + RLS keys off,
-  // so removing it sends the member back through AuthCallback on next login
-  // — where the hardened findMemberByEmail will skip the soft-deleted row
-  // and they'll land on the "not a member of {gym}" screen correctly.
-  if (memberRow?.user_id) {
-    // Primary path: direct lookup via the backfilled user_id link.
-    await supabase.from('users').delete().eq('id', memberRow.user_id)
-      .then(({ error: e }) => { if (e) console.warn('deleteMember: users cleanup failed:', e.message) })
-  } else if (memberRow?.email && memberRow?.gym_id) {
-    // Fallback for legacy members where user_id was never backfilled.
-    // Match by gym_id + email + role='member' so we don't accidentally
-    // touch an owner profile or a member of another gym.
-    await supabase.from('users').delete()
-      .eq('gym_id', memberRow.gym_id)
-      .ilike('email', memberRow.email.trim().toLowerCase())
-      .eq('role', 'member')
-      .then(({ error: e }) => { if (e) console.warn('deleteMember: legacy users cleanup failed:', e.message) })
-  }
 }
 
 // ─── Dashboard Stats ───

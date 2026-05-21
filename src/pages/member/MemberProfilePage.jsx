@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { LogOut, CreditCard, ChevronRight, AlertTriangle, Clock, Loader2 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
@@ -32,23 +31,24 @@ function StatBox({ value, label, accent }) {
 
 export default function MemberProfilePage() {
   const { profile, logout, gymSlug } = useAuth()
-  const navigate = useNavigate()
   const { member, attendance, pending, isLoading } = useMemberData()
   const [loggingOut, setLoggingOut] = useState(false)
 
   async function handleLogout() {
     setLoggingOut(true)
-    // Snapshot the gym slug BEFORE logout — `logout()` clears AuthContext
-    // so by the time we navigate, gymSlug would be null and we'd fall back
-    // to the SaaS /login. Falling back to / preserves the gym brand: the
-    // GymJoinPage / GymLoginPage are reachable from there.
+    // Snapshot the slug BEFORE logout — AuthContext gets cleared.
     const slug = gymSlug
     try {
       await logout()
     } catch (e) {
       console.error(e); setLoggingOut(false); return
     }
-    navigate(slug ? `/${slug}/login` : '/login', { replace: true })
+    // HARD navigation. We can't use react-router's `navigate()` here
+    // because ProtectedRoute fires <Navigate to="/login"/> during render
+    // the instant `isAuthenticated` flips to false, beating our imperative
+    // call. `window.location.assign` leaves the React app entirely → the
+    // browser does a full page load to the gym's own portal, no race.
+    window.location.assign(slug ? `/${slug}/login` : '/login')
   }
 
   if (isLoading) return <ProfileSkeleton />
