@@ -121,6 +121,15 @@ export async function createMember({ gymId, branchId, name, phone, email }) {
       .select('*, plan:plans(id, name, price, duration_days)')
       .single()
     if (error) throw error
+
+    // Re-activate the previously-neutered users row (role/gym_id/branch_id
+    // were nulled when the member was deleted — see delete_member_with_cleanup).
+    // Without this, the revived member logs in with role=null → AuthContext
+    // signs them out + shows "not a member". RPC is owner-scoped + idempotent,
+    // and a no-op when the member never signed up (members.user_id is null).
+    await supabase.rpc('relink_member_user_row', { p_member_id: existingId })
+      .then(({ error: e }) => { if (e) console.warn('relink_member_user_row:', e.message) })
+
     return data
   }
 
