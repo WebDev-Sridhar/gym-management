@@ -84,6 +84,20 @@ export function AuthProvider({ children }) {
     try {
       const p = await fetchUserProfile(authId)
 
+      // "Neutered" profile detection — when an owner deletes a member, that
+      // member's public.users row gets role=null, gym_id=null (the RPC keeps
+      // the row alive to avoid CASCADE'ing away their members + payments
+      // history). If we let the session continue, ProtectedRoute would
+      // bounce them around with no clear destination. Force a clean logout.
+      if (p && !p.role) {
+        setAccessToken(null)
+        try { await authSignOut() } catch { /* ignore */ }
+        setSession(null)
+        setProfile(null)
+        setSubscription(null)
+        return
+      }
+
       // If owner, fetch subscription BEFORE updating state to avoid
       // a flash where profile is set but subscription is still null
       // (ProtectedRoute would briefly redirect to /billing)

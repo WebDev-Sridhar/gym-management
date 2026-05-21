@@ -177,11 +177,12 @@ export default function GymLoginPage() {
         }
       }
 
-      // ── 4. No profile + no member/trainer match = stranger on a gym site
+      // ── 4. No profile + no member/trainer match, OR a "neutered" profile
+      // (former member whose role + gym_id were nulled by deleteMember).
       // Don't silently route them into the owner-onboarding wizard (jarring
       // UX — they thought they were joining THIS gym). Sign them out and
       // tell them to either join via pricing or contact the gym owner.
-      if (!profile) {
+      if (!profile || !profile.role) {
         await supabase.auth.signOut().catch(() => {})
         setAccessToken(null)
         setError(`We couldn't find you on ${gym.name}'s member list. Pick a plan from the pricing page to join, or ask the gym to add you.`)

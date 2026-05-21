@@ -1,18 +1,28 @@
 -- Owner-initiated member deletion is a 2-step operation:
---   1. Soft-delete the members row (deleted_at, status=inactive, plan_id/expiry cleared)
---   2. Hard-delete the matching public.users row so the member's next login
---      can't land on /member-app with a broken "profile not found" state.
 --
--- Step 2 fails silently under RLS when called from a regular owner session
--- (the users table has no DELETE policy that permits cross-row deletes), so
--- the cleanup is wrapped in a SECURITY DEFINER RPC that the gym owner can
--- invoke. The RPC verifies the caller IS the gym's owner before doing
--- anything, so it doesn't widen the attack surface.
+--   1. Soft-delete the members row (deleted_at, status=inactive, plan/expiry
+--      cleared). This preserves ALL the member's historical data (payments,
+--      attendance, assigned plans, reminders, notifications) — the rest of
+--      the schema's queries already filter `deleted_at IS NULL`, so the
+--      member just disappears from active lists while the audit trail and
+--      revenue history stay intact.
 --
--- The auth.users row stays (Supabase Auth owns that table). Future sign-ins
--- by the deleted member succeed at the auth layer but find no public.users
--- row → AuthContext.profile is null → ProtectedRoute routes them out of
--- /member-app cleanly.
+--   2. Neuter the linked public.users row (role=null, gym_id=null,
+--      branch_id=null). This blocks future access — fetchUserProfile still
+--      returns the row but with no role, so ProtectedRoute routes them out
+--      of /member-app cleanly and they hit the gym login or SaaS login.
+--
+-- IMPORTANT — why we NULL the users row instead of DELETE'ing it:
+--   members.user_id has a foreign key to users.id with ON DELETE CASCADE
+--   (Supabase default). A literal DELETE on users CASCADES back to the
+--   members row we just soft-deleted, undoing step 1 + cascading further
+--   into payments.member_id, attendance.member_id, etc. — wiping revenue
+--   and analytics. NULLing the row preserves the chain entirely.
+--
+-- Both steps fail under RLS when called from a normal owner session (no
+-- DELETE/UPDATE policy on users that permits cross-row writes), so we
+-- wrap them in a SECURITY DEFINER RPC that verifies the caller IS the
+-- gym's owner before doing anything.
 
 create or replace function public.delete_member_with_cleanup(p_member_id uuid)
 returns void
@@ -47,7 +57,7 @@ begin
     raise exception 'not authorised';
   end if;
 
-  -- 1. Soft-delete the members row
+  -- 1. Soft-delete the members row (preserves history + downstream FKs)
   update public.members
      set deleted_at = now(),
          status     = 'inactive',
@@ -55,12 +65,22 @@ begin
          expiry_date = null
    where id = p_member_id;
 
-  -- 2. Hard-delete the linked public.users row. Two paths because legacy
-  --    member rows never populated user_id.
+  -- 2. Neuter the linked public.users row instead of DELETE'ing it
+  --    (DELETE would cascade and undo step 1 — see file header).
   if v_member_user is not null then
-    delete from public.users where id = v_member_user;
+    update public.users
+       set role      = null,
+           gym_id    = null,
+           branch_id = null
+     where id = v_member_user;
   elsif v_member_email is not null then
-    delete from public.users
+    -- Fallback for legacy members where user_id was never backfilled.
+    -- Match by gym + email + role to avoid neutering an owner or member
+    -- of another gym.
+    update public.users
+       set role      = null,
+           gym_id    = null,
+           branch_id = null
      where gym_id = v_member_gym
        and lower(email) = lower(v_member_email)
        and role = 'member';
