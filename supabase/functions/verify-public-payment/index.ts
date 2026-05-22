@@ -10,6 +10,7 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 import { decryptSecret, byteaToBytes } from '../_shared/crypto.ts'
 import { hmacSha256Hex, timingSafeEqual } from '../_shared/razorpay.ts'
 import { sendNotification } from '../_shared/notifications.ts'
+import { extendMembership } from '../_shared/membershipExpiry.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,9 +95,11 @@ Deno.serve(async (req) => {
       .eq('status', 'pending')
     if (updErr) throw new Error(`update failed: ${updErr.message}`)
 
-    // Activate member
+    // Activate member with anchor-with-grace renewal math.
+    // create-public-order already cleared deleted_at on the member row for
+    // the public-checkout re-join path, so we don't need to set it here.
     if (payment.plan_id && payment.member_id) {
-      await activateMember(supabase, payment.member_id, payment.plan_id)
+      await extendMembership(supabase, payment.member_id, payment.plan_id)
     }
 
     const memberInfo = await fetchMemberInfo(supabase, payment.member_id, payment.plan_id)
@@ -131,26 +134,6 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: message }, 500)
   }
 })
-
-async function activateMember(supabase: SupabaseClient, memberId: string, planId: string) {
-  const { data: plan } = await supabase
-    .from('plans').select('duration_days').eq('id', planId).single()
-  const days = plan?.duration_days ?? 30
-  const now = new Date()
-  const expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
-
-  // Preserve original join_date for existing members — only set it for new members
-  const { data: existing } = await supabase
-    .from('members').select('join_date').eq('id', memberId).single()
-
-  await supabase.from('members').update({
-    plan_id: planId,
-    ...(existing?.join_date ? {} : { join_date: now.toISOString().slice(0, 10) }),
-    expiry_date: expiry.toISOString().slice(0, 10),
-    status: 'active',
-    deleted_at: null,   // revive soft-deleted members who re-join via public checkout
-  }).eq('id', memberId)
-}
 
 async function fetchMemberInfo(
   supabase: SupabaseClient,

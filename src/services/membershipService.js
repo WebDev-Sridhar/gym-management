@@ -81,6 +81,42 @@ export async function createMember({ gymId, branchId, name, phone, email }) {
   const cleanPhone = phone?.trim() || null
   const cleanEmail = email?.trim().toLowerCase() || null
 
+  // Pre-flight: reject duplicates against ACTIVE (non-deleted) members in
+  // this gym. Email is checked first (more uniquely identifying — typos
+  // less common, case-insensitive per RFC), phone is the fallback.
+  // Two separate queries so we can give a precise error pointing at which
+  // field collided. Skipped entirely when both fields are blank.
+  if (cleanEmail) {
+    const { data: emailHit } = await supabase
+      .from('members')
+      .select('id, name')
+      .eq('gym_id', gymId)
+      .is('deleted_at', null)
+      .ilike('email', cleanEmail)
+      .limit(1)
+      .maybeSingle()
+    if (emailHit) {
+      throw new Error(
+        `A member with email ${cleanEmail} already exists in this gym (${emailHit.name}).`
+      )
+    }
+  }
+  if (cleanPhone) {
+    const { data: phoneHit } = await supabase
+      .from('members')
+      .select('id, name')
+      .eq('gym_id', gymId)
+      .is('deleted_at', null)
+      .eq('phone', cleanPhone)
+      .limit(1)
+      .maybeSingle()
+    if (phoneHit) {
+      throw new Error(
+        `A member with phone ${cleanPhone} already exists in this gym (${phoneHit.name}).`
+      )
+    }
+  }
+
   // Find a soft-deleted member matching EITHER the phone OR email so we
   // revive the original row instead of creating a duplicate. Email match is
   // case-insensitive (ilike) — emails are case-insensitive per RFC.
@@ -127,8 +163,19 @@ export async function createMember({ gymId, branchId, name, phone, email }) {
     // Without this, the revived member logs in with role=null → AuthContext
     // signs them out + shows "not a member". RPC is owner-scoped + idempotent,
     // and a no-op when the member never signed up (members.user_id is null).
-    await supabase.rpc('relink_member_user_row', { p_member_id: existingId })
-      .then(({ error: e }) => { if (e) console.warn('relink_member_user_row:', e.message) })
+    //
+    // We THROW on failure rather than swallow — a missing RPC (forgot to
+    // apply the migration) or a permission issue leaves the system in a
+    // confusing half-state where members appear revived but can't log in.
+    // Better to fail loud and surface the misconfig to the owner.
+    const { error: relinkErr } = await supabase.rpc('relink_member_user_row', { p_member_id: existingId })
+    if (relinkErr) {
+      throw new Error(
+        `Member data revived, but couldn't re-activate their login account. ` +
+        `${relinkErr.message}. ` +
+        `(If you haven't applied the relink_member_user_row migration yet, run it now and retry.)`
+      )
+    }
 
     return data
   }
@@ -164,16 +211,61 @@ export async function updateMemberBranch({ memberId, branchId }) {
   return data
 }
 
+/**
+ * Compute the new join_date + expiry_date for a member when a plan is
+ * assigned or renewed. Uses anchor-with-grace:
+ *
+ *   - No prior plan → anchor = today (fresh sign-up).
+ *   - Active renewal (currentExpiry in the future) → anchor = currentExpiry
+ *     so renewals stack on top of unused days. A 30-day plan with 10 days
+ *     left becomes 40 days, not 30.
+ *   - Late renewal within one plan-duration of the old expiry → anchor =
+ *     currentExpiry. Member pays for the gap days (so the gym doesn't lose
+ *     revenue), which mirrors how Indian gyms actually bill late-payers.
+ *   - Gap longer than one plan duration → anchor = today. Treats it as a
+ *     fresh sign-up so the new expiry isn't nonsensically in the past.
+ *
+ * join_date is preserved when set; only assigned for first-time members.
+ */
+export function computeRenewalDates({ currentExpiry, planDuration, existingJoinDate }) {
+  const now = new Date()
+  const todayStr = now.toISOString().slice(0, 10)
+  let anchor
+  if (!currentExpiry) {
+    anchor = now
+  } else {
+    // Force UTC midnight so date arithmetic isn't shifted by local TZ.
+    const expiry = new Date(currentExpiry + 'T00:00:00Z')
+    const gapDays = Math.ceil((now.getTime() - expiry.getTime()) / 86_400_000)
+    anchor = gapDays > planDuration ? now : expiry
+  }
+  const newExpiry = new Date(anchor.getTime() + planDuration * 86_400_000)
+  return {
+    expiry_date: newExpiry.toISOString().slice(0, 10),
+    join_date: existingJoinDate || todayStr,
+  }
+}
+
 export async function assignPlan({ memberId, planId, durationDays }) {
-  const joinDate = new Date()
-  const expiryDate = new Date(joinDate.getTime() + durationDays * 24 * 60 * 60 * 1000)
+  // Fetch existing dates so renewals stack from currentExpiry instead of
+  // resetting to today — otherwise a member with 20 unused days who renews
+  // loses those 20 days. join_date is preserved across renewals so it keeps
+  // representing the original sign-up date.
+  const { data: m } = await supabase
+    .from('members').select('expiry_date, join_date').eq('id', memberId).maybeSingle()
+
+  const { expiry_date, join_date } = computeRenewalDates({
+    currentExpiry:    m?.expiry_date ?? null,
+    planDuration:     durationDays,
+    existingJoinDate: m?.join_date   ?? null,
+  })
 
   const { data, error } = await supabase
     .from('members')
     .update({
       plan_id: planId,
-      join_date: joinDate.toISOString().split('T')[0],
-      expiry_date: expiryDate.toISOString().split('T')[0],
+      join_date,
+      expiry_date,
       status: 'active',
     })
     .eq('id', memberId)
@@ -186,9 +278,9 @@ export async function assignPlan({ memberId, planId, durationDays }) {
 
 export async function updateMember({ memberId, name, phone, email }) {
   const updates = {}
-  if (name !== undefined) updates.name = name
-  if (phone !== undefined) updates.phone = phone || null
-  if (email !== undefined) updates.email = email || null
+  if (name  !== undefined) updates.name  = name
+  if (phone !== undefined) updates.phone = phone?.trim() || null
+  if (email !== undefined) updates.email = email?.trim().toLowerCase() || null
 
   const { data, error } = await supabase
     .from('members')
@@ -198,6 +290,15 @@ export async function updateMember({ memberId, name, phone, email }) {
     .single()
 
   if (error) throw error
+
+  // Mirror the change onto the linked users row so the member's auth
+  // profile (and anything that reads from it — Topbar avatar, MemberApp
+  // profile screen) stays in sync. RPC is owner-scoped + idempotent +
+  // a no-op when the member never signed up (members.user_id is null).
+  // Failure is non-fatal — members update already succeeded, log + move on.
+  const { error: syncErr } = await supabase.rpc('relink_member_user_row', { p_member_id: memberId })
+  if (syncErr) console.warn('updateMember: user-row sync failed:', syncErr.message)
+
   return data
 }
 

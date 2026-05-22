@@ -95,7 +95,7 @@ async function processMemberReminders(supabase: SupabaseClient) {
 
   const { data: members, error } = await supabase
     .from('members')
-    .select('id, gym_id, name, phone, expiry_date, plan:plans(id, name, price)')
+    .select('id, gym_id, branch_id, name, phone, expiry_date, plan:plans(id, name, price)')
     .in('expiry_date', targets)
     .eq('status', 'active')
     .is('deleted_at', null)
@@ -162,6 +162,7 @@ async function sendMemberReminder(
     const { error: insErr } = await supabase.from('payments').insert({
       id: paymentId,
       gym_id: gym.id,
+      branch_id: member.branch_id ?? null,
       member_id: member.id,
       plan_id: member.plan.id,
       amount: member.plan.price,
@@ -263,7 +264,8 @@ async function sendMemberReminder(
   }
 
   await supabase.from('payment_reminders').insert({
-    gym_id: gym.id, payment_id: paymentId!, member_id: member.id,
+    gym_id: gym.id, branch_id: member.branch_id ?? null,
+    payment_id: paymentId!, member_id: member.id,
     channel: 'whatsapp', provider: 'interakt',
     template_name: templateName,
     status: sendErr ? 'failed' : 'sent',

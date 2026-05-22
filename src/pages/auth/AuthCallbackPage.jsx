@@ -16,16 +16,16 @@ import { useAuth } from '../../store/AuthContext'
 import BrandLoader from '../../components/ui/BrandLoader'
 
 export default function AuthCallbackPage() {
-  const [status, setStatus]     = useState('processing') // 'processing' | 'error' | 'notMember'
+  const [status, setStatus] = useState('processing') // 'processing' | 'error' | 'notMember'
   const [errorMsg, setErrorMsg] = useState('')
   const [unknownGym, setUnknownGym] = useState(null)     // { name, slug, theme_color } when notMember
-  const navigate    = useNavigate()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // Optional gym context — set by GymJoinPage when the signup happened on a
   // gym's own join page. Used to render a friendly "not a member of {gym}"
   // screen instead of silently routing strangers to the owner onboarding.
-  const gymSlug   = searchParams.get('gym')
-  const returnTo  = searchParams.get('return')
+  const gymSlug = searchParams.get('gym')
+  const returnTo = searchParams.get('return')
   const { refreshProfile } = useAuth()
 
   useEffect(() => {
@@ -109,17 +109,34 @@ export default function AuthCallbackPage() {
               // them somewhere than block them with no recourse.
             }
 
+            // Phone preference order: member row's phone (owner entered
+            // it) > signup-form phone (user supplied via user_metadata).
+            // If the member row had no phone but the user provided one at
+            // signup, we ALSO backfill it onto the member row below so
+            // owner sees the contact in MembersPage going forward.
+            const signupPhone = user.user_metadata?.phone || null
+            const effectivePhone = memberRecord.phone || signupPhone || null
+
             await createUserProfile({
               authId: user.id,
               name: memberRecord.name,
               email: user.email,
-              phone: memberRecord.phone || null,
+              phone: effectivePhone,
               role: 'member',
               gymId: memberRecord.gym_id,
             })
             // Backfill the link both directions so future deleteMember can
             // find and clean up the auth profile cleanly.
             await linkMemberToAuthUser({ memberId: memberRecord.id, userId: user.id })
+            // Backfill members.phone from signup if the member row didn't
+            // already have one — so owner sees a contact phone in
+            // MembersPage and reminder cron jobs have somewhere to send.
+            if (!memberRecord.phone && signupPhone) {
+              await supabase.from('members')
+                .update({ phone: signupPhone })
+                .eq('id', memberRecord.id)
+                .then(({ error: e }) => { if (e) console.warn('phone backfill:', e.message) })
+            }
             await refreshProfile()
             navigate(safeReturn || '/member-app', { replace: true })
             return
@@ -337,13 +354,6 @@ export default function AuthCallbackPage() {
                 </a>
               </>
             )}
-
-            <p className="text-[11px] text-gray-400 mt-5 pt-4 border-t border-gray-100">
-              Looking to start your own gym instead?{' '}
-              <a href="/create-gym" className="text-violet-600 font-medium hover:text-violet-800">
-                Create a gym
-              </a>
-            </p>
           </div>
         </div>
       </div>

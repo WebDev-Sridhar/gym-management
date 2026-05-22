@@ -16,7 +16,7 @@ import {
 } from '../../services/programsService'
 import { assignTrainerToMember } from '../../services/trainerService'
 import { supabaseData as supabase } from '../../services/supabaseClient'
-import { markPaymentPaid } from '../../services/paymentService'
+import { markPaymentPaid, recordManualPayment, deletePayment, canDeletePayment } from '../../services/paymentService'
 import { sendPaymentReminder, fetchLastReminders } from '../../services/reminderService'
 import CustomSelect from './CustomSelect'
 
@@ -199,6 +199,9 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
   const [changingPlan, setChangingPlan] = useState(false)
   const [selPlanId, setSelPlanId]       = useState(member.plan_id || '')
   const [savingPlan, setSavingPlan]     = useState(false)
+  // Plan-payment state — only meaningful while changingPlan is open
+  const [alreadyPaid, setAlreadyPaid]       = useState(false)
+  const [paymentMethod, setPaymentMethod]   = useState('cash')
   const [assignType, setAssignType]     = useState(null)   // 'workout' | 'diet' | null
   const [needsConfirm, setNeedsConfirm] = useState(false)  // duplicate-plan warning visible
   const [templates, setTemplates]       = useState([])
@@ -218,8 +221,28 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
     setSavingPlan(true)
     try {
       await assignMembershipPlan({ memberId: member.id, planId: plan.id, durationDays: plan.duration_days })
+      // Every Save records a payment — including re-save of the same plan,
+      // so an owner who deleted a pending row can re-record by re-saving.
+      // recordManualPayment expires existing pendings first, so back-to-back
+      // saves with the (default) unticked box don't accumulate pending rows.
+      // Non-fatal: assignment already succeeded; if this errors the member
+      // still has the new plan, owner can record manually later.
+      try {
+        await recordManualPayment({
+          gymId,
+          branchId: member.branch_id,
+          memberId: member.id,
+          planId: plan.id,
+          status: alreadyPaid ? 'paid' : 'pending',
+          paymentMethod: alreadyPaid ? paymentMethod : undefined,
+        })
+      } catch (payErr) {
+        console.error('recordManualPayment failed:', payErr)
+      }
       onMemberUpdate({ ...member, plan_id: plan.id, plan })
       setChangingPlan(false)
+      setAlreadyPaid(false)
+      setPaymentMethod('cash')
     } catch (err) { dialog.alert(err.message || 'Failed') }
     finally { setSavingPlan(false) }
   }
@@ -299,12 +322,51 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
                   label: `${p.name} — ₹${p.price} / ${p.duration_days}d`,
                 }))}
               />
+
+              {/* Payment row — shown for any save with a plan selected,
+                  including re-saving the same plan (so an owner who deleted
+                  a pending row can re-record by re-saving). */}
+              {selPlanId && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={alreadyPaid}
+                      onChange={(e) => setAlreadyPaid(e.target.checked)}
+                      className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span>
+                      <span className="block text-xs font-semibold text-gray-900">Already paid</span>
+                      <span className="block text-[11px] text-gray-500 mt-0.5 leading-snug">
+                        {alreadyPaid
+                          ? 'Records a paid payment — counts as revenue now.'
+                          : 'Records a pending payment — owner can mark paid later.'}
+                      </span>
+                    </span>
+                  </label>
+                  {alreadyPaid && (
+                    <CustomSelect
+                      compact
+                      value={paymentMethod}
+                      onChange={setPaymentMethod}
+                      placeholder="Method"
+                      options={[
+                        { value: 'cash',          label: 'Cash' },
+                        { value: 'upi',           label: 'UPI' },
+                        { value: 'card',          label: 'Card' },
+                        { value: 'bank_transfer', label: 'Bank Transfer' },
+                      ]}
+                    />
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <button onClick={handleSavePlan} disabled={!selPlanId || savingPlan}
                   className="flex-1 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 cursor-pointer disabled:opacity-50">
                   {savingPlan ? 'Saving…' : 'Save'}
                 </button>
-                <button onClick={() => setChangingPlan(false)}
+                <button onClick={() => { setChangingPlan(false); setAlreadyPaid(false); setPaymentMethod('cash') }}
                   className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 cursor-pointer">
                   Cancel
                 </button>
@@ -478,6 +540,11 @@ function PaymentsTab({ member, gymId }) {
   const [payMethod, setPayMethod]           = useState('cash')
   const [reminderBusy, setReminderBusy]     = useState(null)
   const [lastReminders, setLastReminders]   = useState(new Map())
+  // Inline toast under the Mark/Remind row. Auto-clears after 4s. Holds
+  // { paymentId, kind: 'success' | 'error', message } so the toast only
+  // shows on the row that triggered it (in case we add multi-row UI later).
+  const [reminderToast, setReminderToast]   = useState(null)
+  const [deletingId, setDeletingId]         = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -507,9 +574,71 @@ function PaymentsTab({ member, gymId }) {
 
   async function handleRemind(paymentId) {
     setReminderBusy(paymentId)
-    try { await sendPaymentReminder({ paymentId }) }
-    catch (err) { dialog.alert(err.message || 'Failed to send reminder') }
-    finally { setReminderBusy(null) }
+    setReminderToast(null)
+    try {
+      const res = await sendPaymentReminder({ paymentId })
+      // The edge function returns 200 even when Interakt itself failed —
+      // it logs the attempt and surfaces whatsappSent=false. Treat that as
+      // a failure for the user so they don't think the message went out.
+      if (res?.whatsappSent === false) {
+        setReminderToast({
+          paymentId,
+          kind: 'error',
+          message: res.whatsappError || 'WhatsApp delivery failed',
+        })
+      } else {
+        setReminderToast({
+          paymentId,
+          kind: 'success',
+          message: 'Reminder sent via WhatsApp',
+        })
+        // Refresh the lastReminders cache so the "Last reminder: just now"
+        // line updates and the Remind button flips to its 24h-cooldown state.
+        try {
+          const reminders = await fetchLastReminders(gymId)
+          setLastReminders(reminders)
+        } catch { /* non-fatal */ }
+      }
+    } catch (err) {
+      setReminderToast({
+        paymentId,
+        kind: 'error',
+        message: err.message || 'Failed to send reminder',
+      })
+    } finally {
+      setReminderBusy(null)
+    }
+  }
+
+  // Auto-clear the inline toast after 4s. Effect re-fires whenever a new
+  // toast lands; clearing on unmount avoids the late-tick warning.
+  useEffect(() => {
+    if (!reminderToast) return
+    const t = setTimeout(() => setReminderToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [reminderToast])
+
+  async function handleDeletePayment(p) {
+    // Louder warning when a member submitted payment evidence and is waiting
+    // for verification — deleting destroys their proof of attempting to pay.
+    const isVerificationPending = p.status === 'verification_pending'
+    const amount = Number(p.amount || 0).toLocaleString('en-IN')
+    const planName = p.plan?.name || 'plan'
+    const ok = await dialog.confirm(
+      isVerificationPending
+        ? `${member.name || 'This member'} submitted proof of paying ₹${amount} for ${planName} and is awaiting verification. Deleting will permanently remove their payment evidence — only continue if you've confirmed they did NOT actually pay.`
+        : `Delete this ₹${amount} ${p.status} payment? This cannot be undone.`
+    )
+    if (!ok) return
+    setDeletingId(p.id)
+    try {
+      await deletePayment(p.id)
+      setPayments(prev => prev.filter(x => x.id !== p.id))
+    } catch (err) {
+      dialog.alert(err.message || 'Failed to delete payment')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   if (loading) return (
@@ -574,7 +703,7 @@ function PaymentsTab({ member, gymId }) {
                   Confirm Paid
                 </button>
                 <button onClick={() => { setMarkingId(null); setPayMethod('cash') }}
-                  className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-white cursor-pointer">
+                  className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 cursor-pointer">
                   Cancel
                 </button>
               </div>
@@ -588,11 +717,22 @@ function PaymentsTab({ member, gymId }) {
               <button onClick={() => handleRemind(p.id)}
                 disabled={!canRemind || reminderBusy === p.id}
                 title={!member.phone ? 'No phone number' : sentToday ? 'Already sent today' : 'Send WhatsApp reminder'}
-                className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-white cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                 {reminderBusy === p.id ? 'Sending…' : 'Remind'}
               </button>
             </div>
           )
+        )}
+
+        {reminderToast?.paymentId === p.id && (
+          <div className={`flex items-start gap-2 px-3 py-2 rounded-lg text-[11px] font-medium ${
+            reminderToast.kind === 'success'
+              ? 'bg-green-50 border border-green-200 text-green-700'
+              : 'bg-red-50 border border-red-200 text-red-700'
+          }`}>
+            <span className="mt-px shrink-0">{reminderToast.kind === 'success' ? '✓' : '⚠'}</span>
+            <span className="leading-snug">{reminderToast.message}</span>
+          </div>
         )}
 
         {isPending && reminder?.last_sent_at && (
@@ -613,15 +753,32 @@ function PaymentsTab({ member, gymId }) {
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Payment History</p>
           <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 overflow-hidden">
             {history.map(p => (
-              <div key={p.id} className="flex items-center justify-between px-4 py-3 bg-white">
-                <div>
+              <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 bg-white">
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">₹{Number(p.amount).toLocaleString('en-IN')}</p>
                   <p className="text-[11px] text-gray-400 mt-0.5">{p.plan?.name || 'No plan'}</p>
                 </div>
-                <div className="text-right">
-                  <PayBadge status={p.status} />
-                  {p.payment_date && (
-                    <p className="text-[11px] text-gray-400 mt-1">{fmtDate(p.payment_date)}</p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right">
+                    <PayBadge status={p.status} />
+                    {p.payment_date && (
+                      <p className="text-[11px] text-gray-400 mt-1">{fmtDate(p.payment_date)}</p>
+                    )}
+                  </div>
+                  {canDeletePayment(p) && (
+                    <button
+                      type="button"
+                      title="Delete payment"
+                      disabled={deletingId === p.id}
+                      onClick={() => handleDeletePayment(p)}
+                      className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {deletingId === p.id ? (
+                        <span className="block w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 size={14} strokeWidth={2} />
+                      )}
+                    </button>
                   )}
                 </div>
               </div>

@@ -172,7 +172,7 @@ export default function TrainersPage() {
           onClick={() => { setShowForm(!showForm); setError('') }}
           className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
         >
-          {showForm ? 'Cancel' : '+ Add Trainer'}
+          {showForm ? 'Close' : '+ Add Trainer'}
         </button>
       </div>
 

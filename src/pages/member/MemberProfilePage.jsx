@@ -36,19 +36,23 @@ export default function MemberProfilePage() {
 
   async function handleLogout() {
     setLoggingOut(true)
-    // Snapshot the slug BEFORE logout — AuthContext gets cleared.
     const slug = gymSlug
-    try {
-      await logout()
-    } catch (e) {
-      console.error(e); setLoggingOut(false); return
+    const target = slug ? `/${slug}/login` : '/login'
+    // Sync-purge Supabase session tokens BEFORE the redirect. If we leave
+    // them and let async logout finish during navigation, the new page load
+    // can read a still-alive session before logout completes → loadProfile
+    // re-detects (e.g. neutered state) → another redirect → infinite loop.
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('gym:lastSlug')
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-')) localStorage.removeItem(key)
+        }
+      } catch { /* ignore */ }
     }
-    // HARD navigation. We can't use react-router's `navigate()` here
-    // because ProtectedRoute fires <Navigate to="/login"/> during render
-    // the instant `isAuthenticated` flips to false, beating our imperative
-    // call. `window.location.assign` leaves the React app entirely → the
-    // browser does a full page load to the gym's own portal, no race.
-    window.location.assign(slug ? `/${slug}/login` : '/login')
+    // Then navigate + fire logout in the background for server-side cleanup.
+    window.location.replace(target)
+    logout().catch(e => console.error('logout error during navigation:', e))
   }
 
   if (isLoading) return <ProfileSkeleton />

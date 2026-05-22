@@ -5,13 +5,21 @@ export default function TrainerSettingsPage() {
   const { profile, gymId, gymSlug, logout } = useAuth()
 
   async function handleLogout() {
-    // Snapshot the slug BEFORE logout — AuthContext gets cleared.
     const slug = gymSlug
-    try { await logout() } catch (e) { console.error(e); return }
-    // HARD navigation. ProtectedRoute's <Navigate to="/login"/> fires
-    // during render the moment session clears and beats any imperative
-    // react-router navigate(). window.location.assign sidesteps the race.
-    window.location.assign(slug ? `/${slug}/login` : '/login')
+    const target = slug ? `/${slug}/login` : '/login'
+    // Sync-purge Supabase session tokens BEFORE navigation so the next
+    // page load doesn't read a still-alive session and re-trigger another
+    // redirect (could otherwise infinite-loop the user).
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('gym:lastSlug')
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-')) localStorage.removeItem(key)
+        }
+      } catch { /* ignore */ }
+    }
+    window.location.replace(target)
+    logout().catch(e => console.error('logout error during navigation:', e))
   }
 
   if (!profile) return <SettingsSkeleton />

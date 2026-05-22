@@ -2,6 +2,7 @@
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import { fetchMembers, createMember, assignPlan, fetchPlans } from '../../services/membershipService'
+import { recordManualPayment } from '../../services/paymentService'
 import { fetchTrainers } from '../../services/trainerService'
 import CustomSelect from '../../components/ui/CustomSelect'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
@@ -22,7 +23,7 @@ function MembersSkeleton() {
       <Sk h={38} w={260} r={10} />
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex gap-4">
-          {['Member','Phone','Plan','Status','Actions'].map(c => <Sk key={c} h={12} w={80} />)}
+          {['Member', 'Phone', 'Plan', 'Status', 'Actions'].map(c => <Sk key={c} h={12} w={80} />)}
         </div>
         {Array(8).fill(0).map((_, i) => (
           <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-gray-50">
@@ -44,21 +45,24 @@ export default function MembersPage() {
   const [members, setMembers] = useState([])
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showAddForm, setShowAddForm]   = useState(false)
-  const [submitting, setSubmitting]     = useState(false)
-  const [error, setError]               = useState('')
-  const [filter, setFilter]             = useState('all')
-  const [search, setSearch]             = useState('')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
   const [drawerMember, setDrawerMember] = useState(null)
-  const [page, setPage]                 = useState(1)
+  const [page, setPage] = useState(1)
   const PAGE_SIZE = 10
 
-  const [newName, setNewName]     = useState('')
-  const [newPhone, setNewPhone]   = useState('')
-  const [newEmail, setNewEmail]   = useState('')
+  const [newName, setNewName] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newEmail, setNewEmail] = useState('')
   const [newPlanId, setNewPlanId] = useState('')
   const [newBranchId, setNewBranchId] = useState('')
-  const [trainers, setTrainers]   = useState([])
+  // Plan-payment state (only meaningful when newPlanId is set)
+  const [alreadyPaid, setAlreadyPaid] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [trainers, setTrainers] = useState([])
 
   // Default the add-member branch to the active view, or first branch if "all"
   useEffect(() => {
@@ -95,6 +99,14 @@ export default function MembersPage() {
     e.preventDefault()
     setError('')
     if (!newName.trim()) return setError('Name is required')
+    const phone = newPhone.trim()
+    const email = newEmail.trim()
+    if (!phone) return setError('Phone is required')
+    if (phone.length !== 10) return setError('Phone must be 10 digits')
+    if (!email) return setError('Email is required')
+    // Shape check — type=email already filters egregious garbage but an
+    // input that was typed then cleared can land here as just whitespace.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError('Enter a valid email address')
 
     setSubmitting(true)
     try {
@@ -110,11 +122,27 @@ export default function MembersPage() {
         const plan = plans.find((p) => p.id === newPlanId)
         if (plan) {
           member = await assignPlan({ memberId: member.id, planId: plan.id, durationDays: plan.duration_days })
+          // Record the corresponding payment so the plan price flows into
+          // revenue analytics. Non-fatal — if this errors we still ship the
+          // member; the owner can re-record from PaymentsPage later.
+          try {
+            await recordManualPayment({
+              gymId,
+              branchId: member.branch_id,
+              memberId: member.id,
+              planId: plan.id,
+              status: alreadyPaid ? 'paid' : 'pending',
+              paymentMethod: alreadyPaid ? paymentMethod : undefined,
+            })
+          } catch (payErr) {
+            console.error('recordManualPayment failed:', payErr)
+          }
         }
       }
 
       setMembers((prev) => [member, ...prev])
       setNewName(''); setNewPhone(''); setNewEmail(''); setNewPlanId('')
+      setAlreadyPaid(false); setPaymentMethod('cash')
       setShowAddForm(false)
     } catch (err) {
       setError(err.message || 'Failed to add member')
@@ -134,6 +162,14 @@ export default function MembersPage() {
   function daysLeft(expiryDate) {
     if (!expiryDate) return null
     return Math.ceil((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
+  }
+
+  // "New" badge — true when the member was created within the last 24 hours.
+  // Uses a rolling 24h window (not calendar-day) so a member added at 11pm
+  // doesn't lose the badge two hours later.
+  function isNewMember(createdAt) {
+    if (!createdAt) return false
+    return (Date.now() - new Date(createdAt).getTime()) < 86_400_000
   }
 
   const filteredMembers = members.filter((m) => {
@@ -168,10 +204,10 @@ export default function MembersPage() {
           <p className="text-sm text-gray-500 mt-0.5">{members.length} total member{members.length !== 1 ? 's' : ''}</p>
         </div>
         <button
-          onClick={() => { setShowAddForm(!showAddForm); setError(''); setNewPlanId('') }}
+          onClick={() => { setShowAddForm(!showAddForm); setError(''); setNewPlanId(''); setAlreadyPaid(false); setPaymentMethod('cash') }}
           className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
         >
-          {showAddForm ? 'Cancel' : '+ Add Member'}
+          {showAddForm ? 'Close' : '+ Add Member'}
         </button>
       </div>
 
@@ -186,11 +222,11 @@ export default function MembersPage() {
                 <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" autoFocus />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone <span className="text-red-500">*</span></label>
                 <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, ''))} placeholder="10-digit mobile" maxLength={10} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email <span className="text-red-500">*</span></label>
                 <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email address" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
               <div>
@@ -224,7 +260,48 @@ export default function MembersPage() {
                 </div>
               )}
             </div>
-            {error && !editingId && <p className="text-red-500 text-xs">{error}</p>}
+
+            {/* Payment row — only relevant when a plan is being assigned.
+                Unticked = pending payment (appears in Payments → Pending).
+                Ticked = paid payment (counts as revenue immediately). */}
+            {newPlanId && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={alreadyPaid}
+                    onChange={(e) => setAlreadyPaid(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-900">Already paid</span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      {alreadyPaid
+                        ? 'A paid payment will be recorded — counts as revenue from today.'
+                        : 'A pending payment will be created — appears in Payments → Pending.'}
+                    </span>
+                  </span>
+                </label>
+                {alreadyPaid && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment method</label>
+                    <CustomSelect
+                      value={paymentMethod}
+                      onChange={setPaymentMethod}
+                      placeholder="Select method..."
+                      options={[
+                        { value: 'cash', label: 'Cash' },
+                        { value: 'upi', label: 'UPI' },
+                        { value: 'card', label: 'Card' },
+                        { value: 'bank_transfer', label: 'Bank Transfer' },
+                      ]}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {error && <p className="text-red-500 text-xs">{error}</p>}
             <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2">
               {submitting && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               {submitting ? 'Adding...' : 'Add Member'}
@@ -269,7 +346,7 @@ export default function MembersPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {pagedMembers.map((member) => {
-                  const status    = getMemberStatus(member)
+                  const status = getMemberStatus(member)
                   const remaining = daysLeft(member.expiry_date)
                   return (
                     <tr key={member.id}
@@ -281,7 +358,17 @@ export default function MembersPage() {
                             {member.name?.charAt(0).toUpperCase() || '?'}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{member.name || 'Unnamed'}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-medium text-gray-900">{member.name || 'Unnamed'}</p>
+                              {isNewMember(member.created_at) && (
+                                <span
+                                  title={`Joined ${new Date(member.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+                                  className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold uppercase tracking-wider"
+                                >
+                                  New
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-400">{member.phone || member.email || 'No contact'}</p>
                           </div>
                         </div>
@@ -293,11 +380,10 @@ export default function MembersPage() {
                         }
                       </td>
                       <td className="px-5 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          status === 'active'  ? 'bg-green-50 text-green-700' :
-                          status === 'expired' ? 'bg-red-50 text-red-700'    :
-                          'bg-gray-100 text-gray-500'
-                        }`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status === 'active' ? 'bg-green-50 text-green-700' :
+                            status === 'expired' ? 'bg-red-50 text-red-700' :
+                              'bg-gray-100 text-gray-500'
+                          }`}>
                           {status.charAt(0).toUpperCase() + status.slice(1)}
                         </span>
                       </td>

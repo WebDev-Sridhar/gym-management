@@ -69,7 +69,8 @@ Deno.serve(async (req) => {
 
     // Resolve payment row + member + plan
     type PaymentRow = {
-      id: string; gym_id: string; member_id: string | null; plan_id: string | null
+      id: string; gym_id: string; branch_id: string | null
+      member_id: string | null; plan_id: string | null
       amount: number; status: string; razorpay_payment_link_id: string | null
       razorpay_link_url: string | null
       member: { id: string; name: string; phone: string | null } | null
@@ -80,7 +81,7 @@ Deno.serve(async (req) => {
     if (body.paymentId) {
       const { data, error } = await supabase
         .from('payments')
-        .select('id, gym_id, member_id, plan_id, amount, status, razorpay_payment_link_id, razorpay_link_url, member:members(id, name, phone), plan:plans(id, name, price)')
+        .select('id, gym_id, branch_id, member_id, plan_id, amount, status, razorpay_payment_link_id, razorpay_link_url, member:members(id, name, phone), plan:plans(id, name, price)')
         .eq('id', body.paymentId)
         .eq('gym_id', gymId)
         .single()
@@ -99,7 +100,7 @@ Deno.serve(async (req) => {
         .eq('id', body.planId).eq('gym_id', gymId).single()
       if (planErr || !plan) throw new HttpError(404, 'plan not found in this gym')
       const { data: member, error: memErr } = await supabase
-        .from('members').select('id, gym_id, name, phone')
+        .from('members').select('id, gym_id, branch_id, name, phone')
         .eq('id', body.memberId).eq('gym_id', gymId).single()
       if (memErr || !member) throw new HttpError(404, 'member not found in this gym')
 
@@ -110,6 +111,7 @@ Deno.serve(async (req) => {
         .insert({
           id: newPaymentId,
           gym_id: gymId,
+          branch_id: member.branch_id,
           member_id: member.id,
           plan_id: plan.id,
           amount: plan.price,
@@ -123,6 +125,7 @@ Deno.serve(async (req) => {
       payment = {
         id: newPaymentId,
         gym_id: gymId,
+        branch_id: member.branch_id ?? null,
         member_id: member.id,
         plan_id: plan.id,
         amount: plan.price,
@@ -252,6 +255,7 @@ Deno.serve(async (req) => {
     await Promise.all([
       supabase.from('payment_reminders').insert({
         gym_id: gymId,
+        branch_id: payment.branch_id,
         payment_id: payment.id,
         member_id: payment.member.id,
         channel: 'whatsapp',
@@ -265,6 +269,7 @@ Deno.serve(async (req) => {
       }),
       supabase.from('notifications').insert({
         gym_id: gymId,
+        branch_id: payment.branch_id,
         member_id: payment.member.id,
         type: 'payment_reminder',
         channels: ['whatsapp'],

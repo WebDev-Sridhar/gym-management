@@ -13,6 +13,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { getServiceClient, jsonResponse } from '../_shared/auth.ts'
 import { decryptSecret, byteaToBytes } from '../_shared/crypto.ts'
 import { hmacSha256Hex, timingSafeEqual } from '../_shared/razorpay.ts'
+import { extendMembership } from '../_shared/membershipExpiry.ts'
 
 interface RazorpayWebhookPayload {
   event: string
@@ -138,7 +139,7 @@ async function handlePaymentCaptured(
     .eq('gym_id', gymId).eq('status', 'pending')
     .select('id, member_id, plan_id').maybeSingle()
   if (payment?.plan_id && payment?.member_id) {
-    await assignPlan(supabase, payment.member_id, payment.plan_id)
+    await extendMembership(supabase, payment.member_id, payment.plan_id)
   }
 }
 
@@ -167,7 +168,7 @@ async function handlePaymentLinkPaid(
     .eq('gym_id', gymId).eq('status', 'pending')
     .select('id, member_id, plan_id').maybeSingle()
   if (payment?.plan_id && payment?.member_id) {
-    await assignPlan(supabase, payment.member_id, payment.plan_id)
+    await extendMembership(supabase, payment.member_id, payment.plan_id)
   }
 }
 
@@ -258,17 +259,3 @@ async function handleSubscriptionLinkPaid(
 
 // ─── Shared helper ───────────────────────────────────────────────────────
 
-async function assignPlan(
-  supabase: ReturnType<typeof getServiceClient>, memberId: string, planId: string,
-) {
-  const { data: plan } = await supabase.from('plans').select('duration_days').eq('id', planId).single()
-  const days = plan?.duration_days ?? 30
-  const join = new Date()
-  const expiry = new Date(join.getTime() + days * 24 * 60 * 60 * 1000)
-  await supabase.from('members').update({
-    plan_id: planId,
-    join_date: join.toISOString().slice(0, 10),
-    expiry_date: expiry.toISOString().slice(0, 10),
-    status: 'active',
-  }).eq('id', memberId)
-}

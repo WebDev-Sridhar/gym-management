@@ -16,7 +16,7 @@ import {
   Users, MessageSquare, ClipboardList, Zap, Copy, Check,
   ExternalLink, LogOut, Mail, Phone, MapPin, ChevronRight,
   Bell, HelpCircle, AlertTriangle, CheckCircle, Lock, Pencil, X,
-  Palette, Sun, Moon, Monitor,
+  Palette, Sun, Moon, Monitor,Megaphone,
 } from 'lucide-react'
 import { useTheme } from '../../store/ThemeContext'
 
@@ -440,7 +440,7 @@ export default function SettingsPage() {
               <QuickCard Icon={BarChart2}     label="Analytics"       to="/owner-dashboard/analytics"     color="violet"  />
               <QuickCard Icon={ClipboardList} label="Plans & Pricing" to="/owner-dashboard/plans"         color="amber"   />
               <QuickCard Icon={Globe}         label="Website Builder" to="/owner-dashboard/website"       color="sky"     />
-              <QuickCard Icon={MessageSquare} label="Communication"   to="/owner-dashboard/communication" color="rose"    />
+              <QuickCard Icon={Megaphone} label="Announcements"   to="/owner-dashboard/communication" color="rose"    />
             </div>
           </div>
 

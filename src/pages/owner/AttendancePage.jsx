@@ -258,7 +258,7 @@ export default function AttendancePage() {
               onClick={() => setShowCheckin(!showCheckin)}
               className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
             >
-              {showCheckin ? 'Cancel' : '+ Mark Check-in'}
+              {showCheckin ? 'Close' : '+ Mark Check-in'}
             </button>
           )}
         </div>

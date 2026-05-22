@@ -14,6 +14,7 @@ import {
 } from '../_shared/auth.ts'
 import { decryptSecret, byteaToBytes } from '../_shared/crypto.ts'
 import { hmacSha256Hex, timingSafeEqual } from '../_shared/razorpay.ts'
+import { extendMembership } from '../_shared/membershipExpiry.ts'
 
 interface Body {
   razorpayOrderId: string
@@ -95,9 +96,10 @@ Deno.serve(async (req) => {
 
     if (updErr) throw new Error(`update failed: ${updErr.message}`)
 
-    // Extend plan: if linked, assign to member
+    // Extend plan: if linked, assign to member with anchor-with-grace so
+    // active renewals stack on top of unused days instead of resetting.
     if (payment.plan_id && payment.member_id) {
-      await assignPlan(supabase, payment.member_id, payment.plan_id)
+      await extendMembership(supabase, payment.member_id, payment.plan_id)
     }
 
     return jsonResponse({ ok: true, paymentId: payment.id })
@@ -105,27 +107,3 @@ Deno.serve(async (req) => {
     return errorResponse(err)
   }
 })
-
-// Mirrors src/services/membershipService.js:assignPlan() — sets the member's
-// plan, join_date, expiry_date, and activates them.
-async function assignPlan(supabase: ReturnType<typeof getServiceClient>, memberId: string, planId: string) {
-  const { data: plan } = await supabase
-    .from('plans')
-    .select('duration_days')
-    .eq('id', planId)
-    .single()
-
-  const days = plan?.duration_days ?? 30
-  const join = new Date()
-  const expiry = new Date(join.getTime() + days * 24 * 60 * 60 * 1000)
-
-  await supabase
-    .from('members')
-    .update({
-      plan_id: planId,
-      join_date: join.toISOString().slice(0, 10),
-      expiry_date: expiry.toISOString().slice(0, 10),
-      status: 'active',
-    })
-    .eq('id', memberId)
-}

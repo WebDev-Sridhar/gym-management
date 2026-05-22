@@ -5,10 +5,14 @@ function toYYYYMM(iso)   { return iso?.substring(0, 7) }
 function toYYYYMMDD(iso) { return iso?.substring(0, 10) }
 
 export async function fetchRevenueAnalytics(gymId, startDate, endDate, branchId) {
+  // payment_date is timestamptz; comparing against a bare YYYY-MM-DD treats
+  // the endDate as 00:00:00 UTC and silently drops every payment made later
+  // in the day. Widen to the full end-of-day so today's revenue is included.
   const paidQ = applyBranchFilter(
     supabase.from('payments').select('amount, payment_date, payment_method')
       .eq('gym_id', gymId).eq('status', 'paid')
-      .gte('payment_date', startDate).lte('payment_date', endDate),
+      .gte('payment_date', startDate + 'T00:00:00')
+      .lte('payment_date', endDate   + 'T23:59:59.999Z'),
     branchId
   )
   const pendingQ = applyBranchFilter(
@@ -220,11 +224,14 @@ export async function fetchInactiveMembers(gymId, branchId) {
 }
 
 export async function fetchPaymentInsights(gymId, startDate, endDate, branchId) {
+  // Same end-of-day fix as fetchRevenueAnalytics — bare YYYY-MM-DD on a
+  // timestamptz column drops anything past midnight UTC of the end date.
   const paidQ = applyBranchFilter(
     supabase.from('payments')
       .select('amount, plan_id, member_id, member:members(name), plan:plans(name)')
       .eq('gym_id', gymId).eq('status', 'paid')
-      .gte('payment_date', startDate).lte('payment_date', endDate),
+      .gte('payment_date', startDate + 'T00:00:00')
+      .lte('payment_date', endDate   + 'T23:59:59.999Z'),
     branchId
   )
   const pendingQ = applyBranchFilter(

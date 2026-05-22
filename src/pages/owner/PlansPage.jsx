@@ -190,7 +190,7 @@ export default function PlansPage() {
           onClick={() => setShowCreate(v => !v)}
           className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
         >
-          {showCreate ? 'Cancel' : '+ New Plan'}
+          {showCreate ? 'Close' : '+ New Plan'}
         </button>
       </div>
 

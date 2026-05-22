@@ -3,6 +3,7 @@ import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import { fetchPayments } from '../../services/paymentService'
 import { fetchMembers, fetchPlans, fetchGymDetails } from '../../services/membershipService'
+import { sendPaymentReminder } from '../../services/reminderService'
 
 import CustomSelect from '../../components/ui/CustomSelect'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
@@ -128,12 +129,8 @@ export default function PaymentsPage() {
     try {
       const result = await sendPaymentReminder({ memberId: member.id, planId: plan.id })
       setGeneratedLink(result.payLink)
-      const [updated, reminders] = await Promise.all([
-        fetchPayments(gymId, selectedBranchId),
-        fetchLastReminders(gymId, selectedBranchId).catch(() => new Map()),
-      ])
+      const updated = await fetchPayments(gymId, selectedBranchId)
       setPayments(updated)
-      setLastReminders(reminders)
     } catch (err) {
       setError(err.message || 'Failed to create payment')
     } finally {
@@ -180,7 +177,7 @@ export default function PaymentsPage() {
           onClick={() => { setShowCollect(!showCollect); resetCollect() }}
           className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
         >
-          {showCollect ? 'Cancel' : '+ Collect Payment'}
+          {showCollect ? 'Close' : '+ Collect Payment'}
         </button>
       </div>
 
@@ -428,7 +425,7 @@ export default function PaymentsPage() {
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Plan</th>
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Amount</th>
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Date</th>
+                  <th className="hidden sm:table-cell text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -442,6 +439,11 @@ export default function PaymentsPage() {
                         <div>
                           <p className="text-sm font-medium text-gray-900">{payment.member?.name || 'Unknown'}</p>
                           <p className="text-xs text-gray-400">{payment.member?.phone || payment.member?.email || ''}</p>
+                          {/* Mobile-only date — the Date column is hidden below sm
+                              to keep the row from overflowing on phones. */}
+                          <p className="sm:hidden text-[11px] text-gray-400 mt-0.5">
+                            {new Date(payment.payment_date || payment.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -461,7 +463,7 @@ export default function PaymentsPage() {
                       </span>
                       {payment.payment_method && <p className="text-xs text-gray-400 mt-0.5 capitalize">{payment.payment_method}</p>}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="hidden sm:table-cell px-5 py-4">
                       <p className="text-sm text-gray-700">{new Date(payment.payment_date || payment.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     </td>
                   </tr>
