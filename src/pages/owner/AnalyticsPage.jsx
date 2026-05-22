@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
 import MemberDrawer from '../../components/ui/MemberDrawer'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
@@ -842,16 +843,19 @@ export default function AnalyticsPage() {
         </>
       )}
 
-      {drawerMember && (
-        <MemberDrawer
-          member={drawerMember}
-          gymId={gymId}
-          defaultTab="Info"
-          onClose={() => setDrawerMember(null)}
-          onUpdated={updated => setDrawerMember(updated)}
-          onDeleted={() => setDrawerMember(null)}
-        />
-      )}
+      <AnimatePresence>
+        {drawerMember && (
+          <MemberDrawer
+            key="drawer"
+            member={drawerMember}
+            gymId={gymId}
+            defaultTab="Info"
+            onClose={() => setDrawerMember(null)}
+            onUpdated={updated => setDrawerMember(updated)}
+            onDeleted={() => setDrawerMember(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useBranch } from '../../store/BranchContext'
 import { fetchMembers, createMember, assignPlan, fetchPlans } from '../../services/membershipService'
 import { recordManualPayment } from '../../services/paymentService'
 import { fetchTrainers } from '../../services/trainerService'
+import { AnimatePresence } from 'framer-motion'
 import CustomSelect from '../../components/ui/CustomSelect'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 import MemberDrawer from '../../components/ui/MemberDrawer'
@@ -409,18 +410,27 @@ export default function MembersPage() {
         </div>
       )}
 
-      {drawerMember && (
-        <MemberDrawer
-          member={drawerMember}
-          gymId={gymId}
-          plans={plans}
-          trainers={trainers}
-          defaultTab="Info"
-          onClose={() => setDrawerMember(null)}
-          onUpdated={updated => setMembers(prev => prev.map(m => m.id === updated.id ? updated : m))}
-          onDeleted={id => setMembers(prev => prev.filter(m => m.id !== id))}
-        />
-      )}
+      {/* AnimatePresence holds MemberDrawer mounted through its exit slide
+          when drawerMember becomes null, so the motion.div's `exit` prop
+          actually plays instead of the panel vanishing instantly. Stable key
+          "drawer" — switching between members re-uses the same panel
+          (in-place content swap via the drawer's internal useEffect on
+          member.id) instead of triggering a slide-out + slide-in. */}
+      <AnimatePresence>
+        {drawerMember && (
+          <MemberDrawer
+            key="drawer"
+            member={drawerMember}
+            gymId={gymId}
+            plans={plans}
+            trainers={trainers}
+            defaultTab="Info"
+            onClose={() => setDrawerMember(null)}
+            onUpdated={updated => setMembers(prev => prev.map(m => m.id === updated.id ? updated : m))}
+            onDeleted={id => setMembers(prev => prev.filter(m => m.id !== id))}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -389,12 +389,12 @@ export default function Topbar({ onMenuToggle }) {
       {isOwner && (
         <>
           {panelOpen && (
-            <div className="fixed inset-0 bg-black/10 z-40" onClick={() => setPanelOpen(false)} />
+            <div className="fixed inset-0 bg-black/10 z-[65]" onClick={() => setPanelOpen(false)} />
           )}
 
           <div
             ref={panelRef}
-            className="fixed top-0 right-0 h-full w-80 bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-in-out"
+            className="fixed top-0 right-0 h-full w-80 bg-white border-l border-gray-200 shadow-2xl z-[70] flex flex-col transition-transform duration-300 ease-in-out"
             style={{ transform: panelOpen ? 'translateX(0)' : 'translateX(100%)' }}
           >
             {/* Panel header */}

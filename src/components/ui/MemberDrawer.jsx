@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { motion } from 'framer-motion'
 import { useDialog } from './Dialog'
 import {
   X, Pencil, Trash2, Phone, Mail, Calendar, Clock,
   Dumbbell, Utensils, CreditCard, User, Plus, Archive,
-  TriangleAlert,
+  TriangleAlert, Link2, Check,
 } from 'lucide-react'
 import {
   updateMember, deleteMember,
@@ -530,6 +531,22 @@ function TemplateList({ templates, loading, savingId, onSelect, onCancel }) {
   )
 }
 
+// Resolve a pending payment's shareable link. Razorpay rows carry a hosted
+// payment-link URL directly; UPI rows route through our public /pay/{token}
+// page so the member can hit "I Paid" + confirm. Returns null when neither
+// path is available (e.g. a manual cash row).
+function getPayLink(p) {
+  if (p?.razorpay_link_url) return p.razorpay_link_url
+  if (p?.pay_token && typeof window !== 'undefined') {
+    return `${window.location.origin}/pay/${p.pay_token}`
+  }
+  return null
+}
+
+function canCopyPaymentLink(p) {
+  return (p?.status === 'pending' || p?.status === 'verification_pending') && !!getPayLink(p)
+}
+
 // ─── Payments Tab ─────────────────────────────────────────────────────────────
 
 function PaymentsTab({ member, gymId }) {
@@ -545,6 +562,9 @@ function PaymentsTab({ member, gymId }) {
   // shows on the row that triggered it (in case we add multi-row UI later).
   const [reminderToast, setReminderToast]   = useState(null)
   const [deletingId, setDeletingId]         = useState(null)
+  // Briefly flips the Copy-link button to a checkmark after a successful
+  // clipboard write. Resets via timeout in the click handler below.
+  const [copiedId, setCopiedId]             = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -617,6 +637,20 @@ function PaymentsTab({ member, gymId }) {
     const t = setTimeout(() => setReminderToast(null), 4000)
     return () => clearTimeout(t)
   }, [reminderToast])
+
+  async function handleCopyLink(p) {
+    const url = getPayLink(p)
+    if (!url) return
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedId(p.id)
+      setTimeout(() => setCopiedId((curr) => (curr === p.id ? null : curr)), 1800)
+    } catch {
+      // Clipboard API can fail in insecure contexts; fall back to alert so
+      // the owner can long-press + copy manually from the prompt.
+      dialog.alert(url)
+    }
+  }
 
   async function handleDeletePayment(p) {
     // Louder warning when a member submitted payment evidence and is waiting
@@ -709,17 +743,32 @@ function PaymentsTab({ member, gymId }) {
               </div>
             </div>
           ) : (
-            <div className="flex gap-2 pt-2 border-t border-gray-200">
-              <button onClick={() => setMarkingId(p.id)}
-                className="flex-1 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 cursor-pointer">
-                Mark Paid
-              </button>
-              <button onClick={() => handleRemind(p.id)}
-                disabled={!canRemind || reminderBusy === p.id}
-                title={!member.phone ? 'No phone number' : sentToday ? 'Already sent today' : 'Send WhatsApp reminder'}
-                className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-                {reminderBusy === p.id ? 'Sending…' : 'Remind'}
-              </button>
+            <div className="space-y-2 pt-2 border-t border-gray-200">
+              <div className="flex gap-2">
+                <button onClick={() => setMarkingId(p.id)}
+                  className="flex-1 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 cursor-pointer">
+                  Mark Paid
+                </button>
+                <button onClick={() => handleRemind(p.id)}
+                  disabled={!canRemind || reminderBusy === p.id}
+                  title={!member.phone ? 'No phone number' : sentToday ? 'Already sent today' : 'Send WhatsApp reminder'}
+                  className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                  {reminderBusy === p.id ? 'Sending…' : 'Remind'}
+                </button>
+              </div>
+              {canCopyPaymentLink(p) && (
+                <button
+                  type="button"
+                  onClick={() => handleCopyLink(p)}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-medium text-gray-500 hover:text-indigo-600 cursor-pointer transition-colors"
+                >
+                  {copiedId === p.id ? (
+                    <><Check size={12} strokeWidth={2.5} />Link copied</>
+                  ) : (
+                    <><Link2 size={12} strokeWidth={2} />Copy payment link</>
+                  )}
+                </button>
+              )}
             </div>
           )
         )}
@@ -765,6 +814,18 @@ function PaymentsTab({ member, gymId }) {
                       <p className="text-[11px] text-gray-400 mt-1">{fmtDate(p.payment_date)}</p>
                     )}
                   </div>
+                  {canCopyPaymentLink(p) && (
+                    <button
+                      type="button"
+                      title="Copy payment link"
+                      onClick={() => handleCopyLink(p)}
+                      className="p-1.5 text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer"
+                    >
+                      {copiedId === p.id
+                        ? <Check size={14} strokeWidth={2.5} className="text-emerald-600" />
+                        : <Link2 size={14} strokeWidth={2} />}
+                    </button>
+                  )}
                   {canDeletePayment(p) && (
                     <button
                       type="button"
@@ -881,10 +942,23 @@ export default function MemberDrawer({
 
   const panel = (
     <div data-theme-aware="true">
-      <div className="fixed inset-0 bg-black/25 z-40 backdrop-blur-[1px]" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.25 }}
+        className="fixed inset-0 bg-black/25 z-[65] backdrop-blur-[1px]"
+        onClick={onClose}
+      />
 
-      <div
-        className="fixed top-0 right-0 h-full z-50 flex flex-col bg-white shadow-2xl"
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        // Same curve the notification panel feels like (Tailwind's default
+        // ease-in-out, ~300ms) so both drawers slide identically.
+        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        className="fixed top-0 right-0 h-full z-[70] flex flex-col bg-white shadow-2xl"
         style={{ width: 440, maxWidth: '100vw' }}
         onClick={e => e.stopPropagation()}
       >
@@ -992,7 +1066,7 @@ export default function MemberDrawer({
             {tab === 'Payments' && <PaymentsTab member={local} gymId={gymId} />}
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   )
 

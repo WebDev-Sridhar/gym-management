@@ -1,9 +1,37 @@
 ﻿import { useState, useEffect, useRef } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import { fetchPayments } from '../../services/paymentService'
 import { fetchMembers, fetchPlans, fetchGymDetails } from '../../services/membershipService'
-import { sendPaymentReminder } from '../../services/reminderService'
+import { sendPaymentReminder, fetchLastReminders } from '../../services/reminderService'
+
+// Find the most recent reminder across every payment for this member.
+// Used to enforce one manual reminder per member per 24h, so the owner
+// can't accidentally spam the same member by re-submitting Create & Send.
+function lastReminderForMember(memberId, payments, lastReminders) {
+  let mostRecent = null
+  for (const p of payments) {
+    if (p.member_id !== memberId) continue
+    const r = lastReminders.get?.(p.id)
+    if (!r) continue
+    if (!mostRecent || new Date(r.last_sent_at) > new Date(mostRecent.last_sent_at)) {
+      mostRecent = r
+    }
+  }
+  return mostRecent
+}
+
+function fmtRelative(iso) {
+  if (!iso) return ''
+  const s = iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z'
+  const mins = Math.floor((Date.now() - new Date(s)) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
 
 import CustomSelect from '../../components/ui/CustomSelect'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
@@ -47,6 +75,7 @@ export default function PaymentsPage() {
   const [plans, setPlans] = useState([])
   const [gym, setGym] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [lastReminders, setLastReminders] = useState(new Map())
 
   const [showCollect, setShowCollect] = useState(false)
   const [memberSearch, setMemberSearch] = useState('')
@@ -75,10 +104,11 @@ export default function PaymentsPage() {
       fetchMembers(gymId, selectedBranchId),
       fetchPlans(gymId),
       fetchGymDetails(gymId),
+      fetchLastReminders(gymId, selectedBranchId).catch(() => new Map()),
     ])
-      .then(([pay, mem, pln, g]) => {
+      .then(([pay, mem, pln, g, rem]) => {
         if (cancelled) return
-        setPayments(pay); setMembers(mem); setPlans(pln); setGym(g)
+        setPayments(pay); setMembers(mem); setPlans(pln); setGym(g); setLastReminders(rem)
       })
       .catch((err) => console.error('Failed to load payments data:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -125,12 +155,24 @@ export default function PaymentsPage() {
     if (!member || !plan) return setError('Invalid selection')
     if (!member.phone) return setError('This member has no phone number — add one before sending')
 
+    // One manual reminder per member per 24h — protects members from accidental
+    // spam if the owner re-submits Create & Send (and avoids creating a second
+    // duplicate pending payment + Razorpay link the same day).
+    const recent = lastReminderForMember(member.id, payments, lastReminders)
+    if (recent && (Date.now() - new Date(recent.last_sent_at) < 86_400_000)) {
+      return setError(`A reminder was already sent to ${member.name} ${fmtRelative(recent.last_sent_at)}. You can send another after 24 hours.`)
+    }
+
     setSubmitting(true)
     try {
       const result = await sendPaymentReminder({ memberId: member.id, planId: plan.id })
       setGeneratedLink(result.payLink)
-      const updated = await fetchPayments(gymId, selectedBranchId)
+      const [updated, reminders] = await Promise.all([
+        fetchPayments(gymId, selectedBranchId),
+        fetchLastReminders(gymId, selectedBranchId).catch(() => new Map()),
+      ])
       setPayments(updated)
+      setLastReminders(reminders)
     } catch (err) {
       setError(err.message || 'Failed to create payment')
     } finally {
@@ -160,6 +202,11 @@ export default function PaymentsPage() {
   const selectedMember = members.find((m) => m.id === selectedMemberId)
   const selectedPlan = plans.find((p) => p.id === selectedPlanId)
   const autoSelectedPlan = selectedMemberId && selectedMember?.plan_id === selectedPlanId
+  const recentReminder = selectedMember
+    ? lastReminderForMember(selectedMember.id, payments, lastReminders)
+    : null
+  const onReminderCooldown = !!recentReminder
+    && (Date.now() - new Date(recentReminder.last_sent_at) < 86_400_000)
 
   if (loading) return <PaymentsSkeleton />
 
@@ -314,6 +361,11 @@ export default function PaymentsPage() {
                   {selectedMember.phone
                     ? <p className="text-xs text-gray-400 mt-0.5">via WhatsApp to {selectedMember.phone}</p>
                     : <p className="text-xs text-red-500 mt-0.5 font-medium">Member has no phone number — add it first</p>}
+                  {onReminderCooldown && (
+                    <p className="text-xs text-amber-700 mt-1 font-medium">
+                      Reminder already sent {fmtRelative(recentReminder.last_sent_at)} — wait 24 hours before sending another.
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -378,13 +430,14 @@ export default function PaymentsPage() {
             {!generatedLink && (
               <button
                 type="submit"
-                disabled={submitting}
-                className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                disabled={submitting || onReminderCooldown}
+                title={onReminderCooldown ? 'A reminder was sent to this member in the last 24 hours' : undefined}
+                className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {submitting && (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {submitting ? 'Sending...' : 'Create & Send via WhatsApp'}
+                {submitting ? 'Sending...' : onReminderCooldown ? 'Already sent today' : 'Create & Send via WhatsApp'}
               </button>
             )}
           </form>
@@ -476,18 +529,21 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      {drawerMember && (
-        <MemberDrawer
-          member={drawerMember}
-          gymId={gymId}
-          plans={plans}
-          trainers={[]}
-          defaultTab="Payments"
-          onClose={() => setDrawerMember(null)}
-          onUpdated={updated => setDrawerMember(updated)}
-          onDeleted={() => setDrawerMember(null)}
-        />
-      )}
+      <AnimatePresence>
+        {drawerMember && (
+          <MemberDrawer
+            key="drawer"
+            member={drawerMember}
+            gymId={gymId}
+            plans={plans}
+            trainers={[]}
+            defaultTab="Payments"
+            onClose={() => setDrawerMember(null)}
+            onUpdated={updated => setDrawerMember(updated)}
+            onDeleted={() => setDrawerMember(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

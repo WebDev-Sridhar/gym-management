@@ -381,7 +381,7 @@ export default function MemberApp() {
               <CreditCard size={18} color="#fbbf24" strokeWidth={2} />
             </div>
             <div style={{ flex: 1 }}>
-              <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: '13px' }}>Payment pending — ₹{(pending.amount / 100).toLocaleString('en-IN')}</p>
+              <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: '13px' }}>Payment pending — ₹{(pending.amount).toLocaleString('en-IN')}</p>
               <p style={{ color: 'rgba(251,191,36,0.6)', fontSize: '11px', marginTop: '1px' }}>Tap to complete your renewal</p>
             </div>
             <ChevronRight size={16} color="rgba(251,191,36,0.5)" strokeWidth={2} />

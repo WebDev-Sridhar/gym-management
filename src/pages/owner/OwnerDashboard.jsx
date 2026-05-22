@@ -209,7 +209,7 @@ export default function OwnerDashboard() {
           <p className="text-sm font-medium text-amber-800">
             Your subscription expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''} — renew to keep access.
           </p>
-          <button onClick={() => navigate('/billing')}
+          <button onClick={() => navigate('/owner-dashboard/subscription')}
             className="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors cursor-pointer shrink-0">
             Renew Now
           </button>

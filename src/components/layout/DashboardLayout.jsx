@@ -78,7 +78,11 @@ export default function DashboardLayout() {
         {/* Sidebar + content row below the topbar */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 inset-0">
+          {/* Extra bottom padding so the floating SupportWidget (~56px button
+              at bottom-5/right-5) doesn't overlap pagination or bottom-anchored
+              page content. The pb-24/pb-28 buffer applies across every owner
+              page since main is the shared scroll container. */}
+          <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 sm:pb-28 inset-0">
             <Outlet />
           </main>
         </div>
