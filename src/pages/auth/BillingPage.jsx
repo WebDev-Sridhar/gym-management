@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { createSubscriptionOrder, openSubscriptionCheckout } from '../../services/subscriptionService'
+import { nextRouteFor } from '../../lib/onboarding'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
 import OnboardingAccountBar from '../../components/auth/OnboardingAccountBar'
 
@@ -85,9 +86,12 @@ export default function BillingPage() {
     return <Navigate to="/login" replace />
   }
 
-  // No gym created yet
-  if (!loading && !gymId) {
-    return <Navigate to="/create-gym" replace />
+  // Route by the onboarding state machine. Covers null profile (→/create-gym),
+  // owner mid-onboarding (→/create-gym or stay on /billing), and already-
+  // subscribed (→/owner-dashboard) in one decision.
+  if (!loading) {
+    const next = nextRouteFor(profile)
+    if (next !== '/billing') return <Navigate to={next} replace />
   }
 
   const handleActivate = async () => {

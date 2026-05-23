@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { createGym, createUserProfile, updateGymOnboardingStep } from '../../services/userService'
+import { nextRouteFor } from '../../lib/onboarding'
 import { checkSlugAvailable } from '../../services/membershipService'
 import { buildNameSlug, buildNameCitySlug } from '../../lib/slug'
 import { useDebounce } from '../../hooks/useDebounce'
@@ -29,11 +30,11 @@ export default function CreateGymPage() {
     return <Navigate to="/login" replace />
   }
 
-  // Profile exists → redirect to the correct onboarding step
+  // Profile exists → redirect to wherever the onboarding state machine says
+  // the user should be. If that's still /create-gym, fall through and render.
   if (!loading && profile) {
-    const step = profile.onboarding_step
-    if (step === 'subscribed') return <Navigate to="/owner-dashboard" replace />
-    if (step === 'setup_done' || step === 'gym_created') return <Navigate to="/billing" replace />
+    const next = nextRouteFor(profile)
+    if (next !== '/create-gym') return <Navigate to={next} replace />
   }
 
   if (loading) {

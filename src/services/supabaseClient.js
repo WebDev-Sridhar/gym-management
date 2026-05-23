@@ -31,10 +31,16 @@ export const supabase = globalThis[AUTH_KEY] ||
 // Uses the `accessToken` option so it NEVER calls getSession() internally,
 // which means NO Navigator Lock contention. This is why dashboard pages
 // were hanging — every .from().select() was blocked waiting for the lock.
+//
+// IMPORTANT: return null (not '') when there's no session, so supabase-js's
+// fetchWithAuth — which does `(await getAccessToken()) ?? supabaseKey` —
+// can fall back to the anon key. Empty string isn't nullish, so the old
+// `|| ''` would send `Authorization: Bearer ` (empty) and the Supabase
+// gateway would reject any edge-function call with UNAUTHORIZED_NO_AUTH_HEADER.
 const DATA_KEY = '__supabase_data__'
 export const supabaseData = globalThis[DATA_KEY] ||
   (globalThis[DATA_KEY] = createClient(supabaseUrl, supabaseAnonKey, {
-    accessToken: async () => _accessToken || '',
+    accessToken: async () => _accessToken || null,
   }))
 
 // ── Public client (gym public pages, check-in) ──

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
-import EmailRequiredGuard from '../auth/EmailRequiredGuard'
 import SupportWidget from '../support/SupportWidget'
 import { BranchProvider } from '../../store/BranchContext'
 import {
@@ -68,8 +67,7 @@ export default function DashboardLayout() {
   const planName = subscription?.plan_name || 'Starter'
 
   return (
-    <EmailRequiredGuard>
-      <BranchProvider>
+    <BranchProvider>
       <div className="app-owner flex flex-col h-screen overflow-hidden" style={{ background: 'var(--app-canvas-bg)' }}>
 
         {/* Topbar — always full-width, no layout shift */}
@@ -199,7 +197,6 @@ export default function DashboardLayout() {
         <SupportWidget />
 
       </div>
-      </BranchProvider>
-    </EmailRequiredGuard>
+    </BranchProvider>
   )
 }

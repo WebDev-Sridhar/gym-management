@@ -105,12 +105,38 @@ const gymChildRoutes = (
 
 
 
-// Minimal Routes block rendered when the visitor lands on a tenant host
-// (iron-paradise.gymmobius.app or a verified custom domain). The whole
-// app is "just this gym" — no marketing, auth, dashboard routes here.
+// Routes block rendered when the visitor lands on a tenant host
+// (iron-paradise.gymmobius.app or a verified custom domain). No marketing
+// pages, no owner dashboard — the owner always uses the main host.
+//
+// `/auth/callback` and `/reset-password` are mounted as siblings of GymLayout
+// (not nested under it) so they render bare, without gym chrome. Required
+// on tenant hosts because Supabase email links use the originating host as
+// `redirectTo` — a member who signs up at iron-paradise.gymmobius.app
+// receives a confirmation link that lands at iron-paradise.gymmobius.app/auth/
+// callback. Without these routes, the link 404s.
+//
+// `/member-app` and `/trainer-dashboard` mounted here so that AuthCallback
+// (or any post-login navigation) on a tenant host can reach the user's
+// dashboard without leaving the tenant origin. Phase 2 added these — before
+// then, navigate('/member-app') on a subdomain matched nothing and left the
+// user on a blank page after signup confirmation. Owner dashboard NOT
+// mounted: owners belong on the main host.
 function TenantRoutes() {
   return (
     <Routes>
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/trainer-dashboard/*" element={
+        <ProtectedRoute allowedRoles={['trainer']}>
+          <TrainerLayout />
+        </ProtectedRoute>
+      } />
+      <Route path="/member-app/*" element={
+        <ProtectedRoute allowedRoles={['member']}>
+          <MemberLayout />
+        </ProtectedRoute>
+      } />
       <Route path="/" element={<GymLayout />}>
         {gymChildRoutes}
       </Route>

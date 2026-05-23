@@ -37,19 +37,6 @@ export async function signInWithEmail(email, password) {
   return data
 }
 
-// ─── Magic Link (passwordless email) ───
-
-/**
- * Send a magic link to an email address. User clicks the link and lands on /auth/callback.
- */
-export async function sendMagicLink(email) {
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-  })
-  if (error) throw error
-}
-
 /**
  * Re-send the email verification link for a signup that hasn't been
  * confirmed yet. Surfaced via the "Resend verification email" button on
@@ -93,42 +80,6 @@ export async function signInWithGoogle() {
   if (error) throw error
   return data
 }
-
-// ─── Account email management ───
-
-/**
- * Add (or change) the email on the current user's account.
- * Used by EmailRequiredGuard for legacy phone-only owners.
- * Triggers a confirmation email — user must click the link to finalize.
- */
-export async function addEmailToAccount(email) {
-  const { data, error } = await supabase.auth.updateUser({ email })
-  if (error) throw error
-  return data
-}
-
-// ─── Phone OTP (DEPRECATED) ───
-// SMS OTP is removed from the UI. These functions remain only so any
-// in-flight references don't crash before the next release ships.
-// Do NOT use in new code.
-
-/** @deprecated Phone OTP is removed. Use signInWithGoogle or sendMagicLink instead. */
-export async function sendPhoneOtp(phone) {
-  const { error } = await supabase.auth.signInWithOtp({ phone })
-  if (error) throw error
-}
-
-/** @deprecated Phone OTP is removed. */
-export async function verifyPhoneOtp(phone, token) {
-  const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' })
-  if (error) throw error
-  return data
-}
-
-/** @deprecated alias for sendPhoneOtp. */
-export const sendOtp = sendPhoneOtp
-/** @deprecated alias for verifyPhoneOtp. */
-export const verifyOtp = verifyPhoneOtp
 
 // ─── Shared ───
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { createPlan, addTrainerInvite, updateGymOnboardingStep } from '../../services/userService'
+import { roleHome } from '../../lib/onboarding'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
 
 const PRESET_PLANS = [
@@ -30,20 +31,18 @@ export default function OnboardingPage() {
     return <Navigate to="/login" replace />
   }
 
-  // No gym yet → must create gym first
+  // OnboardingPage is an optional mid-flow screen that doesn't fit the
+  // strict state machine — owners with step 'setup_done' or 'gym_created'
+  // can use this OR go straight to /billing. Just guard the cases where
+  // the user clearly shouldn't be here.
   if (!loading && !gymId) {
     return <Navigate to="/create-gym" replace />
   }
-
-  // Already subscribed with active onboarding → dashboard
   if (!loading && profile?.onboarding_step === 'subscribed') {
     return <Navigate to="/owner-dashboard" replace />
   }
-
-  // Non-owner roles shouldn't be here
   if (!loading && profile?.role && profile.role !== 'owner') {
-    const routes = { trainer: '/trainer-dashboard', member: '/member-app' }
-    return <Navigate to={routes[profile.role] || '/'} replace />
+    return <Navigate to={roleHome(profile.role)} replace />
   }
 
   const handleSavePlan = async () => {

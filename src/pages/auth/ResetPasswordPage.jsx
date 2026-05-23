@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../../services/supabaseClient'
+import { isMainHost } from '../../lib/host'
 import PasswordInput from '../../components/ui/PasswordInput'
 import PasswordRequirements, { isPasswordValid, friendlyPasswordError } from '../../components/ui/PasswordRequirements'
+
+// Whitelist for the ?gym= query — only single-segment slugs (letters,
+// numbers, dashes). Stops a crafted "?gym=//evil.com" from being inserted
+// into the navigation path.
+function safeGymSlug(raw) {
+  if (!raw || typeof raw !== 'string') return null
+  return /^[a-z0-9-]+$/i.test(raw) ? raw : null
+}
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -13,6 +22,16 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState('')
   const [hasSession, setHasSession] = useState(true) // Track if the link is valid
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Optional gym context — set by GymLoginPage when the reset was triggered
+  // from a gym portal. Lets us bounce back to the gym's login after success
+  // instead of dumping the user on the SaaS owner login form.
+  //
+  // The /{slug}/login path only exists on the MAIN host. On tenant hosts
+  // (subdomain / custom domain), the gym is implicit and the login route is
+  // bare /login — adding a slug prefix there would 404 against TenantRoutes.
+  const gymSlug = safeGymSlug(searchParams.get('gym'))
+  const loginTarget = (gymSlug && isMainHost()) ? `/${gymSlug}/login` : '/login'
 
   const passwordOK = isPasswordValid(password)
   const confirmOK  = confirm.length > 0 && confirm === password
@@ -57,7 +76,7 @@ export default function ResetPasswordPage() {
       await supabase.auth.signOut()
 
       setTimeout(() => {
-        navigate('/login', { replace: true })
+        navigate(loginTarget, { replace: true })
       }, 3000)
 
     } catch (err) {
@@ -162,14 +181,14 @@ export default function ResetPasswordPage() {
             </form>
           ) : (
             <div className="text-center mt-6">
-               <Link to="/login" className="text-violet-600 font-bold hover:underline">
+               <Link to={loginTarget} className="text-violet-600 font-bold hover:underline">
                  Request a new reset link
                </Link>
             </div>
           )}
 
           <div className="mt-12 pt-8 border-t border-gray-100 text-center">
-             <Link to="/login" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+             <Link to={loginTarget} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
                Back to login
              </Link>
           </div>

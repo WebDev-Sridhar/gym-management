@@ -1,20 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
-import { signInWithEmail, resendEmailVerification, isEmailNotConfirmedError } from '../../services/authService'
+import { resendEmailVerification, isEmailNotConfirmedError } from '../../services/authService'
+import { signInAndSeed } from '../../services/auth/signInAndSeed'
 import { supabase, setAccessToken } from '../../services/supabaseClient'
 import PasswordInput from '../../components/ui/PasswordInput'
 import { useAuth } from '../../store/AuthContext'
-import {
-  fetchUserProfile,
-  createUserProfile,
-  findMemberByEmail,
-  findTrainerInviteByEmail,
-  claimTrainerInvite,
-  createTrainerRecord,
-  linkMemberToAuthUser,
-} from '../../services/userService'
-import { fetchGymById } from '../../services/gymPublicService'
+import { linkInviteOrMember } from '../../services/auth/linkInviteOrMember'
+import { roleHome } from '../../lib/onboarding'
 
 const inputStyle = {
   width: '100%',
@@ -103,112 +96,61 @@ export default function GymLoginPage() {
     setError('')
     setNeedsVerification(false)
     try {
-      const { user, session } = await signInWithEmail(email.trim(), password)
+      // signInAndSeed handles the "seed _accessToken before any data-client
+      // query" race that used to be inlined here — see the helper's comment.
+      const { user } = await signInAndSeed(email.trim(), password)
 
-      // Seed the data-client token NOW — AuthContext processes SIGNED_IN
-      // asynchronously, so _accessToken is still null at this point. Without
-      // this, supabaseData sends requests with no token and RLS blocks them,
-      // causing fetchUserProfile to return null even for existing users.
-      setAccessToken(session.access_token)
+      // Shared link logic — same call as AuthCallbackPage uses, with the
+      // expected gym pinned so cross-gym mismatches short-circuit cleanly.
+      // GymLoginPage does NOT enable the phone-fallback path (password
+      // login implies the user already has an email-based account).
+      const result = await linkInviteOrMember(user, {
+        expectedGymId: gym.id,
+      })
 
-      // ── 1. Check for an existing users-table profile ──────────────────────
-      let profile = await fetchUserProfile(user.id)
-
-      if (!profile) {
-        // ── 2. No profile yet — try member auto-detection ──────────────────
-        const memberRow = await findMemberByEmail(email.trim())
-        if (memberRow) {
-          // Cross-gym guard: this email is a member elsewhere, NOT here.
-          // Don't silently link to the wrong tenant — sign them out and tell
-          // them which gym's portal they actually belong to.
-          if (memberRow.gym_id !== gym.id) {
-            await supabase.auth.signOut().catch(() => {})
-            setAccessToken(null)
-            const otherGym = await fetchGymById(memberRow.gym_id).catch(() => null)
-            const otherName = otherGym?.name || 'another gym'
-            const otherSlug = otherGym?.slug
-            setError(
-              `This email is registered as a member of ${otherName}, not ${gym.name}. ` +
-              (otherSlug
-                ? `Sign in at /${otherSlug}/login instead, or join ${gym.name} from the pricing page.`
-                : `Sign in at the correct gym's portal instead.`)
-            )
-            return
-          }
-          profile = await createUserProfile({
-            authId: user.id,
-            name: memberRow.name,
-            phone: memberRow.phone || '',
-            email: email.trim(),
-            role: 'member',
-            gymId: memberRow.gym_id,
-          })
-          // Backfill members.user_id so future deleteMember can find this
-          // profile to clean up cleanly.
-          await linkMemberToAuthUser({ memberId: memberRow.id, userId: user.id })
+      // Cross-gym: sign out and surface a clear "wrong gym portal" message.
+      if (result.kind === 'cross_gym_member' || result.kind === 'cross_gym_trainer') {
+        await supabase.auth.signOut().catch(() => {})
+        setAccessToken(null)
+        const other = result.actualGym
+        if (result.kind === 'cross_gym_member') {
+          setError(
+            `This email is registered as a member of ${other?.name || 'another gym'}, not ${gym.name}. ` +
+            (other?.slug
+              ? `Sign in at /${other.slug}/login instead, or join ${gym.name} from the pricing page.`
+              : `Sign in at the correct gym's portal instead.`)
+          )
         } else {
-          // ── 3. Try trainer-invite detection ──────────────────────────────
-          const invite = await findTrainerInviteByEmail(email.trim())
-          if (invite) {
-            // Same cross-gym guard for trainers.
-            if (invite.gym_id !== gym.id) {
-              await supabase.auth.signOut().catch(() => {})
-              setAccessToken(null)
-              const otherGym = await fetchGymById(invite.gym_id).catch(() => null)
-              setError(
-                `Your trainer invite is for ${otherGym?.name || 'a different gym'}, not ${gym.name}. ` +
-                (otherGym?.slug ? `Sign in at /${otherGym.slug}/login instead.` : '')
-              )
-              return
-            }
-            profile = await createUserProfile({
-              authId: user.id,
-              name: invite.name,
-              phone: invite.phone || '',
-              email: email.trim(),
-              role: 'trainer',
-              gymId: invite.gym_id,
-            })
-            await Promise.all([
-              claimTrainerInvite(invite.id),
-              createTrainerRecord({ authId: user.id, gymId: invite.gym_id }),
-            ])
-          }
+          setError(
+            `Your trainer invite is for ${other?.name || 'a different gym'}, not ${gym.name}. ` +
+            (other?.slug ? `Sign in at /${other.slug}/login instead.` : '')
+          )
         }
+        return
       }
 
-      // ── 4. No profile + no member/trainer match, OR a "neutered" profile
-      // (former member whose role + gym_id were nulled by deleteMember).
-      // Don't silently route them into the owner-onboarding wizard (jarring
-      // UX — they thought they were joining THIS gym). Sign them out and
-      // tell them to either join via pricing or contact the gym owner.
-      if (!profile || !profile.role) {
+      // No match, OR an existing-but-neutered profile (former member whose
+      // role + gym_id were nulled by deleteMember). Don't silently route to
+      // owner onboarding — sign them out and tell them what to do.
+      const profile = result.profile
+      if (result.kind === 'no_match' || !profile || !profile.role) {
         await supabase.auth.signOut().catch(() => {})
         setAccessToken(null)
         setError(`We couldn't find you on ${gym.name}'s member list. Pick a plan from the pricing page to join, or ask the gym to add you.`)
         return
       }
 
-      // ── 5. Sync AuthContext with the newly-created profile BEFORE we
-      // navigate. Without this, ProtectedRoute on /member-app reads a stale
-      // null profile (AuthContext's own SIGNED_IN loadProfile hasn't finished
-      // yet) and bounces the user to /create-gym. Page only renders correctly
-      // after a manual refresh. This explicit refresh closes the race.
+      // Sync AuthContext with the (possibly new) profile BEFORE we navigate.
+      // Without this, ProtectedRoute on /member-app reads a stale null
+      // profile and bounces to /create-gym. Page only renders after a manual
+      // refresh. This explicit refresh closes the race.
       await refreshProfile()
 
-      // ── 6. Route based on confirmed role ─────────────────────────────────
-      // For members, honor a ?return= query param so flows like QR-code
-      // check-in can bounce the user back to where they were. Owners and
-      // trainers always go to their respective dashboards — return is only
-      // a member-side UX affordance.
-      const roleRoutes = {
-        owner:   '/owner-dashboard',
-        trainer: '/trainer-dashboard',
-        member:  '/member-app',
-      }
+      // Route based on confirmed role. Members honor ?return= so flows
+      // like QR-code check-in can bounce the user back to where they were.
       const target = (profile.role === 'member' && returnTo)
         ? returnTo
-        : (roleRoutes[profile.role] || '/owner-dashboard')
+        : roleHome(profile.role)
       navigate(target, { replace: true })
     } catch (err) {
       // Recognise Supabase's "Email not confirmed" rejection and switch
@@ -231,8 +173,13 @@ export default function GymLoginPage() {
     setError('')
     setSuccess('')
     try {
+      // Tag the reset link with the gym slug so ResetPasswordPage can route
+      // the user back to THIS gym's login after a successful reset, not the
+      // SaaS owner login. Without the tag, members from a path-based gym URL
+      // (gymmobius.app/iron-paradise/login) end up at /login (SaaS) after
+      // reset — wrong audience, wrong branding.
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/reset-password?gym=${encodeURIComponent(gym.slug)}`,
       })
       if (error) throw error
       setSuccess('Reset link sent — check your email.')

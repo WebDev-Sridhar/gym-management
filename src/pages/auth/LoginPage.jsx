@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { signInWithEmail, signInWithGoogle } from '../../services/authService'
+import { signInWithGoogle } from '../../services/authService'
+import { signInAndSeed } from '../../services/auth/signInAndSeed'
 import { useAuth } from '../../store/AuthContext'
 import { supabase } from '../../services/supabaseClient'
+import { fetchUserProfile } from '../../services/userService'
+import { nextRouteFor } from '../../lib/onboarding'
 import PasswordInput from '../../components/ui/PasswordInput'
 
 export default function LoginPage() {
@@ -59,9 +62,18 @@ export default function LoginPage() {
     setError('')
 
     try {
-      await signInWithEmail(email.trim(), password)
+      // signInAndSeed sets the data-client token before resolving, so
+      // fetchUserProfile below runs as the authed user instead of getting
+      // RLS-blocked under the anon-key fallback. (Used to be inlined here;
+      // extracted after this race was found in two separate login surfaces.)
+      const { user } = await signInAndSeed(email.trim(), password)
+      // Fetch the profile ourselves so we know where to send the user BEFORE
+      // navigating — otherwise non-owners would land on /owner-dashboard and
+      // ProtectedRoute would bounce them with a visible flash. refreshProfile
+      // updates AuthContext so the destination page sees fresh state.
+      const fresh = await fetchUserProfile(user.id)
       await refreshProfile()
-      navigate('/owner-dashboard', { replace: true })
+      navigate(nextRouteFor(fresh), { replace: true })
     } catch (err) {
       setError(err.message === "Invalid login credentials" ? "Invalid email or password" : err.message)
     } finally {

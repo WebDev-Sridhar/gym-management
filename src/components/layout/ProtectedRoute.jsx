@@ -1,8 +1,9 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
+import { nextRouteFor, roleHome } from '../../lib/onboarding'
 
 export default function ProtectedRoute({ allowedRoles, children }) {
-  const { isAuthenticated, profile, role, gymId, loading, initialized } = useAuth()
+  const { isAuthenticated, profile, role, loading, initialized } = useAuth()
 
   // Block ALL route decisions until the first auth check finishes.
   // Without this, a re-render between setSession() and loadProfile()
@@ -27,27 +28,20 @@ export default function ProtectedRoute({ allowedRoles, children }) {
     return <Navigate to="/create-gym" replace />
   }
 
-  // Owner-specific onboarding gate
+  // Owner-specific onboarding gate. nextRouteFor returns the path the user
+  // should be at — if it's anything other than /owner-dashboard, they're
+  // mid-onboarding and we bounce them to that step.
   if (role === 'owner') {
-    const step = profile.onboarding_step
-    if (!gymId || !step || step === 'started') {
-      return <Navigate to="/create-gym" replace />
+    const next = nextRouteFor(profile)
+    if (next !== '/owner-dashboard') {
+      return <Navigate to={next} replace />
     }
-    // Not yet subscribed (first-time onboarding) — send to billing flow
-    if (step === 'gym_created' || step === 'setup_done') {
-      return <Navigate to="/billing" replace />
-    }
-    // Subscription expired — stay in dashboard; upgrade banner handled in-app
+    // Subscription expired falls through (stays in dashboard, in-app banner)
   }
 
   // Role mismatch — send to the correct dashboard
   if (allowedRoles && !allowedRoles.includes(role)) {
-    const roleRoutes = {
-      owner: '/owner-dashboard',
-      trainer: '/trainer-dashboard',
-      member: '/member-app',
-    }
-    return <Navigate to={roleRoutes[role] || '/login'} replace />
+    return <Navigate to={roleHome(role)} replace />
   }
 
   return children

@@ -1,11 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
-
-const ROLE_HOME = {
-  owner:   '/owner-dashboard',
-  trainer: '/trainer-dashboard',
-  member:  '/member-app',
-}
+import { roleHome } from '../../lib/onboarding'
 
 export default function PublicRoute({ children }) {
   const { loading, initialized, isAuthenticated, role } = useAuth()
@@ -19,7 +14,7 @@ export default function PublicRoute({ children }) {
   }
 
   if (isAuthenticated && role) {
-    return <Navigate to={ROLE_HOME[role] ?? '/owner-dashboard'} replace />
+    return <Navigate to={roleHome(role)} replace />
   }
 
   return children

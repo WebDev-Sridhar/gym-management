@@ -1,18 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../../services/supabaseClient'
-import { fetchGymBySlug, fetchGymById } from '../../services/gymPublicService'
+import { supabase, setAccessToken } from '../../services/supabaseClient'
 import {
-  fetchUserProfile,
-  createUserProfile,
-  findMemberByEmail,
-  findMemberByPhone,
-  findTrainerInviteByEmail,
-  claimTrainerInvite,
-  createTrainerRecord,
-  linkMemberToAuthUser,
-} from '../../services/userService'
+  fetchGymBySlug,
+  fetchGymBySubdomain,
+  fetchGymByCustomDomain,
+} from '../../services/gymPublicService'
+import { fetchUserProfile } from '../../services/userService'
+import { linkInviteOrMember } from '../../services/auth/linkInviteOrMember'
 import { useAuth } from '../../store/AuthContext'
+import { nextRouteFor } from '../../lib/onboarding'
+import { detectHost } from '../../lib/host'
 import BrandLoader from '../../components/ui/BrandLoader'
 
 export default function AuthCallbackPage() {
@@ -42,6 +40,12 @@ export default function AuthCallbackPage() {
           async (event, newSession) => {
             if (event === 'SIGNED_IN' && newSession) {
               subscription.unsubscribe()
+              // Seed the data-client token BEFORE routeUser. AuthContext's
+              // own listener also fires SIGNED_IN but the ordering between
+              // it and us isn't guaranteed — if we run first and call any
+              // supabaseData query, RLS would reject under the anon-key
+              // fallback. See Blocker #1 for the same race in LoginPage.
+              setAccessToken(newSession.access_token)
               await routeUser(newSession.user)
             }
           }
@@ -54,6 +58,14 @@ export default function AuthCallbackPage() {
         return
       }
 
+      // Seed BEFORE routeUser — routeUser → linkInviteOrMember →
+      // fetchUserProfile uses supabaseData. Without this, the Google OAuth
+      // flow briefly mis-routed existing owners to /create-gym because
+      // fetchUserProfile returned null under the anon-key fallback (Phase 0
+      // changed empty-token to fall back to anon instead of empty Bearer).
+      // AuthContext.initAuth ALSO seeds in parallel, but the order between
+      // its useEffect and ours isn't deterministic — seed defensively here.
+      setAccessToken(session.access_token)
       await routeUser(session.user)
     } catch (err) {
       console.error('Auth callback error:', err)
@@ -64,9 +76,6 @@ export default function AuthCallbackPage() {
 
   async function routeUser(user) {
     try {
-      await refreshProfile()
-      const profile = await fetchUserProfile(user.id)
-
       // Safe-URL guard for ?return= (mirrors GymLoginPage's safeReturnUrl).
       const safeReturn = (() => {
         if (!returnTo || typeof returnTo !== 'string') return null
@@ -75,142 +84,54 @@ export default function AuthCallbackPage() {
         return returnTo
       })()
 
-      // Pre-resolve the gym they signed up FOR (if context tag present) so we
-      // can detect "member of a different gym" cases below.
+      // Pre-resolve the gym they signed up FOR (if context tag present) so
+      // we can detect "member of a different gym" cases via cross_gym_*.
+      // Falls back to host-derived resolution on tenant origins so cross-gym
+      // detection works for callbacks that don't carry an explicit ?gym tag
+      // (e.g. a future Google-OAuth button on a tenant host).
       let requestedGym = null
       if (gymSlug) {
         try { requestedGym = await fetchGymBySlug(gymSlug) } catch { /* ignore */ }
       }
-
-      if (!profile) {
-        // ── Auto-detect member or trainer by email ──────────────────────────
-        if (user.email) {
-          // 1. Check if this email belongs to a gym member
-          const memberRecord = await findMemberByEmail(user.email)
-          if (memberRecord) {
-            // Cross-gym mismatch: they signed up at /{gymSlug}/join but their
-            // member row is in a different gym. Don't silently link to the
-            // wrong tenant — show a "you're a member of X, not Y" screen.
-            if (requestedGym && memberRecord.gym_id !== requestedGym.id) {
-              const actualGym = await fetchGymById(memberRecord.gym_id).catch(() => null)
-              if (actualGym) {
-                setUnknownGym({
-                  name: requestedGym.name,
-                  slug: requestedGym.slug,
-                  theme_color: requestedGym.theme_color || '#8B5CF6',
-                  logo_url: requestedGym.logo_url || null,
-                  // Extra hint: where they SHOULD log in
-                  belongsTo: { name: actualGym.name, slug: actualGym.slug },
-                })
-                setStatus('notMember')
-                return
-              }
-              // Fall through if the other gym lookup failed — better to link
-              // them somewhere than block them with no recourse.
-            }
-
-            // Phone preference order: member row's phone (owner entered
-            // it) > signup-form phone (user supplied via user_metadata).
-            // If the member row had no phone but the user provided one at
-            // signup, we ALSO backfill it onto the member row below so
-            // owner sees the contact in MembersPage going forward.
-            const signupPhone = user.user_metadata?.phone || null
-            const effectivePhone = memberRecord.phone || signupPhone || null
-
-            await createUserProfile({
-              authId: user.id,
-              name: memberRecord.name,
-              email: user.email,
-              phone: effectivePhone,
-              role: 'member',
-              gymId: memberRecord.gym_id,
-            })
-            // Backfill the link both directions so future deleteMember can
-            // find and clean up the auth profile cleanly.
-            await linkMemberToAuthUser({ memberId: memberRecord.id, userId: user.id })
-            // Backfill members.phone from signup if the member row didn't
-            // already have one — so owner sees a contact phone in
-            // MembersPage and reminder cron jobs have somewhere to send.
-            if (!memberRecord.phone && signupPhone) {
-              await supabase.from('members')
-                .update({ phone: signupPhone })
-                .eq('id', memberRecord.id)
-                .then(({ error: e }) => { if (e) console.warn('phone backfill:', e.message) })
-            }
-            await refreshProfile()
-            navigate(safeReturn || '/member-app', { replace: true })
-            return
+      if (!requestedGym && typeof window !== 'undefined') {
+        const hostInfo = detectHost(window.location.hostname)
+        try {
+          if (hostInfo.kind === 'subdomain') {
+            requestedGym = await fetchGymBySubdomain(hostInfo.subdomain)
+          } else if (hostInfo.kind === 'custom') {
+            requestedGym = await fetchGymByCustomDomain(hostInfo.host)
           }
+        } catch { /* ignore — fall through to no expected gym */ }
+      }
 
-          // 2. Check if this email matches an unclaimed trainer invite
-          const trainerInvite = await findTrainerInviteByEmail(user.email)
-          if (trainerInvite) {
-            await createUserProfile({
-              authId: user.id,
-              name: trainerInvite.name,
-              email: user.email,
-              phone: trainerInvite.phone || null,
-              role: 'trainer',
-              gymId: trainerInvite.gym_id,
-            })
-            await Promise.all([
-              claimTrainerInvite(trainerInvite.id),
-              createTrainerRecord({ authId: user.id, gymId: trainerInvite.gym_id }),
-            ])
-            await refreshProfile()
-            navigate('/trainer-dashboard', { replace: true })
-            return
-          }
+      // Shared link logic: find existing profile, or try email-member,
+      // trainer-invite, phone-member fallback, with cross-gym detection.
+      const result = await linkInviteOrMember(user, {
+        expectedGymId: requestedGym?.id,
+        supportPhoneFallback: true,
+      })
 
-          // 2b. Phone-based fallback. Many Indian gyms add members by phone
-          //     only (no email on the member row). If GymJoinPage stashed a
-          //     phone in user_metadata, try matching that to a member row.
-          const metaPhone = user.user_metadata?.phone
-          if (metaPhone) {
-            const phoneMatch = await findMemberByPhone(metaPhone)
-            if (phoneMatch) {
-              // Cross-gym guard reused from email path.
-              if (requestedGym && phoneMatch.gym_id !== requestedGym.id) {
-                const actualGym = await fetchGymById(phoneMatch.gym_id).catch(() => null)
-                if (actualGym) {
-                  setUnknownGym({
-                    name: requestedGym.name,
-                    slug: requestedGym.slug,
-                    theme_color: requestedGym.theme_color || '#8B5CF6',
-                    logo_url: requestedGym.logo_url || null,
-                    belongsTo: { name: actualGym.name, slug: actualGym.slug },
-                  })
-                  setStatus('notMember')
-                  return
-                }
-              }
-              await createUserProfile({
-                authId: user.id,
-                name: phoneMatch.name,
-                email: user.email,
-                phone: phoneMatch.phone || metaPhone,
-                role: 'member',
-                gymId: phoneMatch.gym_id,
-              })
-              // Backfill the email AND user_id onto the member row so the
-              // owner sees the newly-linked email next to the phone in
-              // MembersPage, and so deleteMember can later find the user
-              // profile to clean up.
-              await supabase.from('members')
-                .update({ email: user.email, user_id: user.id })
-                .eq('id', phoneMatch.id)
-                .then(({ error: e }) => { if (e) console.warn('phone-link backfill:', e.message) })
-              await refreshProfile()
-              navigate(safeReturn || '/member-app', { replace: true })
-              return
-            }
-          }
+      // Cross-gym match — show the branded "wrong gym portal" screen.
+      if (result.kind === 'cross_gym_member' || result.kind === 'cross_gym_trainer') {
+        if (requestedGym && result.actualGym) {
+          setUnknownGym({
+            name: requestedGym.name,
+            slug: requestedGym.slug,
+            theme_color: requestedGym.theme_color || '#8B5CF6',
+            logo_url: requestedGym.logo_url || null,
+            belongsTo: { name: result.actualGym.name, slug: result.actualGym.slug },
+          })
+          setStatus('notMember')
+          return
         }
+        // actualGym lookup failed — fall through to the no_match path below
+        // so the user isn't blocked entirely on an infra hiccup.
+      }
 
-        // 3a. Email/phone don't match any member or trainer-invite, AND they
-        //     came from a gym join page (?gym=<slug> in the URL). Show a
-        //     friendly "we couldn't find you" screen — don't silently route
-        //     them into the owner-onboarding wizard which would be jarring UX.
+      // No match + came from a gym join page → branded "verified but not a
+      // member" screen. No match + no gym context → fresh-owner onboarding
+      // (also catches owners whose gym was cascade-deleted).
+      if (result.kind === 'no_match' || result.kind === 'cross_gym_member' || result.kind === 'cross_gym_trainer') {
         if (gymSlug) {
           try {
             const gym = await fetchGymBySlug(gymSlug)
@@ -224,40 +145,23 @@ export default function AuthCallbackPage() {
               setStatus('notMember')
               return
             }
-          } catch {
-            // gym lookup failed — fall through to owner onboarding rather
-            // than block the user entirely on an infra hiccup
-          }
+          } catch { /* fall through to owner onboarding */ }
         }
-
-        // 3b. No gym context — treat as a fresh owner. Covers:
-        //   a) Brand-new signup just confirmed their email — they haven't
-        //      hit /create-gym yet, so no profile exists yet.
-        //   b) Owner whose gym row was deleted (manual cleanup, account
-        //      deletion, etc.) and CASCADE removed their users row. The
-        //      auth.users record persists; they can recreate their gym.
         navigate('/create-gym', { replace: true })
         return
       }
 
-      // ── Existing user — route by role ────────────────────────────────────
-      if (profile.role === 'owner') {
-        const step = profile.onboarding_step
-        if (step === 'subscribed') {
-          navigate('/owner-dashboard', { replace: true })
-        } else if (step === 'setup_done' || step === 'gym_created') {
-          navigate('/billing', { replace: true })
-        } else {
-          navigate('/create-gym', { replace: true })
-        }
+      // result.kind is 'existing' | 'linked_member' | 'linked_trainer' →
+      // sync the AuthContext with the (possibly new) profile, then route.
+      await refreshProfile()
+      const profile = result.profile || await fetchUserProfile(user.id)
+
+      // Members honor ?return= for deep-link flows (e.g. QR check-in).
+      if (profile?.role === 'member' && safeReturn) {
+        navigate(safeReturn, { replace: true })
         return
       }
-
-      const roleRoutes = {
-        trainer: '/trainer-dashboard',
-        member: '/member-app',
-      }
-      navigate(roleRoutes[profile.role] || '/owner-dashboard', { replace: true })
+      navigate(nextRouteFor(profile), { replace: true })
     } catch (err) {
       console.error('Route user error:', err)
       setStatus('error')
