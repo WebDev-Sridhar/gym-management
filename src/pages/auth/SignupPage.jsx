@@ -46,6 +46,12 @@ export default function SignupPage() {
         return
       }
 
+      //       const identities = data?.user?.identities || []
+      // if (identities.length === 0) {
+      //   setError('An account with this email already exists. Try logging in.')
+      //   return
+      // }
+
       // Note on `data.user.identities.length === 0`: Supabase returns this
       // "shadow user" when the email is already registered. We used to flag
       // it as an error ("already exists, log in") — but for UNCONFIRMED
@@ -117,7 +123,7 @@ export default function SignupPage() {
             <p className="flex items-center gap-2"><span className="text-violet-400">✔</span> Setup in 2 mins</p>
           </div>
           <p className="text-white/30 text-xs uppercase tracking-widest">
-            © {new Date().getFullYear()} Gymmobius Core
+            © {new Date().getFullYear()} Gymmobius. All rights reserved.
           </p>
         </div>
       </div>
@@ -133,6 +139,9 @@ export default function SignupPage() {
           <OnboardingProgress currentStep={1} />
 
           <div className="mb-8 mt-6">
+                 <div className="w-12 h-auto lg:hidden flex items-center justify-center ">
+              <img src="/logo.png" alt="Gymmobius logo" className="w-full h-auto" />
+            </div>
             <h2 className="text-3xl font-bold text-gray-900">
               {step === 'info' ? 'Create Account' : 'Verify Email'}
             </h2>
@@ -251,7 +260,7 @@ export default function SignupPage() {
             </Link>
           </p>
           <p className="text-center text-xs text-gray-400 mt-2">
-            {'This page is for gym owners only. Members & trainers — use '}
+            {'This page is for gym owners only. Members & trainers — use gym portal '}
             <Link to="/login" className="text-violet-500 hover:underline">Login</Link>
             {'.'}
           </p>

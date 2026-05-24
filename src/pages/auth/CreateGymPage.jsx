@@ -132,7 +132,7 @@ export default function CreateGymPage() {
             <p className="text-sm text-white/80 italic">"Setting up my gym took less than 2 minutes. The automation is a game changer."</p>
           </div>
           <p className="text-white/30 text-xs uppercase tracking-widest">
-            © {new Date().getFullYear()} Gymmobius
+            © {new Date().getFullYear()} Gymmobius. All rights reserved.
           </p>
         </div>
       </div>

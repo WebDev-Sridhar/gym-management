@@ -11,6 +11,7 @@ import { canAccess } from '../../lib/featureGates'
 import { useDebounce } from '../../hooks/useDebounce'
 import { supabase } from '../../services/supabaseClient'
 import { Sk } from '../../components/ui/Skeleton'
+import PasswordRequirements, { isPasswordValid } from '../../components/ui/PasswordRequirements'
 import {
   User, Building2, ShieldCheck, CreditCard, Globe, BarChart2,
   Users, MessageSquare, ClipboardList, Zap, Copy, Check,
@@ -201,6 +202,14 @@ export default function SettingsPage() {
   const [sendingReset, setSendingReset] = useState(false)
   const [resetMsg, setResetMsg]         = useState({ text: '', type: 'success' })
 
+  // ── change password form ──
+  const [showPwForm, setShowPwForm]     = useState(false)
+  const [currentPw, setCurrentPw]       = useState('')
+  const [newPw, setNewPw]               = useState('')
+  const [confirmPw, setConfirmPw]       = useState('')
+  const [changingPw, setChangingPw]     = useState(false)
+  const [pwMsg, setPwMsg]               = useState({ text: '', type: 'success' })
+
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
     fetchGymDetails(gymId)
@@ -303,6 +312,33 @@ export default function SettingsPage() {
     } finally {
       setSendingReset(false)
       setTimeout(() => setResetMsg({ text: '', type: 'success' }), 6000)
+    }
+  }
+
+  async function changePassword() {
+    setPwMsg({ text: '', type: 'success' })
+    if (!currentPw) return setPwMsg({ text: 'Enter your current password.', type: 'error' })
+    if (!isPasswordValid(newPw)) return setPwMsg({ text: 'Password must include lowercase, uppercase letters and a number (min 8 chars).', type: 'error' })
+    if (newPw !== confirmPw) return setPwMsg({ text: 'Passwords do not match.', type: 'error' })
+    const userEmail = profile?.email || user?.email
+    setChangingPw(true)
+    try {
+      // Re-authenticate with the current password to verify it
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email: userEmail, password: currentPw })
+      if (signInErr) {
+        setPwMsg({ text: 'Current password is incorrect.', type: 'error' })
+        return
+      }
+      // Update to the new password
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPw })
+      if (updateErr) throw updateErr
+      setPwMsg({ text: 'Password updated successfully.', type: 'success' })
+      setCurrentPw(''); setNewPw(''); setConfirmPw('')
+      setTimeout(() => { setShowPwForm(false); setPwMsg({ text: '', type: 'success' }) }, 2500)
+    } catch (err) {
+      setPwMsg({ text: err.message || 'Failed to update password.', type: 'error' })
+    } finally {
+      setChangingPw(false)
     }
   }
 
@@ -864,39 +900,143 @@ export default function SettingsPage() {
             <CardHeader icon={Lock} title="Password & Security" />
             <div className="divide-y divide-gray-50">
 
-              {/* Change password */}
+              {/* Change password — only relevant for email/password accounts */}
+              {(user?.app_metadata?.provider ?? 'email') !== 'google' && (
               <div className="pb-5">
-                <p className="text-sm font-medium text-gray-800 mb-0.5">Change password</p>
-                <p className="text-xs text-gray-400 mb-3">
-                  A reset link will be sent to <span className="font-medium text-gray-600">{email}</span>.
-                </p>
-                <button
-                  onClick={sendReset}
-                  disabled={sendingReset}
-                  className="px-4 py-2 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:border-indigo-300 hover:text-indigo-700 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
-                >
-                  {sendingReset
-                    ? <><span className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />Sending…</>
-                    : <><Mail size={13} />Send reset link</>}
-                </button>
-                {resetMsg.text && (
-                  <p className={`flex items-center gap-1.5 text-xs font-medium mt-2 ${resetMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
-                    {resetMsg.type === 'success' ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
-                    {resetMsg.text}
-                  </p>
+                <div className="flex items-center justify-between mb-0.5">
+                  <p className="text-sm font-medium text-gray-800">Change password</p>
+                  {showPwForm && (
+                    <button
+                      onClick={() => { setShowPwForm(false); setCurrentPw(''); setNewPw(''); setConfirmPw(''); setPwMsg({ text: '', type: 'success' }) }}
+                      className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer flex items-center gap-1"
+                    >
+                      <X size={12} /> Cancel
+                    </button>
+                  )}
+                </div>
+
+                {!showPwForm ? (
+                  <>
+                    <p className="text-xs text-gray-400 mb-3">Update the password you use to sign in.</p>
+                    <button
+                      onClick={() => setShowPwForm(true)}
+                      className="px-4 py-2 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:border-indigo-300 hover:text-indigo-700 transition-colors cursor-pointer flex items-center gap-2"
+                    >
+                      <Lock size={13} /> Change password
+                    </button>
+                  </>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {/* Current password */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Current password</label>
+                      <input
+                        type="password"
+                        value={currentPw}
+                        onChange={e => setCurrentPw(e.target.value)}
+                        placeholder="Your current password"
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        autoFocus
+                      />
+                    </div>
+                    {/* New password */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">New password</label>
+                      <input
+                        type="password"
+                        value={newPw}
+                        onChange={e => setNewPw(e.target.value)}
+                        placeholder="Min. 8 characters"
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <PasswordRequirements value={newPw} visible={newPw.length > 0} />
+                    </div>
+                    {/* Confirm new password */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Confirm new password</label>
+                      <input
+                        type="password"
+                        value={confirmPw}
+                        onChange={e => setConfirmPw(e.target.value)}
+                        placeholder="Repeat new password"
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        onKeyDown={e => e.key === 'Enter' && changePassword()}
+                      />
+                    </div>
+
+                    {/* Feedback */}
+                    {pwMsg.text && (
+                      <p className={`flex items-center gap-1.5 text-xs font-medium ${pwMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                        {pwMsg.type === 'success' ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
+                        {pwMsg.text}
+                      </p>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        onClick={changePassword}
+                        disabled={changingPw}
+                        className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {changingPw
+                          ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Updating…</>
+                          : 'Update password'}
+                      </button>
+                    </div>
+
+                    {/* Forgot password fallback */}
+                    <div className="pt-2 border-t border-gray-50">
+                      <p className="text-xs text-gray-400 mb-1.5">Forgot your current password?</p>
+                      <button
+                        onClick={sendReset}
+                        disabled={sendingReset}
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {sendingReset
+                          ? <><span className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />Sending…</>
+                          : <><Mail size={11} />Send reset link to {profile?.email || user?.email}</>}
+                      </button>
+                      {resetMsg.text && (
+                        <p className={`flex items-center gap-1.5 text-xs font-medium mt-1.5 ${resetMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                          {resetMsg.type === 'success' ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
+                          {resetMsg.text}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
+              )}
 
               {/* Auth method */}
               <div className="py-5">
                 <p className="text-sm font-medium text-gray-800 mb-0.5">Authentication method</p>
                 <p className="text-xs text-gray-400 mb-3">How you sign in to Gymmobius</p>
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg w-fit">
-                  <div className="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center">
-                    <Mail size={9} className="text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-gray-700">Email & password</span>
-                </div>
+                {(() => {
+                  const provider = user?.app_metadata?.provider ?? 'email'
+                  const isGoogle = provider === 'google'
+                  return (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg w-fit">
+                      {isGoogle ? (
+                        <svg width="14" height="14" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                          <path fill="none" d="M0 0h48v48H0z"/>
+                        </svg>
+                      ) : (
+                        <div className="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center">
+                          <Mail size={9} className="text-white" />
+                        </div>
+                      )}
+                      <span className="text-xs font-medium text-gray-700">
+                        {isGoogle ? 'Google' : 'Email & password'}
+                      </span>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Session */}

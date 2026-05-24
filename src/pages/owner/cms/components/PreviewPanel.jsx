@@ -399,7 +399,7 @@ export default function PreviewPanel({ section, previewData, gym, plans = [], tr
           data-gym-theme={gym?.theme_mode || 'dark'}
           ref={scrollRef}
           style={{ ...themeVars, background: 'var(--gym-bg)', height: 'calc(100vh - 190px)', overflowY: 'auto' }}
-          className="md:w-full w-[calc(100vw-50px)]"
+          className="md:w-full w-[calc(100vw-40px)]"
         >
           {fontStack && (
             <style>{`.font-display { font-family: ${fontStack} !important; }`}</style>

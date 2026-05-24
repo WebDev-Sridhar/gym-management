@@ -74,6 +74,36 @@ export default function GymLoginPage() {
     return () => clearTimeout(id)
   }, [resetCooldown])
 
+  // Cross-tab password-reset detection.
+  // When the user clicks the reset link in a *new* tab, Supabase updates the
+  // password and fires USER_UPDATED via the shared localStorage session.
+  // supabase-js broadcasts this to ALL open tabs through its storage listener,
+  // so onAuthStateChange fires here too — even though the user didn't do
+  // anything on this tab.
+  // When we detect it we:
+  //   1. Clear the "Reset link sent" success banner so the old CTA is gone.
+  //   2. Flip back to the password step with a notice so the user knows their
+  //      password was already changed and they can sign in with the new one.
+  //   3. Immediately sign out the session Supabase just injected — this tab
+  //      wasn't the one the user intended to be logged into, and silently
+  //      keeping a session open here would be surprising.
+  useEffect(() => {
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
+      async (event) => {
+        if (event !== 'USER_UPDATED') return
+        // Sign out the injected session — this tab shouldn't silently inherit it.
+        await supabase.auth.signOut().catch(() => {})
+        // Reset UI to the password step with an informational notice.
+        setSuccess('')
+        setError('')
+        setResetCooldown(0)
+        setStep('password')
+        setSuccess('Your password was updated in another tab. You can now sign in with your new password.')
+      }
+    )
+    return () => authSub.unsubscribe()
+  }, [])
+
   if (!gym) return null
   const base = `/${gym.slug}`
   // Preserve the return URL when offering the "Create account" link.

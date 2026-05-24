@@ -172,6 +172,9 @@ export default function LoginPage() {
           </Link>
 
           <div className="mb-10">
+            <div className="w-12 h-auto lg:hidden flex items-center justify-center ">
+              <img src="/logo.png" alt="Gymmobius logo" className="w-full h-auto" />
+            </div>
             <h2 className="text-3xl font-bold text-gray-900">
               {step === 'forgot' ? 'Reset Password' : 'Welcome back'}
             </h2>

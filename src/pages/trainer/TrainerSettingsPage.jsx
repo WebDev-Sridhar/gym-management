@@ -33,7 +33,7 @@ function handleLogout() {
     //
     // We deliberately DON'T call AuthContext.logout() or supabase.auth
     // .signOut() — both would fire SIGNED_OUT → setProfile(null) →
-    // ProtectedRoute on /member-app would <Navigate to="/login"> BEFORE
+    // ProtectedRoute on /trainer-dashboard would <Navigate to="/login"> BEFORE
     // the browser navigation actually completes, producing a visible flash
     // of the SaaS /login page on its way to the gym login.
     //
