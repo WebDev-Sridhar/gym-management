@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
 import { resendEmailVerification, isEmailNotConfirmedError } from '../../services/authService'
@@ -60,6 +60,19 @@ export default function GymLoginPage() {
   // the user hasn't confirmed their email yet).
   const [needsVerification, setNeedsVerification] = useState(false)
   const [resendBusy, setResendBusy] = useState(false)
+  // Cooldown timer (seconds) for the "send reset link" button. Re-armed
+  // each time a reset email is dispatched. Prevents accidental spam — both
+  // for the initial send and for a reset link the user already clicked in
+  // a new tab (the original tab stays on the success screen until refresh).
+  const [resetCooldown, setResetCooldown] = useState(0)
+
+  // Recursive 1-second timer — counts down to 0, then stops. setTimeout +
+  // re-run on dep change is simpler than setInterval with cleanup tracking.
+  useEffect(() => {
+    if (resetCooldown <= 0) return
+    const id = setTimeout(() => setResetCooldown(s => s - 1), 1000)
+    return () => clearTimeout(id)
+  }, [resetCooldown])
 
   if (!gym) return null
   const base = `/${gym.slug}`
@@ -107,6 +120,17 @@ export default function GymLoginPage() {
       const result = await linkInviteOrMember(user, {
         expectedGymId: gym.id,
       })
+
+      // Owner using a gym portal — they belong on the SaaS owner login.
+      if (result.kind === 'owner_on_gym_portal') {
+        await supabase.auth.signOut().catch(() => {})
+        setAccessToken(null)
+        setError(
+          `This account is a gym owner. Owners sign in at the main Gymmobius login, not on a gym's member portal. ` +
+          `Go to the main site to access your dashboard.`
+        )
+        return
+      }
 
       // Cross-gym: sign out and surface a clear "wrong gym portal" message.
       if (result.kind === 'cross_gym_member' || result.kind === 'cross_gym_trainer') {
@@ -169,6 +193,10 @@ export default function GymLoginPage() {
 
   async function handleForgotPassword(e) {
     e.preventDefault()
+    // Cooldown gate — prevents accidental spam if the user double-clicks,
+    // or clicks "send" again on the original tab after already using the
+    // link in a new tab.
+    if (resetCooldown > 0) return
     setLoading(true)
     setError('')
     setSuccess('')
@@ -183,6 +211,7 @@ export default function GymLoginPage() {
       })
       if (error) throw error
       setSuccess('Reset link sent — check your email.')
+      setResetCooldown(30)   // arm the 30-second cooldown
     } catch (err) {
       setError(err.message || 'Something went wrong')
     } finally {
@@ -311,10 +340,14 @@ export default function GymLoginPage() {
                   onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}
                   onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }} />
               </div>
-              <button type="submit" disabled={loading}
-                className="w-full py-3 text-white font-bold rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity"
+              <button type="submit" disabled={loading || resetCooldown > 0}
+                className="w-full py-3 text-white font-bold rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                 style={{ background: 'var(--gym-gradient)', borderRadius: 'var(--gym-card-radius)' }}>
-                {loading ? 'Sending...' : 'Send Reset Link'}
+                {loading
+                  ? 'Sending...'
+                  : resetCooldown > 0
+                    ? `Resend in ${resetCooldown}s`
+                    : 'Send Reset Link'}
               </button>
               <button type="button" onClick={() => setStep('password')}
                 className="w-full text-sm cursor-pointer hover:opacity-80" style={{ color: 'var(--gym-text-muted)' }}>

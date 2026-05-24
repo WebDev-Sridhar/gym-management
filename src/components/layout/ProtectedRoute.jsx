@@ -5,10 +5,17 @@ import { nextRouteFor, roleHome } from '../../lib/onboarding'
 export default function ProtectedRoute({ allowedRoles, children }) {
   const { isAuthenticated, profile, role, loading, initialized } = useAuth()
 
-  // Block ALL route decisions until the first auth check finishes.
-  // Without this, a re-render between setSession() and loadProfile()
-  // completing can briefly satisfy !profile → redirect to /create-gym.
-  if (!initialized || loading) {
+  // Block route decisions until the very first auth check has finished —
+  // without this, a re-render between setSession() and loadProfile() could
+  // briefly satisfy !profile → redirect to /create-gym.
+  //
+  // But for SUBSEQUENT loads (background refresh, tab refocus, post-login
+  // refreshProfile), only show the spinner when we have no profile yet. If
+  // we already have one, render the dashboard and let the background load
+  // complete silently — otherwise email/pass login produced a visible
+  // "skeleton → spinner → content" flash because refreshProfile flipped
+  // loading=true after navigation completed.
+  if (!initialized || (loading && !profile)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">

@@ -51,9 +51,38 @@ export async function linkInviteOrMember(authUser, options = {}) {
     throw new Error('linkInviteOrMember: authUser.id is required')
   }
 
-  // 1. Already linked? Use the existing profile.
+  // 1. Already linked? Use the existing profile — BUT first guard against
+  //    "right user, wrong portal" cases when the caller pinned an expectedGymId
+  //    (typically: gym-portal login). Two sub-cases:
+  //
+  //    a) Owner using a gym portal. Owners belong on the SaaS login at
+  //       gymmobius.app. Signing them in here would navigate to
+  //       /owner-dashboard which doesn't even exist on tenant hosts (blank
+  //       page), and on the main host it'd take them to THEIR gym (not the
+  //       one whose portal they used) — confusing either way.
+  //
+  //    b) Member/trainer of a different gym. Without this check, a member of
+  //       gym A logging in via gym B's portal would be silently routed to
+  //       their own dashboard from B's portal — confusing UX, and a soft
+  //       cross-tenant leak in the wrong direction.
   const existing = await fetchUserProfile(authUser.id)
   if (existing) {
+    if (expectedGymId) {
+      if (existing.role === 'owner') {
+        return { kind: 'owner_on_gym_portal', profile: existing }
+      }
+      if (
+        existing.gym_id !== expectedGymId
+        && (existing.role === 'member' || existing.role === 'trainer')
+      ) {
+        const actualGym = await fetchGymById(existing.gym_id).catch(() => null)
+        return {
+          kind: existing.role === 'member' ? 'cross_gym_member' : 'cross_gym_trainer',
+          profile: existing,
+          actualGym,
+        }
+      }
+    }
     return { kind: 'existing', profile: existing }
   }
 

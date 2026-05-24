@@ -770,7 +770,7 @@ export default function SettingsPage() {
                   </button>
                 )}
 
-                {/* Row 3: Custom domain (Premium) */}
+                {/* Row 3: Custom domain (Enterprise) */}
                 {canAccess('custom_domain', subscription?.plan_name) ? (
                   gym.custom_domain && gym.domain_status === 'verified' ? (
                     <PublicUrlRow
@@ -835,10 +835,10 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-700">
-                        Custom domain <span className="text-[10px] font-bold ml-1 px-1.5 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded uppercase tracking-wide">Premium</span>
+                        Custom domain <span className="text-[10px] font-bold ml-1 px-1.5 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded uppercase tracking-wide">Enterprise</span>
                       </p>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        Use <span className="font-mono">yourgym.com</span> on the Premium plan.
+                        Use <span className="font-mono">yourgym.com</span> on the Enterprise plan.
                       </p>
                     </div>
                     <ChevronRight size={13} className="text-gray-300 group-hover:text-violet-500 shrink-0" />
@@ -890,7 +890,7 @@ export default function SettingsPage() {
               {/* Auth method */}
               <div className="py-5">
                 <p className="text-sm font-medium text-gray-800 mb-0.5">Authentication method</p>
-                <p className="text-xs text-gray-400 mb-3">How you sign in to GymMobius</p>
+                <p className="text-xs text-gray-400 mb-3">How you sign in to Gymmobius</p>
                 <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg w-fit">
                   <div className="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center">
                     <Mail size={9} className="text-white" />

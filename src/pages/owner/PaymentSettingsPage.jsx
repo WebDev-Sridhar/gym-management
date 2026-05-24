@@ -276,7 +276,7 @@ export default function PaymentSettingsPage() {
         >
           {savingMode ? 'Saving...' : 'Save mode'}
         </button>
-        <p className="text-sm text-green-500 mt-2">{success}</p>
+        <p className="text-sm text-green-600 mt-2">{success}</p>
         <p className="text-sm text-red-500 mt-2">{error}</p>
       </div>
 

@@ -169,7 +169,16 @@ export default function GymJoinPage() {
               <p className="text-sm mt-2 leading-relaxed" style={{ color: 'var(--gym-text-secondary)' }}>
                 {"If "}
                 <span className="font-semibold" style={{ color: 'var(--gym-text)' }}>{email}</span>
-                {" is new, a verification link is on its way. Click it to activate your account."}
+                {" doesn't already have an account, a verification link is on its way. Click it to activate."}
+              </p>
+              <p className="text-sm mt-3 leading-relaxed" style={{ color: 'var(--gym-text-secondary)' }}>
+                {"Already have an account at "}
+                <span className="font-semibold" style={{ color: 'var(--gym-text)' }}>{gym.name}</span>
+                {"? "}
+                <Link to={loginHref} className="font-semibold hover:opacity-80" style={{ color: 'var(--gym-text)' }}>
+                  Sign in instead
+                </Link>
+                {" — no new email gets sent if you're already verified."}
               </p>
             </div>
             {/* Resend with cooldown — replaces the old "Sign in instead"

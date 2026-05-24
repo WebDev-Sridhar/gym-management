@@ -111,6 +111,18 @@ export default function AuthCallbackPage() {
         supportPhoneFallback: true,
       })
 
+      // Owner authenticated via a tenant-host callback (e.g. Google OAuth
+      // from a subdomain). Their dashboard doesn't exist on tenant hosts —
+      // sign out and surface a clear error rather than navigating to a
+      // blank page.
+      if (result.kind === 'owner_on_gym_portal') {
+        await supabase.auth.signOut().catch(() => {})
+        setAccessToken(null)
+        setStatus('error')
+        setErrorMsg('This account is a gym owner. Sign in at the main Gymmobius site, not on a gym\'s portal.')
+        return
+      }
+
       // Cross-gym match — show the branded "wrong gym portal" screen.
       if (result.kind === 'cross_gym_member' || result.kind === 'cross_gym_trainer') {
         if (requestedGym && result.actualGym) {

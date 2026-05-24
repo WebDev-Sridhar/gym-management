@@ -7,7 +7,7 @@ import { BranchProvider } from '../../store/BranchContext'
 import {
   X, Home, LayoutDashboard, CreditCard, Globe,
   Users, UserCheck, QrCode, ClipboardList, BarChart2,
-  Megaphone, Settings, UserCircle, Gem, MessageSquare, HelpCircle, Dumbbell,
+  Megaphone, Settings, UserCircle, Gem, MessageSquare, HelpCircle, FolderKanban,
   MapPin,
 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
@@ -37,7 +37,7 @@ const MOBILE_NAV_SECTIONS = [
     label: 'MANAGE',
     links: [
       { to: '/owner-dashboard/plans',     label: 'Plans',     Icon: ClipboardList },
-      { to: '/owner-dashboard/programs',  label: 'Programs',  Icon: Dumbbell },
+      { to: '/owner-dashboard/programs',  label: 'Programs',  Icon: FolderKanban },
       { to: '/owner-dashboard/payments',  label: 'Payments',  Icon: CreditCard },
       { to: '/owner-dashboard/analytics', label: 'Analytics', Icon: BarChart2 },
       { to: '/owner-dashboard/branches',  label: 'Branches',  Icon: MapPin, feature: 'multi_branch' },

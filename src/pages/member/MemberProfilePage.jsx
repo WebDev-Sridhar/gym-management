@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { LogOut, CreditCard, ChevronRight, AlertTriangle, Clock, Loader2 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 import { useMemberData } from '../../store/MemberDataContext'
+import { isMainHost } from '../../lib/host'
 import ProfileSkeleton from '../../components/member/skeletons/ProfileSkeleton'
 
 const fadeUp = (delay = 0) => ({
@@ -37,7 +38,13 @@ export default function MemberProfilePage() {
   async function handleLogout() {
     setLoggingOut(true)
     const slug = gymSlug
-    const target = slug ? `/${slug}/login` : '/login'
+    // On the main host, prefix with the slug so the user lands on the
+    // gym-branded login at gymmobius.app/{slug}/login. On tenant hosts
+    // (subdomain / custom domain) the slug isn't part of the URL — use
+    // bare /login which resolves to GymLoginPage via TenantRoutes.
+    // Without this check, tenant-host logout would navigate to
+    // /{slug}/login → no route match → blank page → user lost.
+    const target = (slug && isMainHost()) ? `/${slug}/login` : '/login'
     // Sync-purge Supabase session tokens BEFORE the redirect. If we leave
     // them and let async logout finish during navigation, the new page load
     // can read a still-alive session before logout completes → loadProfile

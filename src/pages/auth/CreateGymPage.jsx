@@ -10,50 +10,26 @@ import OnboardingProgress from '../../components/ui/OnboardingProgress'
 import { LogOut, Check, Loader2 } from 'lucide-react'
 
 export default function CreateGymPage() {
+  // ── ALL HOOKS DECLARED UP FRONT ─────────────────────────────────────
+  // React requires the same hook calls every render in the same order.
+  // Before this fix, useState(slugStatus), useDebounce, and useEffect were
+  // declared AFTER the early-return guards — if `loading=true` on first
+  // render they didn't execute, and on the next render they did → hook
+  // count mismatch → "Rendered fewer hooks than expected" (React #300).
   const { user, profile, isAuthenticated, loading, refreshProfile, logout } = useAuth()
   const navigate = useNavigate()
 
-  const accountEmail = profile?.email || user?.email || ''
-  async function handleSignOut() {
-    await logout()
-    navigate('/login', { replace: true })
-  }
-
-  const [ownerName, setOwnerName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [gymName, setGymName] = useState('')
-  const [city, setCity] = useState('')
-  const [error, setError] = useState('')
+  const [ownerName, setOwnerName]   = useState('')
+  const [phone, setPhone]           = useState('')
+  const [gymName, setGymName]       = useState('')
+  const [city, setCity]             = useState('')
+  const [error, setError]           = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  if (!loading && !isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  // Profile exists → redirect to wherever the onboarding state machine says
-  // the user should be. If that's still /create-gym, fall through and render.
-  if (!loading && profile) {
-    const next = nextRouteFor(profile)
-    if (next !== '/create-gym') return <Navigate to={next} replace />
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  // ── Live URL preview ────────────────────────────────────────────────
-  // First-attempt slug = name only. If taken, createGym escalates to
-  // name+city, then to a random-suffix variant. The preview reflects
-  // exactly what we'll attempt first; if taken, we show the fallback.
-  const nameSlug   = buildNameSlug(gymName)
-  const cityFallback = buildNameCitySlug(gymName, city)
-  const debouncedNameSlug = useDebounce(nameSlug, 350)
-
   const [slugStatus, setSlugStatus] = useState('idle') // 'idle' | 'checking' | 'available' | 'taken'
+
+  const nameSlug          = buildNameSlug(gymName)
+  const cityFallback      = buildNameCitySlug(gymName, city)
+  const debouncedNameSlug = useDebounce(nameSlug, 350)
 
   useEffect(() => {
     if (!debouncedNameSlug || debouncedNameSlug === 'gym') {
@@ -68,8 +44,33 @@ export default function CreateGymPage() {
     return () => { cancelled = true }
   }, [debouncedNameSlug])
 
+  // ── Derived values (no hooks) ───────────────────────────────────────
+  const accountEmail = profile?.email || user?.email || ''
   // What the user will actually get if the name-only slug is taken
   const fallbackSlug = cityFallback || (nameSlug !== 'gym' ? `${nameSlug}-XXXX` : null)
+
+  async function handleSignOut() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
+  // ── Early returns AFTER all hooks ────────────────────────────────────
+  if (!loading && !isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+  // Profile exists → redirect to wherever the onboarding state machine says
+  // the user should be. If that's still /create-gym, fall through and render.
+  if (!loading && profile) {
+    const next = nextRouteFor(profile)
+    if (next !== '/create-gym') return <Navigate to={next} replace />
+  }
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -213,7 +214,7 @@ export default function CreateGymPage() {
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
               />
               {nameSlug && nameSlug !== 'gym' && (
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] flex-wrap">
+                <div className="mt-2 flex items-center gap-1.5 text-[11px]">
                   {slugStatus === 'checking' && (
                     <Loader2 size={11} className="text-gray-400 animate-spin" />
                   )}
@@ -221,7 +222,7 @@ export default function CreateGymPage() {
                     <Check size={11} className="text-emerald-600" strokeWidth={3} />
                   )}
                   {slugStatus === 'taken' && (
-                    <svg className="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                     </svg>
                   )}

@@ -39,19 +39,21 @@ export default function SignupPage() {
     setError('')
 
     try {
-      const { data, error: signUpError } = await signUpWithEmail(email.trim(), password)
+      const { error: signUpError } = await signUpWithEmail(email.trim(), password)
 
       if (signUpError) {
         setError(friendlyPasswordError(signUpError.message))
         return
       }
 
-      const identities = data?.user?.identities || []
-      if (identities.length === 0) {
-        setError('An account with this email already exists. Try logging in.')
-        return
-      }
-
+      // Note on `data.user.identities.length === 0`: Supabase returns this
+      // "shadow user" when the email is already registered. We used to flag
+      // it as an error ("already exists, log in") — but for UNCONFIRMED
+      // existing accounts Supabase silently sends a fresh confirmation link,
+      // so the error contradicted the email the user actually received.
+      // Anti-enumeration also means we can't distinguish unconfirmed from
+      // confirmed here. Forward to the confirm-email screen either way —
+      // it has a "Log in" link for users who already have a working account.
       setStep('confirm-email')
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')

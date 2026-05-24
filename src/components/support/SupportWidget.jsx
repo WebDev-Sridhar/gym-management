@@ -10,7 +10,7 @@ import {
 } from '../../services/supportService'
 import CustomSelect from '../ui/CustomSelect'
 import {
-  HelpCircle, X, Search, ArrowLeft, ChevronRight, Sparkles,
+  HelpCircle, X, Search, ArrowLeft, ChevronRight, Sparkles,BotMessageSquare,
   MessageCircle, CheckCircle2, AlertTriangle, ThumbsUp, ThumbsDown,
   Loader2, Send, ExternalLink, Rocket, CreditCard, Users, UserCheck,
   QrCode, Globe, MessageSquare, Crown, Lock,
@@ -376,7 +376,7 @@ export default function SupportWidget() {
                     </button>
                   ) : (
                     <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-                      <Sparkles size={15} />
+                      <BotMessageSquare size={16} />
                     </div>
                   )}
                   <div className="min-w-0">

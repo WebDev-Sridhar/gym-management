@@ -12,7 +12,7 @@ import FormModal from '../../components/ui/FormModal'
 import CustomSelect from '../../components/ui/CustomSelect'
 import { Sk } from '../../components/ui/Skeleton'
 import {
-  Search, Sparkles, ArrowRight, X, Send, ChevronRight, ChevronDown,
+  Search, Sparkles, ArrowRight, X, Send, ChevronRight, ChevronDown,BotMessageSquare,
   TrendingUp, HelpCircle, MessageCircle, CheckCircle2, AlertTriangle,
   ThumbsUp, ThumbsDown, RefreshCw, Image as ImageIcon, Loader2,
   // Category icons
@@ -399,7 +399,7 @@ export default function SupportPage() {
       <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-7 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center">
-            <Sparkles size={14} className="text-white" />
+            <BotMessageSquare size={16} className="text-white" />
           </div>
           <div>
             <p className="text-sm font-semibold text-gray-900">Gymmobius Assistant</p>

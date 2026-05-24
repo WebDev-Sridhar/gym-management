@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import {
   LayoutDashboard, Users, UserCheck, QrCode, ClipboardList, CreditCard,
-  BarChart2, Megaphone, MessageSquare, Settings, HelpCircle, Gem, Dumbbell,
+  BarChart2, Megaphone, MessageSquare, Settings, HelpCircle, Gem,FolderKanban,
   MapPin,
 } from 'lucide-react'
 import { canAccess } from '../../lib/featureGates'
@@ -26,7 +26,7 @@ const sections = [
     label: 'MANAGE',
     links: [
       { to: '/owner-dashboard/plans',     label: 'Plans',     Icon: ClipboardList },
-      { to: '/owner-dashboard/programs',  label: 'Programs',  Icon: Dumbbell },
+      { to: '/owner-dashboard/programs',  label: 'Programs',  Icon: FolderKanban },
       { to: '/owner-dashboard/payments',  label: 'Payments',  Icon: CreditCard },
       { to: '/owner-dashboard/analytics', label: 'Analytics', Icon: BarChart2 },
       { to: '/owner-dashboard/branches',  label: 'Branches',  Icon: MapPin, feature: 'multi_branch' },

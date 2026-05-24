@@ -1,4 +1,5 @@
 import { useAuth } from '../../store/AuthContext'
+import { isMainHost } from '../../lib/host'
 import SettingsSkeleton from '../../components/trainer/skeletons/SettingsSkeleton'
 
 export default function TrainerSettingsPage() {
@@ -6,7 +7,10 @@ export default function TrainerSettingsPage() {
 
   async function handleLogout() {
     const slug = gymSlug
-    const target = slug ? `/${slug}/login` : '/login'
+    // On the main host, prefix with the slug to land on the branded gym
+    // login (gymmobius.app/{slug}/login). On tenant hosts the slug isn't in
+    // the URL — use bare /login which resolves to GymLoginPage via TenantRoutes.
+    const target = (slug && isMainHost()) ? `/${slug}/login` : '/login'
     // Sync-purge Supabase session tokens BEFORE navigation so the next
     // page load doesn't read a still-alive session and re-trigger another
     // redirect (could otherwise infinite-loop the user).
