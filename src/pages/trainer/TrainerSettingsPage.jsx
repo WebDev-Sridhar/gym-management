@@ -1,19 +1,46 @@
 import { useAuth } from '../../store/AuthContext'
 import { isMainHost } from '../../lib/host'
 import SettingsSkeleton from '../../components/trainer/skeletons/SettingsSkeleton'
+import { useState } from 'react'
+import { LogOut, Loader2 } from 'lucide-react'
+import { motion } from 'framer-motion'
+
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { delay, type: 'spring', stiffness: 300, damping: 28 },
+})
+
 
 export default function TrainerSettingsPage() {
   const { profile, gymId, gymSlug, logout } = useAuth()
+  const [loggingOut, setLoggingOut] = useState(false)
 
-  async function handleLogout() {
+function handleLogout() {
+    setLoggingOut(true)
     const slug = gymSlug
-    // On the main host, prefix with the slug to land on the branded gym
-    // login (gymmobius.app/{slug}/login). On tenant hosts the slug isn't in
-    // the URL — use bare /login which resolves to GymLoginPage via TenantRoutes.
+    // On the main host, prefix with the slug so the user lands on the
+    // gym-branded login at gymmobius.app/{slug}/login. On tenant hosts
+    // (subdomain / custom domain) the slug isn't part of the URL — use
+    // bare /login which resolves to GymLoginPage via TenantRoutes.
     const target = (slug && isMainHost()) ? `/${slug}/login` : '/login'
-    // Sync-purge Supabase session tokens BEFORE navigation so the next
-    // page load doesn't read a still-alive session and re-trigger another
-    // redirect (could otherwise infinite-loop the user).
+
+    // Clear the session synchronously from this tab's localStorage. Storage
+    // events don't fire in the tab that made the change, so this does NOT
+    // trigger AuthContext.onAuthStateChange — no React state update, no
+    // re-render, no ProtectedRoute redirect. The window.location.replace
+    // below then navigates cleanly.
+    //
+    // We deliberately DON'T call AuthContext.logout() or supabase.auth
+    // .signOut() — both would fire SIGNED_OUT → setProfile(null) →
+    // ProtectedRoute on /member-app would <Navigate to="/login"> BEFORE
+    // the browser navigation actually completes, producing a visible flash
+    // of the SaaS /login page on its way to the gym login.
+    //
+    // Trade-off: the refresh token isn't revoked server-side; it lives out
+    // its natural TTL (~1 hour). Acceptable for a gym app — tokens are
+    // per-browser, not typically exfiltrated, and the user immediately
+    // signs into the gym portal anyway.
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('gym:lastSlug')
@@ -23,7 +50,6 @@ export default function TrainerSettingsPage() {
       } catch { /* ignore */ }
     }
     window.location.replace(target)
-    logout().catch(e => console.error('logout error during navigation:', e))
   }
 
   if (!profile) return <SettingsSkeleton />
@@ -93,19 +119,19 @@ export default function TrainerSettingsPage() {
         To update your profile, contact your gym owner
       </p>
 
-      {/* Sign out */}
-      <button
-        onClick={handleLogout}
-        style={{
-          width: '100%', padding: '14px', border: '1px solid rgba(248,113,113,0.2)',
-          borderRadius: 16, background: 'rgba(248,113,113,0.06)',
-          color: '#f87171', fontSize: 14, fontWeight: 700,
-          cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.1px',
-          transition: 'background 0.15s',
-        }}
-      >
-        Sign Out
-      </button>
+      {/* Logout */}
+      <motion.div {...fadeUp(0.24)}>
+        <button
+          onClick={handleLogout}
+          disabled={loggingOut}
+          style={{ width: '100%', padding: '15px', borderRadius: '16px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', color: '#f87171', fontSize: '14px', fontWeight: 700, cursor: loggingOut ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s', opacity: loggingOut ? 0.6 : 1 }}
+        >
+          {loggingOut
+            ? <><Loader2 size={16} style={{ animation: 'mspin .75s linear infinite' }} />Signing out…</>
+            : <><LogOut size={17} strokeWidth={2} />Sign Out</>
+          }
+        </button>
+      </motion.div>
 
       {/* Footer */}
       <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.14)', textAlign: 'center', margin: '4px 0 0', letterSpacing: '0.2px' }}>

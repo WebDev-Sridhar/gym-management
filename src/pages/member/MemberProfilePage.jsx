@@ -31,24 +31,35 @@ function StatBox({ value, label, accent }) {
 }
 
 export default function MemberProfilePage() {
-  const { profile, logout, gymSlug } = useAuth()
+  const { profile, gymSlug } = useAuth()
   const { member, attendance, pending, isLoading } = useMemberData()
   const [loggingOut, setLoggingOut] = useState(false)
 
-  async function handleLogout() {
+  function handleLogout() {
     setLoggingOut(true)
     const slug = gymSlug
     // On the main host, prefix with the slug so the user lands on the
     // gym-branded login at gymmobius.app/{slug}/login. On tenant hosts
     // (subdomain / custom domain) the slug isn't part of the URL — use
     // bare /login which resolves to GymLoginPage via TenantRoutes.
-    // Without this check, tenant-host logout would navigate to
-    // /{slug}/login → no route match → blank page → user lost.
     const target = (slug && isMainHost()) ? `/${slug}/login` : '/login'
-    // Sync-purge Supabase session tokens BEFORE the redirect. If we leave
-    // them and let async logout finish during navigation, the new page load
-    // can read a still-alive session before logout completes → loadProfile
-    // re-detects (e.g. neutered state) → another redirect → infinite loop.
+
+    // Clear the session synchronously from this tab's localStorage. Storage
+    // events don't fire in the tab that made the change, so this does NOT
+    // trigger AuthContext.onAuthStateChange — no React state update, no
+    // re-render, no ProtectedRoute redirect. The window.location.replace
+    // below then navigates cleanly.
+    //
+    // We deliberately DON'T call AuthContext.logout() or supabase.auth
+    // .signOut() — both would fire SIGNED_OUT → setProfile(null) →
+    // ProtectedRoute on /member-app would <Navigate to="/login"> BEFORE
+    // the browser navigation actually completes, producing a visible flash
+    // of the SaaS /login page on its way to the gym login.
+    //
+    // Trade-off: the refresh token isn't revoked server-side; it lives out
+    // its natural TTL (~1 hour). Acceptable for a gym app — tokens are
+    // per-browser, not typically exfiltrated, and the user immediately
+    // signs into the gym portal anyway.
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('gym:lastSlug')
@@ -57,9 +68,7 @@ export default function MemberProfilePage() {
         }
       } catch { /* ignore */ }
     }
-    // Then navigate + fire logout in the background for server-side cleanup.
     window.location.replace(target)
-    logout().catch(e => console.error('logout error during navigation:', e))
   }
 
   if (isLoading) return <ProfileSkeleton />
