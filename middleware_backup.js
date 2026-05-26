@@ -32,7 +32,7 @@ export const config = {
   ],
 }
 
-const MAIN_DOMAIN = process.env.VITE_MAIN_DOMAIN || process.env.MAIN_DOMAIN || 'gymmobius.app'
+const MAIN_DOMAIN = process.env.VITE_MAIN_DOMAIN || process.env.MAIN_DOMAIN || 'gymmobius.com'
 
 // Routes that share the /:slug space on the main domain.
 // SYNC WITH src/lib/slug.js RESERVED_SLUGS.
