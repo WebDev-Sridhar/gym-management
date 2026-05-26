@@ -31,6 +31,8 @@ const labelStyle = {
   marginBottom: '6px',
 }
 
+const RESEND_COOLDOWN_SECONDS = 30
+
 // Open-redirect guard. Only accept return URLs that are same-origin paths
 // starting with a single "/" — block "//evil.com", "\\evil", full URLs, etc.
 function safeReturnUrl(raw) {
@@ -49,22 +51,24 @@ export default function GymLoginPage() {
   const returnTo = safeReturnUrl(searchParams.get('return'))
   const { refreshProfile } = useAuth()
 
-  const [step, setStep]         = useState('email') // 'email' | 'password' | 'forgot'
+  const [step, setStep]         = useState('email') // 'email' | 'password' | 'forgot' | 'verify-email'
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [success, setSuccess]   = useState('')
   const [loading, setLoading]   = useState(false)
-  // When set, the password screen surfaces a "Resend verification email"
-  // button alongside the error message (Supabase rejected sign-in because
-  // the user hasn't confirmed their email yet).
-  const [needsVerification, setNeedsVerification] = useState(false)
-  const [resendBusy, setResendBusy] = useState(false)
   // Cooldown timer (seconds) for the "send reset link" button. Re-armed
   // each time a reset email is dispatched. Prevents accidental spam — both
   // for the initial send and for a reset link the user already clicked in
   // a new tab (the original tab stays on the success screen until refresh).
   const [resetCooldown, setResetCooldown] = useState(0)
+  // Separate cooldown for the verify-email Resend button. Kept distinct
+  // from resetCooldown so the two flows never share a stale timer.
+  const [verifyCooldown, setVerifyCooldown] = useState(0)
+  // Inline "we just sent a new link" confirmation under the Resend button.
+  // Kept separate from the global `success` banner so it can render next
+  // to its button on the verify-email step instead of at the top of the card.
+  const [resendMsg, setResendMsg] = useState('')
 
   // Recursive 1-second timer — counts down to 0, then stops. setTimeout +
   // re-run on dep change is simpler than setInterval with cleanup tracking.
@@ -73,6 +77,13 @@ export default function GymLoginPage() {
     const id = setTimeout(() => setResetCooldown(s => s - 1), 1000)
     return () => clearTimeout(id)
   }, [resetCooldown])
+
+  // Mirror tick effect for the verify-email Resend cooldown.
+  useEffect(() => {
+    if (verifyCooldown <= 0) return
+    const id = setTimeout(() => setVerifyCooldown(s => s - 1), 1000)
+    return () => clearTimeout(id)
+  }, [verifyCooldown])
 
   // Cross-tab password-reset detection.
   // When the user clicks the reset link in a *new* tab, Supabase updates the
@@ -119,17 +130,17 @@ export default function GymLoginPage() {
   }
 
   async function handleResendVerification() {
-    if (!email.trim() || resendBusy) return
-    setResendBusy(true); setError(''); setSuccess('')
+    if (!email.trim() || verifyCooldown > 0 || loading) return
+    setLoading(true); setError(''); setResendMsg('')
     try {
       const redirectTo = `${window.location.origin}/auth/callback?gym=${encodeURIComponent(gym.slug)}`
       await resendEmailVerification(email.trim(), { emailRedirectTo: redirectTo })
-      setSuccess(`Verification email re-sent to ${email}. Check your inbox (and spam folder).`)
-      setNeedsVerification(false)
+      setResendMsg(`A new verification link has been sent to ${email}.`)
+      setVerifyCooldown(RESEND_COOLDOWN_SECONDS)
     } catch (err) {
       setError(err.message || 'Failed to resend verification email')
     } finally {
-      setResendBusy(false)
+      setLoading(false)
     }
   }
 
@@ -137,7 +148,8 @@ export default function GymLoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    setNeedsVerification(false)
+    setSuccess('')
+    setResendMsg('')
     try {
       // signInAndSeed handles the "seed _accessToken before any data-client
       // query" race that used to be inlined here — see the helper's comment.
@@ -207,12 +219,24 @@ export default function GymLoginPage() {
         : roleHome(profile.role)
       navigate(target, { replace: true })
     } catch (err) {
-      // Recognise Supabase's "Email not confirmed" rejection and switch
-      // the UI to the resend-verification affordance instead of a flat
-      // error string the user can't act on.
+      // "Email not confirmed" → don't dead-end the user on an inline error.
+      // Auto-fire a fresh confirmation link (they already proved intent by
+      // hitting Sign In — the old UI told them "we sent a link" without
+      // actually sending one) and forward to a dedicated verify-email step
+      // with the Resend button already on cooldown so a double-click can't
+      // spam Supabase's email service.
       if (isEmailNotConfirmedError(err)) {
-        setNeedsVerification(true)
-        setError(`Please verify your email before signing in. We sent a confirmation link to ${email}.`)
+        try {
+          const redirectTo = `${window.location.origin}/auth/callback?gym=${encodeURIComponent(gym.slug)}`
+          await resendEmailVerification(email.trim(), { emailRedirectTo: redirectTo })
+        } catch {
+          // Swallow — the verify-email step's Resend button is the user's
+          // fallback. Most failures here are Supabase rate-limits, which
+          // the cooldown also handles. Better to land them on the right
+          // screen than block on a resend that they can retry.
+        }
+        setVerifyCooldown(RESEND_COOLDOWN_SECONDS)
+        setStep('verify-email')
       } else {
         setError(err.message === 'Invalid login credentials' ? 'Invalid email or password' : err.message)
       }
@@ -276,29 +300,24 @@ export default function GymLoginPage() {
 
           <div>
             <h1 className="text-xl font-bold" style={{ color: 'var(--gym-text)' }}>
-              {step === 'forgot' ? 'Reset Password' : 'Sign In'}
+              {step === 'forgot'
+                ? 'Reset Password'
+                : step === 'verify-email'
+                  ? 'Verify Your Email'
+                  : 'Sign In'}
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--gym-text-secondary)' }}>
               {step === 'forgot'
                 ? 'Enter your email to receive a reset link.'
-                : 'Sign in to access your workouts and plans.'}
+                : step === 'verify-email'
+                  ? "We've sent a confirmation link to your inbox."
+                  : 'Sign in to access your workouts and plans.'}
             </p>
           </div>
 
           {error && (
-            <div className="p-3 rounded-xl text-sm space-y-2" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
-              <div>{error}</div>
-              {needsVerification && (
-                <button
-                  type="button"
-                  onClick={handleResendVerification}
-                  disabled={resendBusy}
-                  className="w-full py-2 mt-1 text-xs font-semibold rounded-lg transition-opacity hover:opacity-80 disabled:opacity-50"
-                  style={{ background: 'rgba(248,113,113,0.18)', border: '1px solid rgba(248,113,113,0.35)', color: '#fff' }}
-                >
-                  {resendBusy ? 'Sending…' : 'Resend verification email'}
-                </button>
-              )}
+            <div className="p-3 rounded-xl text-sm" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
+              {error}
             </div>
           )}
           {success && (
@@ -359,6 +378,54 @@ export default function GymLoginPage() {
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
+          )}
+
+          {step === 'verify-email' && (
+            <div className="text-center space-y-5">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto"
+                style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                <svg className="w-7 h-7" fill="none" stroke="#4ade80" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm" style={{ color: 'var(--gym-text-secondary)' }}>
+                  We've sent a verification link to{' '}
+                  <span className="font-semibold" style={{ color: 'var(--gym-text)' }}>{email}</span>.
+                </p>
+                <p className="text-xs" style={{ color: 'var(--gym-text-muted)' }}>
+                  Click the link to activate your account, then sign in.
+                  Check your spam folder if you don't see it.
+                </p>
+              </div>
+              {resendMsg && (
+                <p className="text-xs font-medium" style={{ color: '#4ade80' }}>{resendMsg}</p>
+              )}
+              <div className="flex flex-col gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={loading || verifyCooldown > 0}
+                  className="font-semibold text-sm cursor-pointer hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ color: 'var(--gym-primary)' }}
+                >
+                  {loading
+                    ? 'Sending…'
+                    : verifyCooldown > 0
+                      ? `Resend in ${verifyCooldown}s`
+                      : 'Resend verification email'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep('email')}
+                  className="text-sm hover:opacity-80"
+                  style={{ color: 'var(--gym-text-muted)' }}
+                >
+                  Use a different email
+                </button>
+              </div>
+            </div>
           )}
 
           {step === 'forgot' && (

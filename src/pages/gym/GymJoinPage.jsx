@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
-import { signUpWithEmail, resendEmailVerification } from '../../services/authService'
+import { signUpWithEmail, resendEmailVerification, getEmailState } from '../../services/authService'
 import PasswordInput from '../../components/ui/PasswordInput'
 import { isPasswordValid, PASSWORD_MIN_LENGTH } from '../../components/ui/PasswordRequirements'
 
@@ -56,6 +56,11 @@ export default function GymJoinPage() {
   const [resendBusy, setResendBusy] = useState(false)
   const [resendMsg, setResendMsg] = useState('')
   const [resendError, setResendError] = useState('')
+  // True when the pre-signup probe saw the email as 'unconfirmed' — Supabase's
+  // signUp still resends the confirmation, but the success-screen copy should
+  // say "you already started signup, here's a new link" instead of pretending
+  // the user is starting fresh.
+  const [isPendingResend, setIsPendingResend] = useState(false)
 
   // Tick the cooldown each second once the post-signup "done" screen is
   // shown. Stops at 0 (or when leaving the screen).
@@ -86,7 +91,30 @@ export default function GymJoinPage() {
     if (password !== confirm) return setError('Passwords do not match')
 
     setLoading(true)
+    setIsPendingResend(false)
     try {
+      const cleanEmail = email.trim()
+
+      // Probe the email's auth state BEFORE calling signUp. Supabase's signUp
+      // returns the same shape (identities=[]) for both unconfirmed and
+      // already-confirmed accounts — anti-enumeration — so without the probe
+      // we can't tell whether to forward to the success screen (unconfirmed:
+      // Supabase resends) or steer to gym sign-in (confirmed: no email goes
+      // out, user waits forever).
+      const state = await getEmailState(cleanEmail)
+
+      if (state === 'confirmed') {
+        // Don't reveal which gym they're a member of (could be a different
+        // gym entirely — the cross-gym check happens at sign-in). Just point
+        // them at this gym's login; the login flow's cross_gym detection will
+        // redirect them if they're actually a member elsewhere.
+        setError(
+          `An account with ${cleanEmail} already exists. Sign in instead — ` +
+          `if you joined a different gym, the sign-in screen will point you there.`
+        )
+        return
+      }
+
       // Tag the email confirmation redirect with this gym's slug so the
       // post-verification AuthCallback can render a gym-aware "not a member"
       // screen if the signup doesn't match any existing member/trainer row.
@@ -95,8 +123,10 @@ export default function GymJoinPage() {
       const redirectTo = `${window.location.origin}/auth/callback?gym=${encodeURIComponent(gym.slug)}`
         + (returnTo ? `&return=${encodeURIComponent(returnTo)}` : '')
 
+      // 'new' or 'unconfirmed' — both proceed via signUp. For 'unconfirmed',
+      // Supabase silently resends the confirmation link to the existing user.
       const { error: signUpError } = await signUpWithEmail(
-        email.trim(), password,
+        cleanEmail, password,
         {
           emailRedirectTo: redirectTo,
           // Phone gets stashed in user_metadata so AuthCallback can use it
@@ -107,6 +137,7 @@ export default function GymJoinPage() {
 
       if (signUpError) { setError(signUpError.message); return }
 
+      setIsPendingResend(state === 'unconfirmed')
       setDone(true)
       setResendIn(RESEND_COOLDOWN_SECONDS)   // arm the resend cooldown
     } catch (err) {
@@ -165,20 +196,15 @@ export default function GymJoinPage() {
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-bold" style={{ color: 'var(--gym-text)' }}>Check your email</h2>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--gym-text)' }}>
+                {isPendingResend ? 'Pending Verification' : 'Check your email'}
+              </h2>
               <p className="text-sm mt-2 leading-relaxed" style={{ color: 'var(--gym-text-secondary)' }}>
-                {"If "}
+                {isPendingResend
+                  ? "You signed up earlier but haven't verified yet — we've re-sent the confirmation link to "
+                  : 'A verification link has been sent to '}
                 <span className="font-semibold" style={{ color: 'var(--gym-text)' }}>{email}</span>
-                {" doesn't already have an account, a verification link is on its way. Click it to activate."}
-              </p>
-              <p className="text-sm mt-3 leading-relaxed" style={{ color: 'var(--gym-text-secondary)' }}>
-                {"Already have an account at "}
-                <span className="font-semibold" style={{ color: 'var(--gym-text)' }}>{gym.name}</span>
-                {"? "}
-                <Link to={loginHref} className="font-semibold hover:opacity-80" style={{ color: 'var(--gym-text)' }}>
-                  Sign in instead
-                </Link>
-                {" — no new email gets sent if you're already verified."}
+                {'. Click it to activate your account.'}
               </p>
             </div>
             {/* Resend with cooldown — replaces the old "Sign in instead"

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { signInWithGoogle } from '../../services/authService'
+import { signInWithGoogle, resendEmailVerification, isEmailNotConfirmedError } from '../../services/authService'
 import { signInAndSeed } from '../../services/auth/signInAndSeed'
 import { useAuth } from '../../store/AuthContext'
 import { supabase } from '../../services/supabaseClient'
@@ -8,16 +8,27 @@ import { fetchUserProfile } from '../../services/userService'
 import { nextRouteFor } from '../../lib/onboarding'
 import PasswordInput from '../../components/ui/PasswordInput'
 
+const RESEND_COOLDOWN_SECONDS = 30
+
 export default function LoginPage() {
   // --- States ---
-  const [step, setStep] = useState('email') // 'email' | 'password' | 'forgot'
+  const [step, setStep] = useState('email') // 'email' | 'password' | 'forgot' | 'verify-email'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const [cooldown, setCooldown] = useState(0)
-  
+  // Cooldown for the "Resend verification email" button on the verify-email
+  // step. Separate from `cooldown` (which is for the forgot-password reset
+  // link) so the two flows don't share a stale timer.
+  const [verifyCooldown, setVerifyCooldown] = useState(0)
+  // Inline "we just sent a new link" confirmation under the Resend button.
+  // Kept distinct from the global `success` banner because the verify-email
+  // step renders its own static "we've sent a link" header and we want the
+  // resend confirmation to appear next to its button, not at the top.
+  const [resendMsg, setResendMsg] = useState('')
+
   const navigate = useNavigate()
   const { refreshProfile } = useAuth()
   const timerRef = useRef(null)
@@ -47,6 +58,15 @@ export default function LoginPage() {
     }
   }, [])
 
+  // Tick the verify-email resend cooldown down to 0. setTimeout recursion
+  // keeps the deps array stable and avoids the cleanup tracking that
+  // setInterval would need.
+  useEffect(() => {
+    if (verifyCooldown <= 0) return
+    const id = setTimeout(() => setVerifyCooldown(s => s - 1), 1000)
+    return () => clearTimeout(id)
+  }, [verifyCooldown])
+
   // --- Handlers ---
   const handleEmailContinue = (e) => {
     e.preventDefault()
@@ -60,6 +80,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setSuccess('')
 
     try {
       // signInAndSeed sets the data-client token before resolving, so
@@ -75,7 +96,50 @@ export default function LoginPage() {
       await refreshProfile()
       navigate(nextRouteFor(fresh), { replace: true })
     } catch (err) {
-      setError(err.message === "Invalid login credentials" ? "Invalid email or password" : err.message)
+      // "Email not confirmed" → don't dead-end the user on a flat error.
+      // Auto-fire a fresh confirmation link (they already proved intent by
+      // hitting Sign In) and forward to the verify screen with the resend
+      // button already on cooldown so a double-click can't spam.
+      if (isEmailNotConfirmedError(err)) {
+        try {
+          // Pass emailRedirectTo explicitly. Without it, supabase.auth.resend
+          // sends `undefined` for options and Supabase falls back to the Site
+          // URL — the confirm link then lands on '/' instead of /auth/callback
+          // and the user never gets routed past the landing page.
+          await resendEmailVerification(email.trim(), {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          })
+        } catch {
+          // Don't block the UI transition on a resend failure — the verify
+          // screen's Resend button is the user's fallback. Most failures
+          // here are Supabase rate-limits which the cooldown also handles.
+        }
+        setVerifyCooldown(RESEND_COOLDOWN_SECONDS)
+        setStep('verify-email')
+      } else {
+        setError(err.message === "Invalid login credentials" ? "Invalid email or password" : err.message)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleResendVerification() {
+    if (verifyCooldown > 0 || loading) return
+    setLoading(true)
+    setError('')
+    setResendMsg('')
+    try {
+      // Pass emailRedirectTo so the confirm link lands on /auth/callback —
+      // omitting it makes Supabase fall back to Site URL ('/'), which leaves
+      // the user stranded on the landing page after clicking the link.
+      await resendEmailVerification(email.trim(), {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      })
+      setResendMsg(`A new verification link has been sent to ${email}.`)
+      setVerifyCooldown(RESEND_COOLDOWN_SECONDS)
+    } catch (err) {
+      setError(err.message || 'Could not resend verification email')
     } finally {
       setLoading(false)
     }
@@ -117,9 +181,10 @@ export default function LoginPage() {
   }
 
   useEffect(() => {
-  setError('')
-  setSuccess('')
-}, [step])
+    setError('')
+    setSuccess('')
+    setResendMsg('')
+  }, [step])
 
   return (
     <div className="min-h-screen flex font-sans selection:bg-violet-100">
@@ -176,12 +241,18 @@ export default function LoginPage() {
               <img src="/logo.png" alt="Gymmobius logo" className="w-full h-auto" />
             </div>
             <h2 className="text-3xl font-bold text-gray-900">
-              {step === 'forgot' ? 'Reset Password' : 'Welcome back'}
+              {step === 'forgot'
+                ? 'Reset Password'
+                : step === 'verify-email'
+                  ? 'Verify Your Email'
+                  : 'Welcome back'}
             </h2>
             <p className="text-gray-500 mt-2">
-              {step === 'forgot' 
-                ? 'Enter your email to receive a secure link.' 
-                : 'Sign in to manage your gym dashboard.'}
+              {step === 'forgot'
+                ? 'Enter your email to receive a secure link.'
+                : step === 'verify-email'
+                  ? "We've sent a confirmation link to your inbox."
+                  : 'Sign in to manage your gym dashboard.'}
             </p>
           </div>
 
@@ -272,6 +343,50 @@ export default function LoginPage() {
                   {loading ? 'Signing in...' : 'Sign In'}
                 </button>
               </form>
+            )}
+
+            {step === 'verify-email' && (
+              <div className="text-center space-y-6">
+                <div className="bg-emerald-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
+                  <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-gray-600 text-sm">
+                    We've sent a verification link to{' '}
+                    <span className="font-bold text-gray-900">{email}</span>.
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Click the link to activate your account, then sign in.
+                    Check your spam folder if you don't see it.
+                  </p>
+                </div>
+                {resendMsg && (
+                  <p className="text-xs text-emerald-600 font-medium">{resendMsg}</p>
+                )}
+                <div className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={loading || verifyCooldown > 0}
+                    className="text-violet-600 font-bold hover:underline text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                  >
+                    {loading
+                      ? 'Sending...'
+                      : verifyCooldown > 0
+                        ? `Resend in ${verifyCooldown}s`
+                        : 'Resend verification email'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep('email')}
+                    className="text-gray-500 text-sm hover:text-gray-800"
+                  >
+                    Use a different email
+                  </button>
+                </div>
+              </div>
             )}
 
             {step === 'forgot' && (
