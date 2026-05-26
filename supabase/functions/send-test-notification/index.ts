@@ -49,18 +49,18 @@ Deno.serve(async (req) => {
         phoneNumber: norm.phoneNumber,
         templateName: Deno.env.get('INTERAKT_TEMPLATE_WELCOME') ?? 'member_welcome',
         languageCode: 'en',
-        bodyValues: [owner.name ?? 'Owner', gym?.name ?? 'GymOS', 'Test Plan'],
+        bodyValues: [owner.name ?? 'Owner', gym?.name ?? 'Gymmobius', 'Test Plan'],
       })
       result = { ok: true, channel: 'whatsapp', id: r.id }
     } else {
       if (!owner.email) throw new HttpError(400, 'no email on file — add one in Settings first')
       const r = await sendEmail({
         to: owner.email,
-        subject: `✓ Test email from ${gym?.name ?? 'GymOS'}`,
+        subject: `✓ Test email from ${gym?.name ?? 'Gymmobius'}`,
         html: `
           <div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:24px;color:#1f2937;">
             <h2 style="margin-top:0">Email is working ✓</h2>
-            <p>Hi ${owner.name ?? 'there'} — this is a test email from your GymOS dashboard.</p>
+            <p>Hi ${owner.name ?? 'there'} — this is a test email from your Gymmobius dashboard.</p>
             <p>If you received this, your email channel is configured correctly. Members will receive payment receipts and notifications via this channel.</p>
             <p style="color:#9ca3af;font-size:12px;margin-top:24px;">Sent at ${new Date().toLocaleString()}</p>
           </div>

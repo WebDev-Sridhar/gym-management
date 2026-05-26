@@ -10,17 +10,17 @@ interface GymCtx {
 function shell(brand: string, body: string): string {
   return `
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"/><title>GymOS</title></head>
+<html><head><meta charset="utf-8"/><title>Gymmobius</title></head>
 <body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);">
-        <tr><td style="background:${brand};padding:18px 24px;color:#fff;font-weight:700;font-size:14px;letter-spacing:1px;">GYMOS</td></tr>
+        <tr><td style="background:${brand};padding:18px 24px;color:#fff;font-weight:700;font-size:14px;letter-spacing:1px;">Gymmobius</td></tr>
         <tr><td style="padding:28px 28px 32px;color:#1f2937;font-size:15px;line-height:1.6;">
           ${body}
         </td></tr>
         <tr><td style="background:#fafafa;padding:14px 24px;color:#9ca3af;font-size:12px;border-top:1px solid #f0f0f0;">
-          You received this because you have an account on GymOS. Reply to this email if you need help.
+          You received this because you have an account on Gymmobius. Reply to this email if you need help.
         </td></tr>
       </table>
     </td></tr>
@@ -118,7 +118,7 @@ export function dailySummaryEmail(args: {
         </td>
       </tr>
     </table>
-    <div style="color:#6b7280;font-size:13px;">Open the GymOS dashboard for full details.</div>
+    <div style="color:#6b7280;font-size:13px;">Open the Gymmobius dashboard for full details.</div>
   `
   return { subject: `📊 ${gymName} — daily summary`, html: shell(brand, body) }
 }

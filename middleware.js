@@ -3,12 +3,12 @@
  *
  * Three execution paths:
  *
- *   A. Main domain + path-based slug (gymmobius.app/iron-paradise)
+ *   A. Main domain + path-based slug (gymmobius.com/iron-paradise)
  *      → Look up gym by slug
  *      → If gym has `subdomain` claimed → 301 redirect to https://{sub}.{MAIN}
  *      → Else → inject gym OG tags into index.html, serve SPA
  *
- *   B. Subdomain (iron-paradise.gymmobius.app)
+ *   B. Subdomain (iron-paradise.gymmobius.com)
  *      → Look up gym by subdomain
  *      → Inject gym OG tags, serve SPA at path "/"
  *
