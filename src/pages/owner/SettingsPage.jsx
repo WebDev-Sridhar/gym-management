@@ -209,6 +209,11 @@ export default function SettingsPage() {
   const [confirmPw, setConfirmPw]       = useState('')
   const [changingPw, setChangingPw]     = useState(false)
   const [pwMsg, setPwMsg]               = useState({ text: '', type: 'success' })
+  // null = loading; true = user has email/password identity (change-flow);
+  // false = Google-only or other OAuth-only user (set-flow, no current pw).
+  // Fetched via supabase.auth.getUser() — session.user from the JWT alone
+  // doesn't reliably include the identities list.
+  const [hasEmailIdentity, setHasEmailIdentity] = useState(null)
 
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
@@ -226,6 +231,18 @@ export default function SettingsPage() {
   useEffect(() => {
     if (profile) { setPName(profile.name || ''); setPPhone(profile.phone || '') }
   }, [profile])
+
+  // Resolve whether this account has an email/password identity so the
+  // password card can pick the right flow (set vs change). Runs once.
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (cancelled || error) return
+      const idents = data?.user?.identities || []
+      setHasEmailIdentity(idents.some(i => i.provider === 'email'))
+    }).catch(() => { /* leave as null, UI will hide the form */ })
+    return () => { cancelled = true }
+  }, [])
 
   // Re-sync the Gym Details form fields whenever the active source flips
   // (org ↔ branch). Editing is silently cancelled to avoid losing edits to
@@ -317,22 +334,37 @@ export default function SettingsPage() {
 
   async function changePassword() {
     setPwMsg({ text: '', type: 'success' })
-    if (!currentPw) return setPwMsg({ text: 'Enter your current password.', type: 'error' })
     if (!isPasswordValid(newPw)) return setPwMsg({ text: 'Password must include lowercase, uppercase letters and a number (min 8 chars).', type: 'error' })
     if (newPw !== confirmPw) return setPwMsg({ text: 'Passwords do not match.', type: 'error' })
     const userEmail = profile?.email || user?.email
     setChangingPw(true)
     try {
-      // Re-authenticate with the current password to verify it
-      const { error: signInErr } = await supabase.auth.signInWithPassword({ email: userEmail, password: currentPw })
-      if (signInErr) {
-        setPwMsg({ text: 'Current password is incorrect.', type: 'error' })
-        return
+      // Re-auth only matters when the user HAS a password to verify against
+      // (email/pass identity). Google-only users are SETTING a password for
+      // the first time — there's nothing to verify, and their authenticated
+      // session is the trust signal.
+      if (hasEmailIdentity) {
+        if (!currentPw) {
+          setPwMsg({ text: 'Enter your current password.', type: 'error' })
+          return
+        }
+        const { error: signInErr } = await supabase.auth.signInWithPassword({ email: userEmail, password: currentPw })
+        if (signInErr) {
+          setPwMsg({ text: 'Current password is incorrect.', type: 'error' })
+          return
+        }
       }
-      // Update to the new password
+      // updateUser works for both flows: it changes the password for email/pass
+      // accounts AND attaches an email/password identity to Google-only ones.
       const { error: updateErr } = await supabase.auth.updateUser({ password: newPw })
       if (updateErr) throw updateErr
-      setPwMsg({ text: 'Password updated successfully.', type: 'success' })
+      // After a successful first-time set, the account NOW has an email
+      // identity — flip the flag so subsequent changes use the change-flow.
+      if (!hasEmailIdentity) setHasEmailIdentity(true)
+      setPwMsg({
+        text: hasEmailIdentity ? 'Password updated successfully.' : 'Password set! You can now sign in with email + password.',
+        type: 'success',
+      })
       setCurrentPw(''); setNewPw(''); setConfirmPw('')
       setTimeout(() => { setShowPwForm(false); setPwMsg({ text: '', type: 'success' }) }, 2500)
     } catch (err) {
@@ -900,11 +932,16 @@ export default function SettingsPage() {
             <CardHeader icon={Lock} title="Password & Security" />
             <div className="divide-y divide-gray-50">
 
-              {/* Change password — only relevant for email/password accounts */}
-              {(user?.app_metadata?.provider ?? 'email') !== 'google' && (
+              {/* Set/Change password.
+                  hasEmailIdentity === true  → "Change password" (requires current pw)
+                  hasEmailIdentity === false → "Set password" (Google-only user; first-time)
+                  hasEmailIdentity === null  → identities still loading; hide */}
+              {hasEmailIdentity !== null && (
               <div className="pb-5">
                 <div className="flex items-center justify-between mb-0.5">
-                  <p className="text-sm font-medium text-gray-800">Change password</p>
+                  <p className="text-sm font-medium text-gray-800">
+                    {hasEmailIdentity ? 'Change password' : 'Set a password'}
+                  </p>
                   {showPwForm && (
                     <button
                       onClick={() => { setShowPwForm(false); setCurrentPw(''); setNewPw(''); setConfirmPw(''); setPwMsg({ text: '', type: 'success' }) }}
@@ -917,17 +954,23 @@ export default function SettingsPage() {
 
                 {!showPwForm ? (
                   <>
-                    <p className="text-xs text-gray-400 mb-3">Update the password you use to sign in.</p>
+                    <p className="text-xs text-gray-400 mb-3">
+                      {hasEmailIdentity
+                        ? 'Update the password you use to sign in.'
+                        : 'You signed up with Google. Set a password to also sign in with email + password.'}
+                    </p>
                     <button
                       onClick={() => setShowPwForm(true)}
                       className="px-4 py-2 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:border-indigo-300 hover:text-indigo-700 transition-colors cursor-pointer flex items-center gap-2"
                     >
-                      <Lock size={13} /> Change password
+                      <Lock size={13} /> {hasEmailIdentity ? 'Change password' : 'Set password'}
                     </button>
                   </>
                 ) : (
                   <div className="mt-3 space-y-3">
-                    {/* Current password */}
+                    {/* Current password — only shown for users that already
+                        HAVE a password to verify against. */}
+                    {hasEmailIdentity && (
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Current password</label>
                       <input
@@ -939,6 +982,7 @@ export default function SettingsPage() {
                         autoFocus
                       />
                     </div>
+                    )}
                     {/* New password */}
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">New password</label>
@@ -980,12 +1024,14 @@ export default function SettingsPage() {
                         className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
                       >
                         {changingPw
-                          ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Updating…</>
-                          : 'Update password'}
+                          ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />{hasEmailIdentity ? 'Updating…' : 'Setting…'}</>
+                          : hasEmailIdentity ? 'Update password' : 'Set password'}
                       </button>
                     </div>
 
-                    {/* Forgot password fallback */}
+                    {/* Forgot-current-password fallback — irrelevant for
+                        Google-only users (no current password to forget). */}
+                    {hasEmailIdentity && (
                     <div className="pt-2 border-t border-gray-50">
                       <p className="text-xs text-gray-400 mb-1.5">Forgot your current password?</p>
                       <button
@@ -1004,6 +1050,7 @@ export default function SettingsPage() {
                         </p>
                       )}
                     </div>
+                    )}
                   </div>
                 )}
               </div>

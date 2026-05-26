@@ -81,6 +81,27 @@ export async function signInWithGoogle() {
   return data
 }
 
+// ─── Email-state probe (signup UX disambiguation) ───
+
+/**
+ * Returns the auth-state of an email so the signup UI can pick the right
+ * UX path: 'new', 'unconfirmed', or 'confirmed'. See the
+ * 20260525_auth_email_state migration for the why and the privacy note.
+ *
+ * Failures fall back to 'new' — better to attempt signup and let Supabase
+ * decide than to block the user on a probe failure. The signUp call itself
+ * is anti-enumeration safe (won't leak whether an email exists).
+ */
+export async function getEmailState(email) {
+  if (!email) return 'new'
+  const { data, error } = await supabase.rpc('auth_email_state', { p_email: email })
+  if (error) {
+    console.warn('getEmailState failed, falling back to "new":', error.message)
+    return 'new'
+  }
+  return data || 'new'
+}
+
 // ─── Shared ───
 
 export async function signOut() {

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { signUpWithEmail, signInWithGoogle } from '../../services/authService'
+import { signUpWithEmail, signInWithGoogle, getEmailState } from '../../services/authService'
 import { supabase } from '../../services/supabaseClient'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
 import PasswordInput from '../../components/ui/PasswordInput'
 import PasswordRequirements, { isPasswordValid, friendlyPasswordError } from '../../components/ui/PasswordRequirements'
+
+const RESEND_COOLDOWN_SECONDS = 30
 
 export default function SignupPage() {
   const [step, setStep] = useState('info') // 'info' | 'confirm-email'
@@ -13,12 +15,30 @@ export default function SignupPage() {
   const [pwFocused, setPwFocused] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // When true, the confirm-email screen renders "verification pending"
+  // copy instead of the standard "we've sent a link" copy. Set when the
+  // pre-signup email-state probe returned 'unconfirmed' — Supabase's
+  // signUp does still send a fresh confirmation, but the user expects
+  // "you already started signup, here's a new link" not "fresh signup".
+  const [isPendingResend, setIsPendingResend] = useState(false)
+  // 30-second cooldown for the resend button. Armed every time a resend
+  // (or the initial signup that ALSO sent the link) is dispatched.
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resendMsg, setResendMsg] = useState('')
 
   const passwordOK = isPasswordValid(password)
 
   useEffect(() => {
     setError('')
+    setResendMsg('')
   }, [step])
+
+  // Cooldown tick — setTimeout recursion keeps the deps array stable.
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const id = setTimeout(() => setResendCooldown(s => s - 1), 1000)
+    return () => clearTimeout(id)
+  }, [resendCooldown])
 
   function validate() {
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -37,29 +57,37 @@ export default function SignupPage() {
 
     setLoading(true)
     setError('')
+    setIsPendingResend(false)
 
     try {
-      const { error: signUpError } = await signUpWithEmail(email.trim(), password)
+      const cleanEmail = email.trim()
 
+      // Probe the email's auth state BEFORE calling signUp. Supabase's
+      // signUp returns the same shape (identities=[]) for both unconfirmed
+      // and confirmed existing accounts — anti-enumeration — so we can't
+      // tell from signUp output alone whether to forward to the verification
+      // screen (unconfirmed → fresh link gets sent) or steer to sign-in
+      // (confirmed → no email gets sent at all, user waits forever).
+      const state = await getEmailState(cleanEmail)
+
+      if (state === 'confirmed') {
+        setError(
+          `An account with ${cleanEmail} already exists. Sign in instead — ` +
+          `or if you signed up with Google, sign in and set a password in Account Settings.`
+        )
+        return
+      }
+
+      // 'new' or 'unconfirmed' — both proceed via signUp. For 'unconfirmed',
+      // Supabase silently resends the confirmation link to the existing user.
+      const { error: signUpError } = await signUpWithEmail(cleanEmail, password)
       if (signUpError) {
         setError(friendlyPasswordError(signUpError.message))
         return
       }
 
-      //       const identities = data?.user?.identities || []
-      // if (identities.length === 0) {
-      //   setError('An account with this email already exists. Try logging in.')
-      //   return
-      // }
-
-      // Note on `data.user.identities.length === 0`: Supabase returns this
-      // "shadow user" when the email is already registered. We used to flag
-      // it as an error ("already exists, log in") — but for UNCONFIRMED
-      // existing accounts Supabase silently sends a fresh confirmation link,
-      // so the error contradicted the email the user actually received.
-      // Anti-enumeration also means we can't distinguish unconfirmed from
-      // confirmed here. Forward to the confirm-email screen either way —
-      // it has a "Log in" link for users who already have a working account.
+      setIsPendingResend(state === 'unconfirmed')
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)   // initial signup also sent the email
       setStep('confirm-email')
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')
@@ -81,8 +109,10 @@ export default function SignupPage() {
   }
 
   async function handleResendEmail() {
+    if (resendCooldown > 0 || loading) return
     setLoading(true)
     setError('')
+    setResendMsg('')
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
@@ -90,7 +120,8 @@ export default function SignupPage() {
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       })
       if (error) throw error
-      alert('A new verification link has been sent!')
+      setResendMsg(`A new verification link has been sent to ${email}.`)
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
     } catch (err) {
       setError(err.message || 'Could not resend email')
     } finally {
@@ -143,12 +174,16 @@ export default function SignupPage() {
               <img src="/logo.png" alt="Gymmobius logo" className="w-full h-auto" />
             </div>
             <h2 className="text-3xl font-bold text-gray-900">
-              {step === 'info' ? 'Create Account' : 'Verify Email'}
+              {step === 'info'
+                ? 'Create Account'
+                : isPendingResend ? 'Pending Verification' : 'Verify Email'}
             </h2>
             <p className="text-gray-500 mt-2 text-sm">
               {step === 'info'
                 ? 'Start managing your gym with precision.'
-                : "We've sent a confirmation link to your inbox."}
+                : isPendingResend
+                  ? "You signed up earlier but haven't verified yet — we've re-sent the confirmation link."
+                  : "We've sent a confirmation link to your inbox."}
             </p>
           </div>
 
@@ -229,19 +264,27 @@ export default function SignupPage() {
               </div>
               <div className="space-y-2">
                 <p className="text-gray-600 text-sm">
-                  We've sent a link to <span className="font-bold text-gray-900">{email}</span>.
+                  {isPendingResend ? 'A fresh verification link has been sent to ' : "We've sent a link to "}
+                  <span className="font-bold text-gray-900">{email}</span>.
                 </p>
                 <p className="text-xs text-gray-400">
                   Check your spam folder if you don't see it.
                 </p>
               </div>
+              {resendMsg && (
+                <p className="text-xs text-emerald-600 font-medium">{resendMsg}</p>
+              )}
               <div className="flex flex-col gap-3">
                 <button
                   onClick={handleResendEmail}
-                  disabled={loading}
-                  className="text-violet-600 font-bold hover:underline text-sm disabled:opacity-50"
+                  disabled={loading || resendCooldown > 0}
+                  className="text-violet-600 font-bold hover:underline text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                 >
-                  {loading ? 'Sending...' : 'Resend verification email'}
+                  {loading
+                    ? 'Sending...'
+                    : resendCooldown > 0
+                      ? `Resend in ${resendCooldown}s`
+                      : 'Resend verification email'}
                 </button>
                 <button
                   onClick={() => setStep('info')}
@@ -259,13 +302,13 @@ export default function SignupPage() {
               Log in
             </Link>
           </p>
-          <p className="text-center text-xs text-gray-400 mt-2">
+          {/* <p className="text-center text-xs text-gray-400 mt-2">
             {'This page is for gym owners only. Members & trainers — use gym portal '}
             <Link to="/login" className="text-violet-500 hover:underline">Login</Link>
             {'.'}
-          </p>
+          </p> */}
 
-          <div className="mt-12 pt-8 border-t border-gray-100">
+          <div className="mt-4 pt-8 border-t border-gray-100">
             <p className="text-center text-[11px] text-gray-400 leading-relaxed">
               By creating an account, you agree to our{' '}
               <a href="/privacy" className="text-gray-600 font-medium underline underline-offset-2">Privacy Policy</a> and{' '}
