@@ -19,7 +19,7 @@ export async function sendEmail(params: SendEmailParams): Promise<ResendResult> 
   const apiKey = Deno.env.get('RESEND_API_KEY')
   if (!apiKey) throw new Error('RESEND_API_KEY is not configured')
 
-  const from = Deno.env.get('RESEND_FROM') ?? 'Gymmobius <gymmobius@gmail.com>'
+  const from = Deno.env.get('RESEND_FROM') ?? 'Gymmobius <noreply@gymmobius.com>'
 
   const res = await fetch(RESEND_API, {
     method: 'POST',
