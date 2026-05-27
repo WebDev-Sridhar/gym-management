@@ -45,6 +45,7 @@ import GymContact from './pages/gym/GymContact'
 import GymLoginPage from './pages/gym/GymLoginPage'
 import GymJoinPage from './pages/gym/GymJoinPage'
 import ScrollToTop from './ScrollToTop'
+import PwaInstallBanner from './components/PwaInstallBanner'
 import { ROUTES } from './lib/constants/routes'
 import { detectHost } from './lib/host'
 
@@ -148,6 +149,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <PwaInstallBanner />
       <DialogProvider>
       <AuthProvider>
         <ThemeProvider>
