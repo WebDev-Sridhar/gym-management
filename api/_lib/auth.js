@@ -34,11 +34,28 @@ export function getAdmin() {
 }
 
 /**
+ * Cross-runtime header reader. The /api/domain/* endpoints use named HTTP-
+ * method exports (export async function POST), which makes Vercel hand us a
+ * Web Request whose `headers` is a `Headers` instance — property access
+ * (`req.headers.authorization`) silently returns undefined, causing every
+ * request to 401 even with a valid Bearer token. This helper tries the
+ * Web API first, then falls back to the Node-style plain-object lookup so
+ * the auth helper stays safe if any endpoint reverts to the legacy default
+ * export signature.
+ */
+function readHeader(req, name) {
+  if (typeof req?.headers?.get === 'function') {
+    return req.headers.get(name)
+  }
+  return req?.headers?.[name.toLowerCase()] ?? req?.headers?.[name] ?? null
+}
+
+/**
  * Verify the caller's JWT from the Authorization header and return their
  * (user_id, gym_id, plan_name) trio, or throw a 401-shaped error.
  */
 export async function authenticateOwner(req) {
-  const auth = req.headers?.authorization || req.headers?.Authorization
+  const auth = readHeader(req, 'authorization')
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null
   if (!token) {
     const err = new Error('Authorization required')
