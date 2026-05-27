@@ -92,8 +92,10 @@ function buildTenantManifest(gym, origin) {
   const description = gym.seo_description || gym.description ||
     `${name} — manage your fitness journey.`
 
-  // Use the gym's uploaded logo; fall back to the platform default.
-  const iconSrc = gym.logo_url || `${origin}/logo.png`
+  // Use the gym's uploaded logo for both sizes, or fall back to the
+  // platform's properly-sized PWA icons.
+  const icon192 = gym.logo_url || `${origin}/favicon/web-app-manifest-192x192.png`
+  const icon512 = gym.logo_url || `${origin}/favicon/web-app-manifest-512x512.png`
 
   return {
     name,
@@ -106,8 +108,8 @@ function buildTenantManifest(gym, origin) {
     theme_color: themeColor,
     orientation: 'portrait-primary',
     icons: [
-      { src: iconSrc, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-      { src: iconSrc, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+      { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+      { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   }
 }
@@ -123,8 +125,8 @@ const GENERIC_MANIFEST = {
   theme_color: '#6366f1',
   orientation: 'portrait-primary',
   icons: [
-    { src: '/logo.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-    { src: '/logo.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+    { src: '/favicon/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+    { src: '/favicon/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   ],
 }
 
