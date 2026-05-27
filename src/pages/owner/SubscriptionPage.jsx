@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { createSubscriptionOrder, openSubscriptionCheckout } from '../../services/subscriptionService'
 import { Sk } from '../../components/ui/Skeleton'
 import {
   Zap, Check, Crown, Rocket, Building, AlertTriangle,
-  CheckCircle, RefreshCw, Clock, CreditCard,
+  CheckCircle, RefreshCw, Clock, CreditCard, X, ArrowRight,
 } from 'lucide-react'
 
 const PLANS = [
@@ -121,6 +122,7 @@ function SubscriptionSkeleton() {
 }
 
 export default function SubscriptionPage() {
+  const navigate = useNavigate()
   const { profile, subscription, hasActiveSubscription, loading, refreshProfile } = useAuth()
 
   const [selectedPlan, setSelectedPlan] = useState(() => {
@@ -176,20 +178,6 @@ export default function SubscriptionPage() {
     }
   }
 
-  if (success) {
-    return (
-      <div className="max-w-[1000px] mx-auto flex items-center justify-center py-24">
-        <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center max-w-md w-full">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={32} className="text-green-600" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Subscription Activated!</h2>
-          <p className="text-sm text-gray-500">Your plan is now active. Enjoy full access to your dashboard.</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="max-w-[1000px] mx-auto space-y-6">
 
@@ -198,6 +186,49 @@ export default function SubscriptionPage() {
         <h1 className="text-2xl font-bold text-gray-900">Subscription</h1>
         <p className="text-sm text-gray-500 mt-0.5">Manage your Gymmobius plan and billing</p>
       </div>
+
+      {/* Post-payment success banner. Renders inline above the page content
+          (instead of taking over the whole page like before) so the user can
+          see their newly-renewed plan reflected in the status card + plans
+          grid below. CTAs let them either jump straight to the dashboard or
+          dismiss and stay on this page. */}
+      {success && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+            <CheckCircle size={18} className="text-emerald-700" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-emerald-900">Subscription activated!</p>
+            <p className="text-xs text-emerald-800 mt-0.5">
+              Your plan is now active. The details below reflect the renewed subscription.
+            </p>
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                type="button"
+                onClick={() => navigate('/owner-dashboard')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+              >
+                Go to Dashboard <ArrowRight size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSuccess(false)}
+                className="text-xs font-medium text-emerald-800 hover:text-emerald-900 cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccess(false)}
+            aria-label="Dismiss"
+            className="shrink-0 p-1 text-emerald-700 hover:text-emerald-900 cursor-pointer rounded"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Current plan status card */}
       {subscription && (
