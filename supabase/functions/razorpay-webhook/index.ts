@@ -182,7 +182,7 @@ async function handleSubscriptionPaymentCaptured(
 
   const { data: sub } = await supabase
     .from('subscriptions')
-    .select('id, duration_days')
+    .select('id, duration_days, plan_name')
     .eq('razorpay_order_id', entity.order_id)
     .eq('gym_id', gymId).eq('status', 'pending')
     .maybeSingle()
@@ -191,7 +191,42 @@ async function handleSubscriptionPaymentCaptured(
 
   const days = sub.duration_days ?? 30
   const now = new Date()
-  const expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+
+  // Same carry-forward policy as verify-subscription-payment: same plan +
+  // unused time on the prior active sub → new expires_at = old.expires_at
+  // + days. Different plan or no prior active → standard now + days. See
+  // verify-subscription-payment for full notes.
+  const { data: currentActive } = await supabase
+    .from('subscriptions')
+    .select('id, plan_name, expires_at')
+    .eq('gym_id', gymId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let expiresAt: Date
+  const oldExpiresAt = currentActive?.expires_at ? new Date(currentActive.expires_at) : null
+  if (
+    currentActive
+    && currentActive.plan_name === sub.plan_name
+    && oldExpiresAt
+    && oldExpiresAt.getTime() > now.getTime()
+  ) {
+    expiresAt = new Date(oldExpiresAt.getTime() + days * 24 * 60 * 60 * 1000)
+  } else {
+    expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+  }
+
+  // Expire-then-activate. Order matters for the partial unique index
+  // `unique(gym_id) where status='active'`. See verify-subscription-payment
+  // for the full bug rationale.
+  await supabase
+    .from('subscriptions')
+    .update({ status: 'expired' })
+    .eq('gym_id', gymId)
+    .eq('status', 'active')
+    .neq('id', sub.id)
 
   await supabase
     .from('subscriptions')
@@ -230,7 +265,7 @@ async function handleSubscriptionLinkPaid(
 
   const { data: sub } = await supabase
     .from('subscriptions')
-    .select('id, duration_days')
+    .select('id, duration_days, plan_name')
     .eq('razorpay_payment_link_id', entity.id)
     .eq('gym_id', gymId).eq('status', 'pending')
     .maybeSingle()
@@ -239,7 +274,39 @@ async function handleSubscriptionLinkPaid(
 
   const days = sub.duration_days ?? 30
   const now = new Date()
-  const expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+
+  // Same carry-forward policy as verify-subscription-payment + the
+  // payment.captured handler above.
+  const { data: currentActive } = await supabase
+    .from('subscriptions')
+    .select('id, plan_name, expires_at')
+    .eq('gym_id', gymId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let expiresAt: Date
+  const oldExpiresAt = currentActive?.expires_at ? new Date(currentActive.expires_at) : null
+  if (
+    currentActive
+    && currentActive.plan_name === sub.plan_name
+    && oldExpiresAt
+    && oldExpiresAt.getTime() > now.getTime()
+  ) {
+    expiresAt = new Date(oldExpiresAt.getTime() + days * 24 * 60 * 60 * 1000)
+  } else {
+    expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+  }
+
+  // Expire-then-activate — same rationale as the payment.captured handler
+  // above; the partial unique index requires this order.
+  await supabase
+    .from('subscriptions')
+    .update({ status: 'expired' })
+    .eq('gym_id', gymId)
+    .eq('status', 'active')
+    .neq('id', sub.id)
 
   await supabase
     .from('subscriptions')

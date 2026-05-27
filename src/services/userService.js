@@ -155,6 +155,16 @@ export async function addTrainerInvite({ gymId, name, phone, email }) {
 /**
  * Fetch the active subscription for a gym.
  * Returns null if no active subscription exists.
+ *
+ * Defensive query: orders by created_at DESC and takes the newest row. The
+ * verify-subscription-payment and razorpay-webhook handlers now explicitly
+ * supersede prior active rows on renewal, so two active rows per gym
+ * shouldn't happen — but if a future code path or a manual DB edit ever
+ * produces them, `.maybeSingle()` on a raw `status='active'` filter would
+ * throw "result contains multiple rows", AuthContext would swallow it and
+ * set subscription=null, and every page would treat the owner as Starter
+ * despite a paid plan. The order/limit shape guarantees one row max
+ * regardless of how many actives exist. See gym 25cb9090… on 2026-05-27.
  */
 export async function fetchSubscription(gymId) {
   const { data, error } = await supabase
@@ -162,6 +172,8 @@ export async function fetchSubscription(gymId) {
     .select('*')
     .eq('gym_id', gymId)
     .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (error) throw error

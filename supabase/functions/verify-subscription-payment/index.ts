@@ -65,7 +65,61 @@ Deno.serve(async (req) => {
 
     const days = sub.duration_days ?? 30
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+
+    // Look up the gym's current active subscription BEFORE we expire it,
+    // so we can compute carry-forward on early-renewal of the same plan.
+    // Policy:
+    //   - Same plan + old sub still valid (expires_at > now) → carry
+    //     forward the unused time: new expires_at = old expires_at + days.
+    //     Example: 7 days left on Enterprise, renew Enterprise → new
+    //     expires at old.expires_at + 30 (i.e. user keeps the unused 7d).
+    //   - Different plan (upgrade / downgrade / switch) → standard now + days.
+    //     User chose to change plans; the unused time on the prior plan
+    //     is forfeited.
+    //   - No prior active OR prior already expired → standard now + days.
+    const { data: currentActive } = await supabase
+      .from('subscriptions')
+      .select('id, plan_name, expires_at')
+      .eq('gym_id', gymId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    let expiresAt: Date
+    const oldExpiresAt = currentActive?.expires_at ? new Date(currentActive.expires_at) : null
+    if (
+      currentActive
+      && currentActive.plan_name === sub.plan_name
+      && oldExpiresAt
+      && oldExpiresAt.getTime() > now.getTime()
+    ) {
+      expiresAt = new Date(oldExpiresAt.getTime() + days * 24 * 60 * 60 * 1000)
+    } else {
+      expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+    }
+
+    // EXPIRE FIRST, then activate. Without this, renewal leaves the prior
+    // active row in the table — the daily expire-stale-records cron only
+    // fires once per day, so any renewal that happens before the old sub's
+    // expires_at gets flipped (or even hours after, before the cron runs)
+    // ends up with two `status='active'` rows per gym. userService.
+    // fetchSubscription uses .maybeSingle() and throws on multiple rows,
+    // AuthContext catches and sets sub=null, and every page treats the owner
+    // as Starter despite the just-paid Enterprise. See gym 25cb9090… on
+    // 2026-05-27 for the canonical reproduction.
+    //
+    // Order matters: with the partial unique index
+    // `unique(gym_id) where status='active'`, marking the new sub active
+    // BEFORE expiring the old one would violate the constraint. So we
+    // expire-then-activate, accepting the millisecond window where the gym
+    // has no active sub (acceptable — only matters for concurrent reads).
+    await supabase
+      .from('subscriptions')
+      .update({ status: 'expired' })
+      .eq('gym_id', gymId)
+      .eq('status', 'active')
+      .neq('id', sub.id)
 
     const { error: updErr } = await supabase
       .from('subscriptions')
