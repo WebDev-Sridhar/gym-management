@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { fetchGymBySlug, fetchGymBySubdomain, fetchGymByCustomDomain, resolveSlugRedirect } from '../services/gymPublicService'
 import { detectHost } from '../lib/host'
 import { useTenantMeta } from '../hooks/useTenantMeta'
+import PwaInstallBanner from '../components/PwaInstallBanner'
 
 const GymContext = createContext(null)
 
@@ -114,6 +115,7 @@ export function GymProvider({ children }) {
   return (
     <GymContext.Provider value={{ gym, loading, error, hostInfo }}>
       {children}
+      {gym && <PwaInstallBanner logo={gym.logo_url} appName={gym.name} />}
     </GymContext.Provider>
   )
 }

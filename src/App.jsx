@@ -149,7 +149,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <PwaInstallBanner />
+      {HOST_KIND === 'main' && <PwaInstallBanner />}
       <DialogProvider>
       <AuthProvider>
         <ThemeProvider>

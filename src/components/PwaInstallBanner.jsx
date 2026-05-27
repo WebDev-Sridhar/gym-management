@@ -17,10 +17,13 @@ import { usePwaInstall } from '../hooks/usePwaInstall'
 const DISMISS_KEY   = 'gymmobius-pwa-dismissed-at'
 const SNOOZE_MS     = 7 * 24 * 60 * 60 * 1000   // 7 days
 
-export default function PwaInstallBanner() {
+export default function PwaInstallBanner({ logo, appName }) {
   const { canInstall, isInstalled, install } = usePwaInstall()
   const [hidden, setHidden]   = useState(true)   // start hidden to avoid flash
   const [closing, setClosing] = useState(false)
+
+  const iconSrc  = logo    || '/favicon/web-app-manifest-192x192.png'
+  const name     = appName || 'Gymmobius'
 
   // Reveal the banner only after checking the snooze timestamp
   useEffect(() => {
@@ -63,7 +66,7 @@ export default function PwaInstallBanner() {
     >
       {/* App icon */}
       <img
-        src="/favicon/web-app-manifest-192x192.png"
+        src={iconSrc}
         alt=""
         aria-hidden="true"
         className="h-10 w-10 rounded-xl flex-shrink-0 object-cover"
@@ -72,7 +75,7 @@ export default function PwaInstallBanner() {
       {/* Text */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-[var(--color-text,#fafafa)] truncate leading-tight">
-          Add to Home Screen
+          {name}
         </p>
         <p className="text-xs text-[var(--color-text-muted,#a1a1aa)] leading-tight mt-0.5">
           Install for faster access — works offline
