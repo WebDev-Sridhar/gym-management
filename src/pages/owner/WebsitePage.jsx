@@ -909,6 +909,7 @@ function CustomDomainPanel({ gym, planName, onSave }) {
   const [input,       setInput]       = useState('')
   const [adding,      setAdding]      = useState(false)
   const [verifying,   setVerifying]   = useState(false)
+  const [removing,    setRemoving]    = useState(false)
   const [error,       setError]       = useState('')
   const [copiedField, setCopiedField] = useState('')
 
@@ -921,7 +922,7 @@ function CustomDomainPanel({ gym, planName, onSave }) {
     none:      { label: 'No domain',          bg: 'bg-gray-100',     dot: 'bg-gray-400',    text: 'text-gray-600'    },
     pending:   { label: 'Waiting for DNS',    bg: 'bg-amber-50',     dot: 'bg-amber-500 animate-pulse',   text: 'text-amber-800'   },
     verifying: { label: 'Checking DNS…',      bg: 'bg-amber-50',     dot: 'bg-amber-500 animate-pulse',   text: 'text-amber-800'   },
-    verified:  { label: 'Verified',           bg: 'bg-emerald-50',   dot: 'bg-emerald-500', text: 'text-emerald-800' },
+    verified:  { label: 'Verified',           bg: 'bg-emerald-50',   dot: 'bg-emerald-500', text: 'text-emerald-700' },
     failed:    { label: 'DNS misconfigured',  bg: 'bg-red-50',       dot: 'bg-red-500',     text: 'text-red-800'     },
   }[status] || { label: 'No domain', bg: 'bg-gray-100', dot: 'bg-gray-400', text: 'text-gray-600' }
 
@@ -978,6 +979,11 @@ function CustomDomainPanel({ gym, planName, onSave }) {
 
   async function handleRemove() {
     if (!await dialog.confirm(`Remove ${domain}? Your gym will fall back to its subdomain / path URL.`)) return
+    // Detach call hits Vercel for both apex + www in parallel and can take
+    // 5-6s on the worst path — without an in-flight indicator the trash
+    // button looks broken. Disable it + spin the icon for the duration,
+    // and reset in finally so a thrown error doesn't leave it stuck.
+    setRemoving(true)
     try {
       await removeCustomDomain()
       onSave?.({
@@ -989,6 +995,8 @@ function CustomDomainPanel({ gym, planName, onSave }) {
       })
     } catch (err) {
       dialog.alert(err.message || 'Failed to remove domain')
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -1084,10 +1092,11 @@ function CustomDomainPanel({ gym, planName, onSave }) {
                   <button
                     type="button"
                     onClick={handleRemove}
-                    title="Remove domain"
-                    className="px-3 py-2.5 border border-gray-200 text-red-500 hover:text-red-700 hover:border-red-200 rounded-lg cursor-pointer"
+                    disabled={removing}
+                    title={removing ? 'Removing…' : 'Remove domain'}
+                    className="px-3 py-2.5 border border-gray-200 text-red-500 hover:text-red-700 hover:border-red-200 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Trash2 size={14} />
+                    {removing ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
                   </button>
                 </div>
               </Field>
@@ -1194,7 +1203,7 @@ function CustomDomainPanel({ gym, planName, onSave }) {
                   {/* Indicator stack: SSL, www, status flags */}
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {sslProvisioned && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-100 text-emerald-800">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-100 text-emerald-700">
                         <Check size={9} strokeWidth={3} /> SSL active
                       </span>
                     )}

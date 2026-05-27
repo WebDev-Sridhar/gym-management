@@ -468,9 +468,20 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading || cooldown > 0}
-                  className="w-full mt-4 py-3 bg-violet-600 text-white rounded-xl font-bold disabled:bg-gray-400 transition-colors"
+                  className="w-full mt-4 py-3 bg-violet-600 text-white rounded-xl font-bold disabled:bg-gray-400 transition-colors flex items-center justify-center gap-2"
                 >
-                  {cooldown > 0 ? `Retry in ${cooldown}s` : 'Send Reset Link'}
+                  {loading ? (
+                    // In-flight reset request. Spinner uses the same
+                    // border-current trick the rest of the app uses for
+                    // inline loaders so it stays visible against both the
+                    // active violet bg and the disabled gray-400 bg.
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Sending…
+                    </>
+                  ) : cooldown > 0
+                    ? `Retry in ${cooldown}s`
+                    : 'Send Reset Link'}
                 </button>
                 <button
                   type="button"
