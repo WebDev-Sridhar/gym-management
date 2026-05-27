@@ -1099,35 +1099,54 @@ function CustomDomainPanel({ gym, planName, onSave }) {
                   Sign into your domain provider (GoDaddy / Namecheap / Cloudflare) and add the records below. DNS can take 5–30 minutes to propagate.
                 </p>
 
-                {/* Apex A record */}
-                <DnsRow
-                  type="A"
-                  host="@  (apex)"
-                  value={(verData.apex_a && verData.apex_a[0]) || '76.76.21.21'}
-                  onCopy={(v) => copy(v, 'apex')}
-                  copied={copiedField === 'apex'}
-                />
+                {/* Table layout mirrors what most registrar UIs show, so
+                    owners can match field-by-field while transcribing. The
+                    overflow-x-auto wrapper keeps it horizontally scrollable
+                    on narrow screens instead of collapsing rows. */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="py-2 pr-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Type</th>
+                        <th className="py-2 pr-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Name</th>
+                        <th className="py-2 pr-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Priority</th>
+                        <th className="py-2 pr-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Content</th>
+                        <th className="py-2 pr-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">TTL</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Apex A record */}
+                      <DnsRow
+                        type="A"
+                        name="@"
+                        content={(verData.apex_a && verData.apex_a[0]) || '76.76.21.21'}
+                        onCopy={(v) => copy(v, 'apex')}
+                        copied={copiedField === 'apex'}
+                      />
 
-                {/* www CNAME */}
-                <DnsRow
-                  type="CNAME"
-                  host="www"
-                  value={verData.cname_target || 'cname.vercel-dns.com'}
-                  onCopy={(v) => copy(v, 'cname')}
-                  copied={copiedField === 'cname'}
-                />
+                      {/* www CNAME */}
+                      <DnsRow
+                        type="CNAME"
+                        name="www"
+                        content={verData.cname_target || 'cname.vercel-dns.com'}
+                        onCopy={(v) => copy(v, 'cname')}
+                        copied={copiedField === 'cname'}
+                      />
 
-                {/* Verification TXT (only if Vercel returned one) */}
-                {Array.isArray(verData.verification) && verData.verification.map((v, i) => (
-                  <DnsRow
-                    key={i}
-                    type={v.type}
-                    host={v.domain}
-                    value={v.value}
-                    onCopy={(val) => copy(val, `ver-${i}`)}
-                    copied={copiedField === `ver-${i}`}
-                  />
-                ))}
+                      {/* Verification TXT (only if Vercel returned one) */}
+                      {Array.isArray(verData.verification) && verData.verification.map((v, i) => (
+                        <DnsRow
+                          key={i}
+                          type={v.type}
+                          name={v.domain}
+                          content={v.value}
+                          onCopy={(val) => copy(val, `ver-${i}`)}
+                          copied={copiedField === `ver-${i}`}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
                   <button
@@ -1244,22 +1263,41 @@ function CustomDomainPanel({ gym, planName, onSave }) {
   )
 }
 
-function DnsRow({ type, host, value, onCopy, copied }) {
+// One DNS-record row inside the records <table>. Priority/TTL aren't
+// applicable to A or CNAME records (Vercel-issued records all fall in those
+// types or TXT for verification), so we render an em-dash for Priority and
+// "Auto" for TTL — both correct defaults at every major registrar. The Copy
+// button copies the Content field, which is the one owners always have to
+// paste manually.
+// One DNS-record row inside the records <table>. Priority defaults to `0`
+// (the universal "no priority set" value at every registrar that requires
+// the field — leaving the column blank confuses some UIs). TTL defaults
+// to "Auto" which Cloudflare/Namecheap/etc. accept; legacy registrars that
+// need a number can use 3600. The Copy button is icon-only (Copy → Check
+// on click) so it sits compactly next to the Content cell without competing
+// with the data for attention.
+function DnsRow({ type, name, content, priority, ttl, onCopy, copied }) {
   return (
-    <div className="grid grid-cols-12 gap-2 items-center py-2 border-b border-gray-50 last:border-0">
-      <span className="col-span-2 text-[10px] font-bold text-gray-500 uppercase tracking-wide font-mono">{type}</span>
-      <span className="col-span-3 text-xs text-gray-700 font-mono truncate">{host}</span>
-      <div className="col-span-7 flex items-center gap-2 min-w-0">
-        <span className="flex-1 text-xs text-gray-900 font-mono truncate" title={value}>{value}</span>
-        <button
-          type="button"
-          onClick={() => onCopy(value)}
-          className="shrink-0 px-2 py-1 border border-gray-200 rounded text-[10px] font-medium text-gray-600 hover:border-gray-300 cursor-pointer flex items-center gap-1"
-        >
-          {copied ? <><Check size={10} className="text-green-500" />Copied</> : <><Copy size={10} />Copy</>}
-        </button>
-      </div>
-    </div>
+    <tr className="border-b border-gray-50 last:border-0 align-middle">
+      <td className="py-2.5 pr-3 text-[10px] font-bold text-gray-600 uppercase tracking-wide font-mono whitespace-nowrap">{type}</td>
+      <td className="py-2.5 pr-3 text-xs text-gray-700 font-mono whitespace-nowrap">{name}</td>
+      <td className="py-2.5 pr-3 text-xs text-gray-400 font-mono whitespace-nowrap">{priority ?? '0'}</td>
+      <td className="py-2.5 pr-1 text-xs text-gray-900 font-mono break-all" title={content}>
+        <span className="inline-flex items-center gap-1.5">
+          <span>{content}</span>
+          <button
+            type="button"
+            onClick={() => onCopy(content)}
+            title={copied ? 'Copied' : 'Copy'}
+            aria-label={copied ? 'Copied' : 'Copy'}
+            className="shrink-0 p-1 text-gray-400 hover:text-gray-700 cursor-pointer inline-flex items-center justify-center rounded"
+          >
+            {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+          </button>
+        </span>
+      </td>
+      <td className="py-2.5 pr-3 text-xs text-gray-400 font-mono whitespace-nowrap">{ttl || 'Auto'}</td>
+    </tr>
   )
 }
 

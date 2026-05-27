@@ -11,7 +11,7 @@
  */
 
 import { authenticateOwner, getAdmin, json, errorResponse } from '../_lib/auth.js'
-import { addDomainToVercel, normaliseDomain, removeDomainFromVercel } from '../../src/lib/vercel.js'
+import { addDomainToVercel, normaliseDomain, removeDomainFromVercel, getDomainVerificationStatus } from '../../src/lib/vercel.js'
 
 // Bump the serverless function budget so the per-call 8s Vercel timeout has
 // room to fire AND return a clean error before the function itself 504s.
@@ -44,18 +44,12 @@ export async function POST(request) {
       return json(409, { error: 'This domain is already registered to another gym. Contact support if you own it.' })
     }
 
-    // Register the apex domain with Vercel — returns verification
-    // challenges + current status (Vercel auto-checks DNS on add).
-    //
-    // Also claim www.{domain} so visitors who type with or without www
-    // both reach the gym. Middleware redirects www → apex for canonical
-    // URL. We swallow www failures — apex still works without www.
-    //
-    // BOTH requests fire in parallel; we await apex strictly (must succeed
-    // or the whole request fails) and treat www as best-effort. The pre-
-    // settled wwwSettled promise can never reject, so an early throw from
-    // the apex await won't leave an unhandled rejection behind when the
-    // www call eventually resolves.
+    // Register apex + www on Vercel AND check DNS routing status — all in
+    // parallel. Apex add is required (throw → bubble); www is best-effort;
+    // DNS-config check is informational (used below to gate the verified
+    // flag — see comment there). Each promise resolves to a tagged result
+    // so an early throw from the apex await can't strand the others as
+    // unhandled rejections.
     const apexPromise = addDomainToVercel(domain)
     const wwwSettled  = domain.startsWith('www.')
       ? Promise.resolve({ kind: 'skipped' })
@@ -63,31 +57,42 @@ export async function POST(request) {
           ()    => ({ kind: 'ok' }),
           (err) => ({ kind: 'failed', error: err }),
         )
+    const dnsSettled = getDomainVerificationStatus(domain).catch(() => null)
 
     const vercelRes = await apexPromise   // throws → caught by outer catch
     const wwwResult = await wwwSettled
+    const dnsConfig = await dnsSettled
 
     const wwwClaimed = wwwResult.kind === 'ok'
     const wwwError   = wwwResult.kind === 'failed'
       ? (wwwResult.error?.message || 'www variant could not be added')
       : null
 
-    // Persist. Even if Vercel says "verified" immediately (unlikely on
-    // first add), we trust their flag.
-    const isVerified = !!vercelRes?.verified
+    // Don't trust Vercel's `verified` flag alone. It reflects only
+    // ACCOUNT-LEVEL OWNERSHIP — once a domain has been verified on this
+    // Vercel account, the flag stays true forever, including after remove
+    // + re-add cycles. A fresh add of a previously-owned domain therefore
+    // returns verified=true even when no DNS records exist, so the route
+    // doesn't actually resolve. We additionally require the DNS check to
+    // come back not-misconfigured before marking as routable. Matches the
+    // logic in /api/domain/verify.js.
+    const ownershipOk = !!vercelRes?.verified
+    const dnsOk       = dnsConfig != null && dnsConfig.misconfigured === false
+    const isVerified  = ownershipOk && dnsOk
     const update = {
       custom_domain: domain,
       domain_status: isVerified ? 'verified' : 'pending',
       domain_verified_at: isVerified ? new Date().toISOString() : null,
       domain_verification_data: {
-        name:         vercelRes?.name,
-        verified:     vercelRes?.verified,
-        verification: vercelRes?.verification || null,
-        apex_a:       ['76.76.21.21'],                  // Vercel apex A record
-        cname_target: 'cname.vercel-dns.com',           // for www / subdomain hosts
-        www_claimed:  wwwClaimed,
-        www_error:    wwwError,
-        added_at:     new Date().toISOString(),
+        name:          vercelRes?.name,
+        verified:      vercelRes?.verified,
+        verification:  vercelRes?.verification || null,
+        apex_a:        ['76.76.21.21'],                 // Vercel apex A record
+        cname_target:  'cname.vercel-dns.com',          // for www / subdomain hosts
+        www_claimed:   wwwClaimed,
+        www_error:     wwwError,
+        misconfigured: dnsConfig?.misconfigured ?? null,
+        added_at:      new Date().toISOString(),
       },
     }
 

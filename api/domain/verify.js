@@ -42,13 +42,21 @@ export async function POST(request) {
       getDomainVerificationStatus(gym.custom_domain).catch(() => null),
     ])
 
-    const verified      = !!projectConfig?.verified
+    // Vercel's `verified` flag is ACCOUNT-LEVEL OWNERSHIP only — once a
+    // domain has been verified on this account, the flag persists across
+    // remove/re-add cycles. Without the additional DNS check, a re-added
+    // domain with no DNS records would falsely flip to 'verified' even
+    // though no traffic actually routes. Require BOTH ownership AND a
+    // not-misconfigured DNS check before marking routable. Matches the
+    // logic in /api/domain/add.js.
+    const ownershipOk   = !!projectConfig?.verified
     const misconfigured = !!dnsConfig?.misconfigured
+    const verified      = ownershipOk && dnsConfig != null && !misconfigured
     const newStatus     = verified
       ? 'verified'
       : misconfigured
         ? 'failed'
-        : 'pending'   // Still waiting on DNS propagation
+        : 'pending'   // Still waiting on DNS propagation (or DNS API unreachable)
 
     // Persist the new status. domain_verified_at gets timestamped only
     // on the first transition into 'verified'.
