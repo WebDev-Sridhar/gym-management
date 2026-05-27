@@ -699,13 +699,33 @@ export async function updateGymSlug({ gymId, currentSlug, newSlug }) {
  * Returns true if a subdomain is free to claim. Checks gyms.subdomain AND
  * gyms.slug AND gym_slug_redirects.old_slug so a former slug or another
  * gym's claim can't collide.
+ *
+ * Pass `gymId` (the current gym's id) to exempt rows that already belong to
+ * this gym. Without the exemption two legitimate cases get blocked:
+ *   1. Claiming a subdomain that matches the gym's own slug — the slugHit
+ *      lookup returns the gym's own row and we'd report "taken".
+ *   2. Re-claiming a subdomain the gym previously released. updateGymSubdomain
+ *      writes the released name into gym_slug_redirects for back-compat; on
+ *      re-claim, the redirHit lookup returns this gym's own redirect and we'd
+ *      report "taken" even though it's the gym's own to take back.
  */
-export async function checkSubdomainAvailable(subdomain) {
+export async function checkSubdomainAvailable(subdomain, gymId = null) {
   if (!subdomain) return false
+
+  let subQuery   = supabase.from('gyms').select('id').eq('subdomain', subdomain)
+  let slugQuery  = supabase.from('gyms').select('id').eq('slug',      subdomain)
+  let redirQuery = supabase.from('gym_slug_redirects').select('gym_id').eq('old_slug', subdomain)
+
+  if (gymId) {
+    subQuery   = subQuery.neq('id', gymId)
+    slugQuery  = slugQuery.neq('id', gymId)
+    redirQuery = redirQuery.neq('gym_id', gymId)
+  }
+
   const [{ data: subHit }, { data: slugHit }, { data: redirHit }] = await Promise.all([
-    supabase.from('gyms').select('id').eq('subdomain', subdomain).maybeSingle(),
-    supabase.from('gyms').select('id').eq('slug',      subdomain).maybeSingle(),
-    supabase.from('gym_slug_redirects').select('old_slug').eq('old_slug', subdomain).maybeSingle(),
+    subQuery.maybeSingle(),
+    slugQuery.maybeSingle(),
+    redirQuery.maybeSingle(),
   ])
   return !subHit && !slugHit && !redirHit
 }
@@ -726,7 +746,7 @@ export async function updateGymSubdomain({ gymId, currentSubdomain, newSubdomain
   }
 
   if (next) {
-    const free = await checkSubdomainAvailable(next)
+    const free = await checkSubdomainAvailable(next, gymId)
     if (!free) throw new Error('That subdomain is already taken — try another.')
   }
 

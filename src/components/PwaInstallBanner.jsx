@@ -14,8 +14,10 @@
 import { useState, useEffect } from 'react'
 import { usePwaInstall } from '../hooks/usePwaInstall'
 
-const DISMISS_KEY   = 'gymmobius-pwa-dismissed-at'
-const SNOOZE_MS     = 7 * 24 * 60 * 60 * 1000   // 7 days
+const DISMISS_KEY         = 'gymmobius-pwa-dismissed-at'
+const SESSION_DISMISS_KEY = 'gymmobius-pwa-session-dismissed'
+const SNOOZE_MS           = 7 * 24 * 60 * 60 * 1000   // 7 days (manual X)
+const AUTO_CLOSE_MS       = 12_000                    // 12s — long enough to read, short enough not to nag
 
 export default function PwaInstallBanner({ logo, appName }) {
   const { canInstall, isInstalled, install } = usePwaInstall()
@@ -25,8 +27,13 @@ export default function PwaInstallBanner({ logo, appName }) {
   const iconSrc  = logo    || '/favicon/web-app-manifest-192x192.png'
   const name     = appName || 'Gymmobius'
 
-  // Reveal the banner only after checking the snooze timestamp
+  // Reveal the banner only after checking BOTH snooze stores:
+  //   - localStorage: 7-day snooze written by manual X dismiss
+  //   - sessionStorage: per-session snooze written by auto-close (so the
+  //     banner doesn't pop again on every nav within the same session, but
+  //     comes back fresh next time the user opens the site)
   useEffect(() => {
+    if (sessionStorage.getItem(SESSION_DISMISS_KEY)) return
     const ts = Number(localStorage.getItem(DISMISS_KEY) || 0)
     if (Date.now() - ts > SNOOZE_MS) {
       setHidden(false)
@@ -42,6 +49,23 @@ export default function PwaInstallBanner({ logo, appName }) {
     localStorage.setItem(DISMISS_KEY, Date.now())
     setClosing(true)
   }
+
+  // Auto-close after AUTO_CLOSE_MS once the banner is actually showing. We
+  // gate on every visibility condition (not just hidden) so the timer doesn't
+  // start during the initial brief period before usePwaInstall captures
+  // beforeinstallprompt. If the user installs or dismisses, the closing
+  // state cleanup tears this effect down before the timer fires.
+  //
+  // Auto-close is treated lighter than manual X — it writes sessionStorage,
+  // not localStorage, so the banner returns on a fresh session.
+  useEffect(() => {
+    if (hidden || closing || !canInstall || isInstalled) return
+    const t = setTimeout(() => {
+      sessionStorage.setItem(SESSION_DISMISS_KEY, '1')
+      setClosing(true)
+    }, AUTO_CLOSE_MS)
+    return () => clearTimeout(t)
+  }, [hidden, closing, canInstall, isInstalled])
 
   // After slide-out animation completes, fully remove from DOM
   useEffect(() => {

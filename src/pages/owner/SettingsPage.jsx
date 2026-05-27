@@ -862,7 +862,7 @@ export default function SettingsPage() {
                       rightAction={
                         <button
                           type="button"
-                          onClick={() => navigate('/owner-dashboard/website')}
+                          onClick={() => navigate('/owner-dashboard/website#domain')}
                           className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:border-indigo-300 hover:text-indigo-700 cursor-pointer flex items-center gap-1.5"
                         >
                           <Pencil size={11} />Manage
@@ -873,7 +873,7 @@ export default function SettingsPage() {
                     // Domain added but not verified yet → status pill row
                     <button
                       type="button"
-                      onClick={() => navigate('/owner-dashboard/website')}
+                      onClick={() => navigate('/owner-dashboard/website#domain')}
                       className="w-full flex items-center gap-3 px-4 py-3 border border-amber-300 bg-amber-50 hover:bg-amber-100/70 rounded-xl text-left transition-colors cursor-pointer group"
                     >
                       <AlertTriangle size={15} className="text-amber-600 shrink-0" />
@@ -888,7 +888,7 @@ export default function SettingsPage() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => navigate('/owner-dashboard/website')}
+                      onClick={() => navigate('/owner-dashboard/website#domain')}
                       className="w-full flex items-center gap-3 px-4 py-3 border border-dashed border-violet-300 bg-violet-50 hover:bg-violet-100/70 rounded-xl text-left transition-colors cursor-pointer group"
                     >
                       <Globe size={15} className="text-violet-600 shrink-0" />
@@ -1598,7 +1598,7 @@ function SubdomainModal({ gymId, gymSlug, currentSubdomain, onClose, onSaved }) 
     }
     let cancelled = false
     setChecking(true)
-    checkSubdomainAvailable(trimmed)
+    checkSubdomainAvailable(trimmed, gymId)
       .then(ok => { if (!cancelled) setAvailable(ok) })
       .catch(() => { if (!cancelled) setAvailable(null) })
       .finally(() => { if (!cancelled) setChecking(false) })

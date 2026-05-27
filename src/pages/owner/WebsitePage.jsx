@@ -2746,7 +2746,16 @@ export default function WebsitePage() {
   const [plans, setPlans] = useState([])
   const [testimonials, setTestimonials] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeSection, setActiveSection] = useState('theme')
+  // Initial section reads from the URL hash so other pages can deep-link
+  // into a specific Website Builder panel — e.g. SettingsPage routes to
+  // /owner-dashboard/website#domain when the user clicks "Add your own
+  // domain". Falls back to 'theme' for a bare /website visit. We only read
+  // on mount (no hash-change listener) — the sidebar drives all subsequent
+  // changes via setActiveSection.
+  const [activeSection, setActiveSection] = useState(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : ''
+    return hash || 'theme'
+  })
   const [expandedPages, setExpandedPages] = useState(new Set(['settings', 'home']))
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
