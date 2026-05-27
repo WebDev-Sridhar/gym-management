@@ -16,11 +16,9 @@ import { getDomainConfig, getDomainVerificationStatus } from '../../src/lib/verc
 // so the function needs >8s of budget to surface a clean timeout error.
 export const config = { maxDuration: 30 }
 
-export default async function handler(request) {
-  if (request.method !== 'POST') {
-    return json(405, { error: 'Method not allowed' })
-  }
-
+// Named HTTP-method export — see add.js for why we use this signature
+// instead of a default export.
+export async function POST(request) {
   try {
     const owner = await authenticateOwner(request)
 

@@ -14,12 +14,17 @@
 
 const VERCEL_API = 'https://api.vercel.com'
 
-// Hard per-call timeout. Vercel's API is usually <1s, but it can hang for
-// 30s+ on certain bogus/unknown domains while their backend resolves
-// ownership. Without this, our wrapping serverless function would 504 with
-// no useful error — the user saw a 2-3 min spinner then a generic gateway
-// timeout. 8s is generous for the happy path and fails fast on the bad one.
-const TIMEOUT_MS = 8000
+// Hard per-call timeout. Vercel's API is usually <1s but can hang for 30s+
+// on certain bogus/unknown domains while their backend resolves ownership.
+// Without this, our wrapping serverless function would 504 with no useful
+// error — the user saw a 2-3 min spinner then a generic gateway timeout.
+//
+// 6s gives the happy-path (~500ms typical) huge headroom while keeping the
+// total function budget within Vercel Hobby's HARD 10s cap (which ignores
+// our `maxDuration: 30` config): parallel apex+www calls = max 6s + ~1.5s
+// for auth+DB+overhead = ~7.5s total. Pro plans get the same fail-fast
+// behaviour with even more margin.
+const TIMEOUT_MS = 6000
 
 function requireEnv(name) {
   const v = process.env[name]

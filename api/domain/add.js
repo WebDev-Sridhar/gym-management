@@ -19,11 +19,12 @@ import { addDomainToVercel, normaliseDomain, removeDomainFromVercel } from '../.
 // pick 30s — apex + www are now parallel (worst case ~9s incl. overhead).
 export const config = { maxDuration: 30 }
 
-export default async function handler(request) {
-  if (request.method !== 'POST') {
-    return json(405, { error: 'Method not allowed' })
-  }
-
+// Named HTTP-method export — Vercel auto-detects this as a Web Fetch-style
+// handler (returns a Response) without needing an explicit `runtime: 'edge'`
+// config. Avoids the runtime warning we'd get from a `export default` that
+// returns a Response (Vercel would treat it as Node-style and ignore the
+// return value).
+export async function POST(request) {
   try {
     const owner = await authenticateOwner(request)
 

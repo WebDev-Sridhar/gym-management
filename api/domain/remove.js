@@ -17,11 +17,11 @@ import { removeDomainFromVercel } from '../../src/lib/vercel.js'
 // the same opaque gateway-timeout the user hit on /add.
 export const config = { maxDuration: 30 }
 
-export default async function handler(request) {
-  if (request.method !== 'DELETE' && request.method !== 'POST') {
-    return json(405, { error: 'Method not allowed' })
-  }
-
+// Named HTTP-method exports — see add.js for why we use this signature
+// instead of a default export. Same handler under both DELETE (canonical,
+// used by domainService.removeCustomDomain) and POST (legacy fallback for
+// callers that can't issue DELETE).
+async function handler(request) {
   try {
     const owner = await authenticateOwner(request)
     const admin = getAdmin()
@@ -34,15 +34,19 @@ export default async function handler(request) {
       return json(200, { ok: true, alreadyRemoved: true })
     }
 
-    // Detach apex + www from Vercel — failures non-fatal (orphaned domains
-    // can be cleaned up by an admin script later).
-    const apexOutcome = await removeDomainFromVercel(gym.custom_domain)
-      .catch(err => ({ error: err.message }))
-    let wwwOutcome = null
-    if (!gym.custom_domain.startsWith('www.')) {
-      wwwOutcome = await removeDomainFromVercel(`www.${gym.custom_domain}`)
-        .catch(err => ({ error: err.message }))
-    }
+    // Detach apex + www from Vercel in parallel — failures non-fatal
+    // (orphaned domains can be cleaned up by an admin script later). Both
+    // calls are wrapped in .catch so neither can reject; Promise.all then
+    // resolves with both outcomes, keeping total wait at max(apex, www)
+    // instead of apex+www. Critical on Hobby (10s function cap).
+    const [apexOutcome, wwwOutcome] = await Promise.all([
+      removeDomainFromVercel(gym.custom_domain)
+        .catch(err => ({ error: err.message })),
+      gym.custom_domain.startsWith('www.')
+        ? Promise.resolve(null)
+        : removeDomainFromVercel(`www.${gym.custom_domain}`)
+            .catch(err => ({ error: err.message })),
+    ])
     const vercelOutcome = { apex: apexOutcome, www: wwwOutcome }
 
     // Clear DB unconditionally — owner has signalled they don't want this domain.
@@ -62,3 +66,6 @@ export default async function handler(request) {
     return errorResponse(err)
   }
 }
+
+export const DELETE = handler
+export const POST   = handler
