@@ -141,6 +141,10 @@ const GENERIC_MANIFEST = {
     { src: '/favicon/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
     { src: '/favicon/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   ],
+  screenshots: [
+    { src: '/screenshots/desktop.png', sizes: '1280x720', type: 'image/png', form_factor: 'wide', label: 'Gymmobius dashboard' },
+    { src: '/screenshots/mobile.png',  sizes: '385x770',  type: 'image/png', label: 'Gymmobius on mobile' },
+  ],
 }
 
 function manifestResponse(data, cacheSecs = 60, cdnSecs = 300) {
