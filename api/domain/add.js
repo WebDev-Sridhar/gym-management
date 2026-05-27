@@ -13,6 +13,12 @@
 import { authenticateOwner, getAdmin, json, errorResponse } from '../_lib/auth.js'
 import { addDomainToVercel, normaliseDomain, removeDomainFromVercel } from '../../src/lib/vercel.js'
 
+// Bump the serverless function budget so the per-call 8s Vercel timeout has
+// room to fire AND return a clean error before the function itself 504s.
+// Hobby is hard-capped at 10s and ignores this; Pro honors up to 60s. We
+// pick 30s — apex + www are now parallel (worst case ~9s incl. overhead).
+export const config = { maxDuration: 30 }
+
 export default async function handler(request) {
   if (request.method !== 'POST') {
     return json(405, { error: 'Method not allowed' })
@@ -39,21 +45,31 @@ export default async function handler(request) {
 
     // Register the apex domain with Vercel — returns verification
     // challenges + current status (Vercel auto-checks DNS on add).
-    const vercelRes = await addDomainToVercel(domain)
-
+    //
     // Also claim www.{domain} so visitors who type with or without www
     // both reach the gym. Middleware redirects www → apex for canonical
-    // URL. We swallow failures — apex still works without www.
-    let wwwClaimed = false
-    let wwwError   = null
-    if (!domain.startsWith('www.')) {
-      try {
-        await addDomainToVercel(`www.${domain}`)
-        wwwClaimed = true
-      } catch (err) {
-        wwwError = err.message || 'www variant could not be added'
-      }
-    }
+    // URL. We swallow www failures — apex still works without www.
+    //
+    // BOTH requests fire in parallel; we await apex strictly (must succeed
+    // or the whole request fails) and treat www as best-effort. The pre-
+    // settled wwwSettled promise can never reject, so an early throw from
+    // the apex await won't leave an unhandled rejection behind when the
+    // www call eventually resolves.
+    const apexPromise = addDomainToVercel(domain)
+    const wwwSettled  = domain.startsWith('www.')
+      ? Promise.resolve({ kind: 'skipped' })
+      : addDomainToVercel(`www.${domain}`).then(
+          ()    => ({ kind: 'ok' }),
+          (err) => ({ kind: 'failed', error: err }),
+        )
+
+    const vercelRes = await apexPromise   // throws → caught by outer catch
+    const wwwResult = await wwwSettled
+
+    const wwwClaimed = wwwResult.kind === 'ok'
+    const wwwError   = wwwResult.kind === 'failed'
+      ? (wwwResult.error?.message || 'www variant could not be added')
+      : null
 
     // Persist. Even if Vercel says "verified" immediately (unlikely on
     // first add), we trust their flag.

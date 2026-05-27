@@ -12,6 +12,10 @@
 import { authenticateOwner, getAdmin, json, errorResponse } from '../_lib/auth.js'
 import { getDomainConfig, getDomainVerificationStatus } from '../../src/lib/vercel.js'
 
+// Same headroom as /add — two parallel Vercel calls, each bounded at 8s,
+// so the function needs >8s of budget to surface a clean timeout error.
+export const config = { maxDuration: 30 }
+
 export default async function handler(request) {
   if (request.method !== 'POST') {
     return json(405, { error: 'Method not allowed' })

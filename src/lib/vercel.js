@@ -14,6 +14,13 @@
 
 const VERCEL_API = 'https://api.vercel.com'
 
+// Hard per-call timeout. Vercel's API is usually <1s, but it can hang for
+// 30s+ on certain bogus/unknown domains while their backend resolves
+// ownership. Without this, our wrapping serverless function would 504 with
+// no useful error — the user saw a 2-3 min spinner then a generic gateway
+// timeout. 8s is generous for the happy path and fails fast on the bad one.
+const TIMEOUT_MS = 8000
+
 function requireEnv(name) {
   const v = process.env[name]
   if (!v) throw new Error(`Missing required env var: ${name}`)
@@ -30,14 +37,32 @@ async function vercelFetch(path, init = {}) {
   const project = requireEnv('VERCEL_PROJECT_ID')
 
   const url = `${VERCEL_API}${path.replace('{project}', encodeURIComponent(project))}${teamQuery()}`
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      'authorization': `Bearer ${token}`,
-      'content-type':  'application/json',
-      ...(init.headers || {}),
-    },
-  })
+
+  let res
+  try {
+    res = await fetch(url, {
+      ...init,
+      // AbortSignal.timeout fires a DOMException('TimeoutError') after the
+      // given ms — bounded retry-friendly behaviour vs an ad-hoc controller.
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: {
+        'authorization': `Bearer ${token}`,
+        'content-type':  'application/json',
+        ...(init.headers || {}),
+      },
+    })
+  } catch (err) {
+    // Convert the abort into a clean user-facing error so the callers can
+    // surface "Vercel didn't respond" instead of the generic 504 they used
+    // to bubble up after the serverless function ran out of budget.
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      const t = new Error("Vercel didn't respond in time. Try again, or double-check that the domain is correctly typed.")
+      t.status = 504
+      t.code   = 'vercel_timeout'
+      throw t
+    }
+    throw err
+  }
 
   let body
   try { body = await res.json() } catch { body = null }

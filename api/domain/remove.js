@@ -12,6 +12,11 @@
 import { authenticateOwner, getAdmin, json, errorResponse } from '../_lib/auth.js'
 import { removeDomainFromVercel } from '../../src/lib/vercel.js'
 
+// Headroom for the Vercel timeout to fire before the function 504s. /remove
+// usually completes in <1s but a hung Vercel call would otherwise produce
+// the same opaque gateway-timeout the user hit on /add.
+export const config = { maxDuration: 30 }
+
 export default async function handler(request) {
   if (request.method !== 'DELETE' && request.method !== 'POST') {
     return json(405, { error: 'Method not allowed' })
