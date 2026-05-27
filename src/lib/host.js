@@ -82,6 +82,21 @@ export function isMainHost(host = (typeof window !== 'undefined' ? window.locati
 }
 
 /**
+ * Returns the tenant subdomain for the current hostname, or null.
+ *
+ *   owngainz.gymmobius.com → 'owngainz'
+ *   gymmobius.com          → null
+ *   localhost              → null
+ *   ironparadise.com       → null  (custom domain, not a subdomain)
+ *
+ * Use this when you only need the slug string, not the full detectHost result.
+ */
+export function getTenantFromHostname(host = (typeof window !== 'undefined' ? window.location.hostname : '')) {
+  const info = detectHost(host)
+  return info.kind === 'subdomain' ? info.subdomain : null
+}
+
+/**
  * Public-page base path for a gym, given the current host.
  *
  *   On main domain:    "/iron-paradise"  → links become "/iron-paradise/about"

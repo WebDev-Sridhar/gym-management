@@ -5,10 +5,23 @@
  * aggressive — the network always wins, so app updates are immediate.
  *
  * Bump SW_VERSION to force all clients to fetch the new SW on next visit.
+ *
+ * Multi-tenant isolation note
+ * ───────────────────────────
+ * Each subdomain (owngainz.gymmobius.com, fitzone.gymmobius.com, etc.) is a
+ * distinct browser origin. The browser automatically isolates between origins:
+ *   • separate service worker registration & scope
+ *   • separate Cache Storage (no cross-tenant cache collisions possible)
+ *   • separate localStorage / sessionStorage / IndexedDB
+ *   • separate auth cookies
+ *
+ * No explicit tenant-keying is needed in this SW for isolation. If caching is
+ * added in the future, prefix any cache name with SW_VERSION (already unique
+ * per deploy) to avoid stale-asset issues across versions.
  */
-const SW_VERSION = 'v1-2026-05-18'
+const SW_VERSION = 'v2-2026-05-27'
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   self.skipWaiting()
 })
 

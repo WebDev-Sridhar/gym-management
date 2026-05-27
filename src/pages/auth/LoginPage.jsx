@@ -3,22 +3,30 @@ import { useNavigate, Link } from 'react-router-dom'
 import { signInWithGoogle, resendEmailVerification, isEmailNotConfirmedError } from '../../services/authService'
 import { signInAndSeed } from '../../services/auth/signInAndSeed'
 import { useAuth } from '../../store/AuthContext'
-import { supabase } from '../../services/supabaseClient'
+import { supabase, setAccessToken } from '../../services/supabaseClient'
 import { fetchUserProfile } from '../../services/userService'
+import { fetchGymById } from '../../services/gymPublicService'
 import { nextRouteFor } from '../../lib/onboarding'
 import PasswordInput from '../../components/ui/PasswordInput'
+import WrongPortalNotice from '../../components/auth/WrongPortalNotice'
 
 const RESEND_COOLDOWN_SECONDS = 30
 
 export default function LoginPage() {
   // --- States ---
-  const [step, setStep] = useState('email') // 'email' | 'password' | 'forgot' | 'verify-email'
+  const [step, setStep] = useState('email') // 'email' | 'password' | 'forgot' | 'verify-email' | 'wrong-portal'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  // Phase 5 hard reject. When a member or trainer signs in on the SaaS
+  // surface we resolve their gym, sign them out, and show a "wrong portal"
+  // screen with a deep link to /{slug}/login. No auto-redirect anymore —
+  // members must use the branded portal. (Was the Phase 4 soft interstitial;
+  // see PortalRedirectNotice deprecation in AUTH_ARCHITECTURE_AUDIT.md.)
+  const [wrongPortalGym, setWrongPortalGym] = useState(null)
   // Cooldown for the "Resend verification email" button on the verify-email
   // step. Separate from `cooldown` (which is for the forgot-password reset
   // link) so the two flows don't share a stale timer.
@@ -30,7 +38,7 @@ export default function LoginPage() {
   const [resendMsg, setResendMsg] = useState('')
 
   const navigate = useNavigate()
-  const { refreshProfile } = useAuth()
+  const { refreshProfile, initialized, isAuthenticated, profile } = useAuth()
   const timerRef = useRef(null)
 
   // --- Helpers ---
@@ -76,6 +84,51 @@ export default function LoginPage() {
     setStep('password')
   }
 
+  // Single source of truth for post-auth routing on this page. Called from
+  // both handleLogin (just-signed-in case) and the useEffect below (user
+  // visited /login while already authenticated — PublicRoute used to
+  // auto-bounce them, but it's now opted out via disableAuthedRedirect so
+  // the wrong-portal screen can render reliably).
+  //
+  // Owners follow the nextRouteFor state machine immediately. Non-owners
+  // with a gym_id are HARD-REJECTED (Phase 5): we resolve their gym, sign
+  // them out, and render the wrong-portal screen. They must re-sign-in at
+  // their gym's branded portal — no soft funnel to /member-app anymore.
+  async function routePostAuth(p) {
+    if (p && p.role !== 'owner' && p.gym_id) {
+      const gym = await fetchGymById(p.gym_id).catch(() => null)
+      if (gym?.slug) {
+        // Sign out so the user doesn't carry a dangling session on the SaaS
+        // surface. The deep link in WrongPortalNotice takes them to the gym
+        // portal where they'll sign in fresh against the branded URL.
+        await supabase.auth.signOut().catch(() => {})
+        setAccessToken(null)
+        setWrongPortalGym(gym)
+        setStep('wrong-portal')
+        return
+      }
+      // Gym lookup failed (deleted gym, RLS edge case) → fall through to
+      // the normal nextRouteFor flow rather than stranding the user.
+    }
+    navigate(nextRouteFor(p), { replace: true })
+  }
+
+  // Case 1: user visits /login while already authenticated. PublicRoute used
+  // to handle this by auto-Navigating; now it defers to us so the
+  // interstitial gets a chance to render. We only fire when idle on the
+  // email step — won't preempt handleLogin's own routing or any in-progress
+  // step (forgot/verify-email/redirecting).
+  useEffect(() => {
+    if (!initialized) return
+    if (loading) return
+    if (step !== 'email') return
+    if (!isAuthenticated) return
+    // profile may be null for fresh-signup authed users with no users-row
+    // yet — routePostAuth → nextRouteFor(null) → '/create-gym'.
+    routePostAuth(profile)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialized, isAuthenticated, profile, step, loading])
+
   async function handleLogin(e) {
     e.preventDefault()
     setLoading(true)
@@ -94,7 +147,8 @@ export default function LoginPage() {
       // updates AuthContext so the destination page sees fresh state.
       const fresh = await fetchUserProfile(user.id)
       await refreshProfile()
-      navigate(nextRouteFor(fresh), { replace: true })
+
+      await routePostAuth(fresh)
     } catch (err) {
       // "Email not confirmed" → don't dead-end the user on a flat error.
       // Auto-fire a fresh confirmation link (they already proved intent by
@@ -232,29 +286,42 @@ export default function LoginPage() {
       <div className="w-full lg:w-[35%] flex flex-col items-center justify-center px-8 bg-white">
         <div className="w-full max-w-sm">
           
-          <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-8 transition-colors">
-            ← Back
-          </Link>
+          {/* Back link hidden on the wrong-portal step — the user just got
+              hard-rejected; their next move is the gym deep link, not a
+              return to the marketing site. */}
+          {step !== 'wrong-portal' && (
+            <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-8 transition-colors">
+              ← Back
+            </Link>
+          )}
 
-          <div className="mb-10">
-            <div className="w-12 h-auto lg:hidden flex items-center justify-center ">
-              <img src="/logo.png" alt="Gymmobius logo" className="w-full h-auto" />
+          {step === 'wrong-portal' && wrongPortalGym && (
+            <div className="mt-10">
+              <WrongPortalNotice gym={wrongPortalGym} />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">
-              {step === 'forgot'
-                ? 'Reset Password'
-                : step === 'verify-email'
-                  ? 'Verify Your Email'
-                  : 'Welcome back'}
-            </h2>
-            <p className="text-gray-500 mt-2">
-              {step === 'forgot'
-                ? 'Enter your email to receive a secure link.'
-                : step === 'verify-email'
-                  ? "We've sent a confirmation link to your inbox."
-                  : 'Sign in to manage your gym dashboard.'}
-            </p>
-          </div>
+          )}
+
+          {step !== 'wrong-portal' && (
+            <div className="mb-10">
+              <div className="w-12 h-auto lg:hidden flex items-center justify-center ">
+                <img src="/logo.png" alt="Gymmobius logo" className="w-full h-auto" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900">
+                {step === 'forgot'
+                  ? 'Reset Password'
+                  : step === 'verify-email'
+                    ? 'Verify Your Email'
+                    : 'Welcome back'}
+              </h2>
+              <p className="text-gray-500 mt-2">
+                {step === 'forgot'
+                  ? 'Enter your email to receive a secure link.'
+                  : step === 'verify-email'
+                    ? "We've sent a confirmation link to your inbox."
+                    : 'Sign in to manage your gym dashboard.'}
+              </p>
+            </div>
+          )}
 
           {/* Error & Success Messages */}
           {error && (
@@ -416,24 +483,31 @@ export default function LoginPage() {
             )}
           </div>
 
-          {/* Footer UI */}
-          <p className="text-center text-sm text-gray-500 mt-10">
-            Don’t have an account?{' '}
-            <Link to="/signup" className="text-violet-600 font-bold hover:underline">
-              Join for free
-            </Link>
-          </p>
-          <p className="text-center text-xs text-gray-400 mt-2">
-            {'Members & trainers — sign in with the email your gym registered for you.'}
-          </p>
+          {/* Footer UI — hidden on the redirecting step since the user is
+              already signed in and about to be navigated away. */}
+          {step !== 'wrong-portal' && (
+            <>
+              <p className="text-center text-sm text-gray-500 mt-10">
+                Don’t have an account?{' '}
+                <Link to="/signup" className="text-violet-600 font-bold hover:underline">
+                  Join for free
+                </Link>
+              </p>
+              <p className="text-center text-xs text-gray-400 mt-2">
+                {'Members & trainers — sign in with the email your gym registered for you.'}
+              </p>
+            </>
+          )}
 
-          <div className="mt-12 pt-8 border-t border-gray-100">
-            <p className="text-center text-[11px] text-gray-400 leading-relaxed">
-              By continuing, you agree to our{' '}
-              <a href="/privacy" className="text-gray-600 font-medium underline underline-offset-2">Privacy Policy</a> and{' '}
-              <a href="/terms" className="text-gray-600 font-medium underline underline-offset-2">Terms of Service</a>.
-            </p>
-          </div>
+          {step !== 'wrong-portal' && (
+            <div className="mt-12 pt-8 border-t border-gray-100">
+              <p className="text-center text-[11px] text-gray-400 leading-relaxed">
+                By continuing, you agree to our{' '}
+                <a href="/privacy" className="text-gray-600 font-medium underline underline-offset-2">Privacy Policy</a> and{' '}
+                <a href="/terms" className="text-gray-600 font-medium underline underline-offset-2">Terms of Service</a>.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

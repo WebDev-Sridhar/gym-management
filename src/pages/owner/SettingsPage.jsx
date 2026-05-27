@@ -1492,7 +1492,7 @@ function ChangeUrlModal({ gymId, currentSlug, onClose, onSaved }) {
           )}
 
           {unchanged && trimmed && (
-            <p className="text-[11px] text-gray-400">This is your current URL.</p>
+            <p className="text-[11px] text-green-600">This is your current URL.</p>
           )}
 
           <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
@@ -1698,7 +1698,7 @@ function SubdomainModal({ gymId, gymSlug, currentSubdomain, onClose, onSaved }) 
           )}
 
           {unchanged && trimmed && (
-            <p className="text-[11px] text-gray-400">This is your current subdomain.</p>
+            <p className="text-[11px] text-green-600">This is your current subdomain.</p>
           )}
 
           {currentSubdomain && !trimmed && (

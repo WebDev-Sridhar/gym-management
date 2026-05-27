@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { roleHome } from '../../lib/onboarding'
 
-export default function PublicRoute({ children }) {
+export default function PublicRoute({ children, disableAuthedRedirect = false }) {
   const { loading, initialized, isAuthenticated, role, profile } = useAuth()
 
   // Block until the first auth check finishes. After that, only show the
@@ -17,7 +17,13 @@ export default function PublicRoute({ children }) {
     )
   }
 
-  if (isAuthenticated && role) {
+  // When the wrapped page owns its own post-auth routing (e.g. LoginPage's
+  // Phase 4 portal-redirect interstitial), skip the auto-Navigate. Without
+  // this opt-out, the race goes: signInAndSeed resolves → AuthContext fires
+  // SIGNED_IN → PublicRoute re-renders with isAuthenticated=true → <Navigate
+  // to=roleHome(role)> beats handleLogin's setStep('redirecting') to the
+  // punch, and the user lands on /member-app without ever seeing the nudge.
+  if (isAuthenticated && role && !disableAuthedRedirect) {
     return <Navigate to={roleHome(role)} replace />
   }
 

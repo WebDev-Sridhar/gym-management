@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useGym } from '../../store/GymContext'
 import { signUpWithEmail, resendEmailVerification, getEmailState } from '../../services/authService'
 import PasswordInput from '../../components/ui/PasswordInput'
-import { isPasswordValid, PASSWORD_MIN_LENGTH } from '../../components/ui/PasswordRequirements'
+import PasswordRequirements, { isPasswordValid, PASSWORD_MIN_LENGTH, friendlyPasswordError } from '../../components/ui/PasswordRequirements'
 
 const RESEND_COOLDOWN_SECONDS = 60
 
@@ -46,9 +46,15 @@ export default function GymJoinPage() {
   const [phone, setPhone]       = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm]   = useState('')
+  // Show the live requirements checklist when the field is focused OR
+  // already has any content (so it stays visible while the user fixes a
+  // partial password after blurring back).
+  const [pwFocused, setPwFocused] = useState(false)
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [done, setDone]         = useState(false)
+
+  const passwordOK = isPasswordValid(password)
   // Resend cooldown — starts at RESEND_COOLDOWN_SECONDS the moment the
   // confirmation email is sent, ticks down to 0, then the button becomes
   // active. Prevents owners from spamming Supabase's email service.
@@ -88,7 +94,7 @@ export default function GymJoinPage() {
     if (!isPasswordValid(password)) {
       return setError(`Password must include lowercase, uppercase letters and a number (min ${PASSWORD_MIN_LENGTH} chars).`)
     }
-    if (password !== confirm) return setError('Passwords do not match')
+    if (password !== confirm) return setError('Passwords do not match.')
 
     setLoading(true)
     setIsPendingResend(false)
@@ -135,7 +141,7 @@ export default function GymJoinPage() {
         },
       )
 
-      if (signUpError) { setError(signUpError.message); return }
+      if (signUpError) { setError(friendlyPasswordError(signUpError.message)); return }
 
       setIsPendingResend(state === 'unconfirmed')
       setDone(true)
@@ -288,11 +294,16 @@ export default function GymJoinPage() {
                   className=""
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
+                  placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
                   style={inputStyle}
                   iconColor="var(--gym-text-muted)"
-                  onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}
-                  onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }}
+                  onFocus={e => { setPwFocused(true); e.target.style.borderColor = 'var(--gym-primary)' }}
+                  onBlur={e => { setPwFocused(false); e.target.style.borderColor = 'var(--gym-border-strong)' }}
+                />
+                <PasswordRequirements
+                  value={password}
+                  visible={pwFocused || password.length > 0}
+                  tone="dark"
                 />
               </div>
               <div>
@@ -308,8 +319,8 @@ export default function GymJoinPage() {
                   onBlur={e => { e.target.style.borderColor = 'var(--gym-border-strong)' }}
                 />
               </div>
-              <button type="submit" disabled={loading}
-                className="w-full py-3 text-white font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
+              <button type="submit" disabled={loading || !email.trim() || !passwordOK || !confirm}
+                className="w-full py-3 text-white font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                 style={{ background: 'var(--gym-gradient)', borderRadius: 'var(--gym-card-radius)' }}>
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>

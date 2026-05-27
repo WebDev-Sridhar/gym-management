@@ -122,3 +122,25 @@ export function dailySummaryEmail(args: {
   `
   return { subject: `📊 ${gymName} — daily summary`, html: shell(brand, body) }
 }
+
+// Phase 5 find-my-gym lookup. Sent from the public /functions/v1/find-my-gym
+// endpoint when a member or trainer can't remember their gym's branded URL
+// and uses the lookup form on the SaaS wrong-portal screen. Anti-enumeration:
+// we send the email only when there's a matching record, but the API always
+// returns success either way so callers can't probe for registered emails.
+export function findMyGymEmail(args: {
+  gym: GymCtx
+  portalUrl: string
+}): { subject: string; html: string } {
+  const brand = args.gym.theme_color || '#8B5CF6'
+  const gymName = safe(args.gym.name, 'your gym')
+  const body = `
+    <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:6px;">Your gym portal</div>
+    <div style="color:#6b7280;margin-bottom:22px;">You asked us to look up your gym on Gymmobius — here's the branded portal for <b>${gymName}</b>.</div>
+    ${btn(args.portalUrl, `Sign in to ${gymName}`, brand)}
+    <div style="color:#6b7280;font-size:13px;margin-top:22px;">Bookmark this URL so you don't lose it:</div>
+    <div style="color:${brand};font-size:13px;word-break:break-all;margin-top:4px;"><a href="${args.portalUrl}" style="color:${brand};text-decoration:underline;">${args.portalUrl}</a></div>
+    <div style="color:#9ca3af;font-size:12px;margin-top:22px;">Didn't request this? You can safely ignore this email — no changes were made to your account.</div>
+  `
+  return { subject: `Your Gymmobius gym portal — ${gymName}`, html: shell(brand, body) }
+}

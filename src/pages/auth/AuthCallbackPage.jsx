@@ -5,18 +5,25 @@ import {
   fetchGymBySlug,
   fetchGymBySubdomain,
   fetchGymByCustomDomain,
+  fetchGymById,
 } from '../../services/gymPublicService'
 import { fetchUserProfile } from '../../services/userService'
 import { linkInviteOrMember } from '../../services/auth/linkInviteOrMember'
 import { useAuth } from '../../store/AuthContext'
 import { nextRouteFor } from '../../lib/onboarding'
-import { detectHost } from '../../lib/host'
+import { detectHost, isMainHost } from '../../lib/host'
 import BrandLoader from '../../components/ui/BrandLoader'
+import WrongPortalNotice from '../../components/auth/WrongPortalNotice'
 
 export default function AuthCallbackPage() {
-  const [status, setStatus] = useState('processing') // 'processing' | 'error' | 'notMember'
+  const [status, setStatus] = useState('processing') // 'processing' | 'error' | 'notMember' | 'wrongPortal'
   const [errorMsg, setErrorMsg] = useState('')
   const [unknownGym, setUnknownGym] = useState(null)     // { name, slug, theme_color } when notMember
+  // Phase 5 hard reject — when a member/trainer completes OAuth or email
+  // verification on the SaaS surface (main host), we resolve their gym,
+  // sign them out, and show the wrong-portal screen. No auto-redirect to
+  // /member-app anymore; members must use the branded /{slug}/login URL.
+  const [wrongPortalGym, setWrongPortalGym] = useState(null)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // Optional gym context — set by GymJoinPage when the signup happened on a
@@ -173,6 +180,36 @@ export default function AuthCallbackPage() {
         navigate(safeReturn, { replace: true })
         return
       }
+
+      // Phase 5 hard reject. A non-owner who completed OAuth or email
+      // verification on the SaaS main host (e.g. Google sign-in from /login)
+      // gets signed out and shown the wrong-portal screen — the SaaS surface
+      // is owner-only after Phase 5. Skip when:
+      //   - the user is an owner (SaaS callback is their normal path)
+      //   - we're already on a tenant host (the branded path — members are
+      //     allowed there; this is exactly where the gym deep link sends them)
+      //   - there's no gym_id to resolve (newly linked but row not ready)
+      if (profile && profile.role !== 'owner' && profile.gym_id && isMainHost()) {
+        // Reuse the already-fetched gym row when it matches — saves a round
+        // trip in the common case where requestedGym (from ?gym tag) is the
+        // same one their profile points at.
+        const gym = requestedGym?.id === profile.gym_id
+          ? requestedGym
+          : await fetchGymById(profile.gym_id).catch(() => null)
+        if (gym?.slug) {
+          // Sign out so they don't carry a dangling session on the SaaS
+          // surface. The deep link in WrongPortalNotice routes them to the
+          // gym portal where they'll re-authenticate against the branded URL.
+          await supabase.auth.signOut().catch(() => {})
+          setAccessToken(null)
+          setWrongPortalGym(gym)
+          setStatus('wrongPortal')
+          return
+        }
+        // Gym lookup failed (deleted gym, RLS edge) — fall through rather
+        // than stranding the user on a stuck spinner.
+      }
+
       navigate(nextRouteFor(profile), { replace: true })
     } catch (err) {
       console.error('Route user error:', err)
@@ -270,6 +307,18 @@ export default function AuthCallbackPage() {
                 </a>
               </>
             )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'wrongPortal' && wrongPortalGym) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+            <WrongPortalNotice gym={wrongPortalGym} />
           </div>
         </div>
       </div>

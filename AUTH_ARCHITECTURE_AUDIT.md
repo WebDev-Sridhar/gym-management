@@ -670,14 +670,19 @@ A staged sequence that avoids touching production auth state until late:
 
 ### Phase 4 — Move user-facing surfaces
 
-12. Announce: members and trainers should sign in at their gym portal. SaaS `/login` continues to accept them with a redirect-to-gym-portal message.
-13. Update email templates so links match the originating surface.
+12. Announce: members and trainers should sign in at their gym portal. SaaS `/login` continues to accept them with a redirect-to-gym-portal message. *(Done — see [PortalRedirectNotice.jsx](src/components/auth/PortalRedirectNotice.jsx); LoginPage now owns its own post-auth routing via the new `disableAuthedRedirect` prop on PublicRoute so the interstitial isn't preempted by PublicRoute's auto-Navigate race.)*
+13. Update email templates so links match the originating surface. *(Done — see [SUPABASE_EMAIL_TEMPLATES.md](SUPABASE_EMAIL_TEMPLATES.md) for drop-in snippets to paste into Supabase Dashboard → Authentication → Email Templates.)*
 
 ### Phase 5 — Hard split
 
-14. SaaS `/login` rejects non-owner roles with a "wrong portal" message + deep-link to the correct gym portal.
-15. Member-app and trainer-dashboard move under tenant URLs (`/{slug}/app`, `/{slug}/trainer`). Old `/member-app` and `/trainer-dashboard` URLs 301 to the tenant variant.
-16. Decommission shared SaaS callback path. Each surface owns its own.
+14. SaaS `/login` rejects non-owner roles with a "wrong portal" message + deep-link to the correct gym portal. *(Done — see [WrongPortalNotice.jsx](src/components/auth/WrongPortalNotice.jsx); LoginPage's `routePostAuth` now signs out non-owners and renders the screen instead of the Phase 4 soft interstitial. The find-my-gym affordance posts to [find-my-gym/index.ts](supabase/functions/find-my-gym/index.ts) — anti-enumeration email lookup for users who forgot their gym slug.)*
+15. Member-app and trainer-dashboard move under tenant URLs (`/{slug}/app`, `/{slug}/trainer`). Old `/member-app` and `/trainer-dashboard` URLs 301 to the tenant variant. *(Deferred — needs its own planning doc. Largest single phase scope: touches every navigation call inside the member/trainer surfaces, plus a redirect table for outstanding email-link bookmarks.)*
+16. Decommission shared SaaS callback path. Each surface owns its own. *(Done — see [AuthCallbackPage.jsx](src/pages/auth/AuthCallbackPage.jsx) `routeUser`. Main-host callbacks now hard-reject any non-owner result (signs out + renders WrongPortalNotice). Tenant-host callbacks still handle the member/trainer link flows. The file is still shared, but the surface logic is split by `isMainHost()`.)*
+
+**Phase 5 follow-ups:**
+- [PortalRedirectNotice.jsx](src/components/auth/PortalRedirectNotice.jsx) is now unused — delete in a cleanup commit once Phase 5 has bedded in.
+- Find-my-gym function expects `MAIN_DOMAIN` env var in Supabase Function secrets (mirrors frontend `VITE_MAIN_DOMAIN`). Defaults to `gymmobius.vercel.app` if unset.
+- Deploy: `supabase functions deploy find-my-gym --no-verify-jwt` (must allow anonymous callers).
 
 ### Rollback plan
 

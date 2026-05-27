@@ -174,8 +174,12 @@ export default function App() {
           <Route path={ROUTES.LEGAL.REFUND} element={<RefundPolicyPage />} />
 
           {/* Auth & onboarding flow */}
+          {/* LoginPage owns its own post-auth routing so it can show the
+              Phase 4 portal-redirect interstitial before navigating non-owners
+              to /member-app. disableAuthedRedirect skips PublicRoute's auto-
+              Navigate that would otherwise race the interstitial. */}
           <Route path={ROUTES.AUTH.LOGIN} element={
-            <PublicRoute><LoginPage /></PublicRoute>
+            <PublicRoute disableAuthedRedirect><LoginPage /></PublicRoute>
           } />
           <Route path={ROUTES.AUTH.SIGNUP} element={
             <PublicRoute><SignupPage /></PublicRoute>

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { fetchGymBySlug, fetchGymBySubdomain, fetchGymByCustomDomain, resolveSlugRedirect } from '../services/gymPublicService'
 import { detectHost } from '../lib/host'
+import { useTenantMeta } from '../hooks/useTenantMeta'
 
 const GymContext = createContext(null)
 
@@ -25,6 +26,10 @@ export function GymProvider({ children }) {
   const [gym, setGym] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+
+  // Sync document <head> metadata (title, theme-color, favicon, OG tags) with
+  // the resolved tenant. No-ops on the main domain where gym stays null.
+  useTenantMeta(gym)
 
   // Detected once — host doesn't change without a full page reload
   const hostInfo = useMemo(

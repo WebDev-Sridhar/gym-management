@@ -18,8 +18,10 @@ export const PASSWORD_MIN_LENGTH = 8
  *   minLen   — minimum length (defaults to PASSWORD_MIN_LENGTH)
  *   visible  — controls whether the checklist renders (e.g. only on focus
  *              or when value is non-empty). Caller decides.
+ *   tone     — 'light' (default, white-bg SaaS pages) or 'dark' (gym
+ *              tenant pages, which use --gym-* CSS variables and dark cards).
  */
-export default function PasswordRequirements({ value = '', minLen = PASSWORD_MIN_LENGTH, visible = true }) {
+export default function PasswordRequirements({ value = '', minLen = PASSWORD_MIN_LENGTH, visible = true, tone = 'light' }) {
   if (!visible) return null
 
   const checks = [
@@ -29,18 +31,24 @@ export default function PasswordRequirements({ value = '', minLen = PASSWORD_MIN
     { label: 'One number (0–9)',              pass: /\d/.test(value)    },
   ]
 
+  const isDark = tone === 'dark'
+  const idleBadge = isDark ? 'bg-white/10 text-white/40' : 'bg-gray-100 text-gray-400'
+  const idleText  = isDark ? 'text-white/50'             : 'text-gray-400'
+  const passBadge = isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'
+  const passText  = isDark ? 'text-white/80'             : 'text-gray-700'
+
   return (
     <ul className="mt-2 space-y-1">
       {checks.map(({ label, pass }) => (
         <li key={label} className="flex items-center gap-2 text-[11px]">
           <span
             className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-              pass ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'
+              pass ? passBadge : idleBadge
             }`}
           >
             {pass ? <Check size={9} strokeWidth={3} /> : <X size={8} strokeWidth={2.5} />}
           </span>
-          <span className={`transition-colors ${pass ? 'text-gray-700' : 'text-gray-400'}`}>
+          <span className={`transition-colors ${pass ? passText : idleText}`}>
             {label}
           </span>
         </li>
