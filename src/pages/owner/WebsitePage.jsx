@@ -1099,6 +1099,7 @@ function CustomDomainPanel({ gym, planName, onSave }) {
                   Sign into your domain provider (GoDaddy / Namecheap / Cloudflare) and add the records below. DNS can take 5–30 minutes to propagate.
                 </p>
 
+
                 {/* Table layout mirrors what most registrar UIs show, so
                     owners can match field-by-field while transcribing. The
                     overflow-x-auto wrapper keeps it horizontally scrollable
@@ -1119,7 +1120,7 @@ function CustomDomainPanel({ gym, planName, onSave }) {
                       <DnsRow
                         type="A"
                         name="@"
-                        content={(verData.apex_a && verData.apex_a[0]) || '76.76.21.21'}
+                        content={(verData.apex_a && verData.apex_a[0]) || '216.198.79.1'}
                         onCopy={(v) => copy(v, 'apex')}
                         copied={copiedField === 'apex'}
                       />

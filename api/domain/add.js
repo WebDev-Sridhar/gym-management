@@ -87,8 +87,8 @@ export async function POST(request) {
         name:          vercelRes?.name,
         verified:      vercelRes?.verified,
         verification:  vercelRes?.verification || null,
-        apex_a:        ['76.76.21.21'],                 // Vercel apex A record
-        cname_target:  'cname.vercel-dns.com',          // for www / subdomain hosts
+        apex_a:        ['216.198.79.1'],                // Vercel apex A record (current)
+        cname_target:  'cname.vercel-dns.com',          // generic fallback; Vercel may issue a per-domain target — check their dashboard if our value doesn't work
         www_claimed:   wwwClaimed,
         www_error:     wwwError,
         misconfigured: dnsConfig?.misconfigured ?? null,

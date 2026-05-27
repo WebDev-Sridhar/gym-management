@@ -58,11 +58,22 @@ export async function POST(request) {
         ? 'failed'
         : 'pending'   // Still waiting on DNS propagation (or DNS API unreachable)
 
+    // Pull the previously-stored verification payload so we don't wipe
+    // apex_a / cname_target / www_claimed when we update with the fresh
+    // verification status. Verify is called repeatedly (manually + by the
+    // 30s auto-poll), and clobbering those fields on every call left the
+    // UI falling back to its hardcoded literals — masking any per-domain
+    // CNAME Vercel may have issued.
+    const { data: existing } = await admin
+      .from('gyms').select('domain_verification_data').eq('id', owner.gymId).single()
+    const prevData = existing?.domain_verification_data || {}
+
     // Persist the new status. domain_verified_at gets timestamped only
     // on the first transition into 'verified'.
     const update = {
       domain_status: newStatus,
       domain_verification_data: {
+        ...prevData,
         ...(projectConfig?.verification ? { verification: projectConfig.verification } : {}),
         last_checked_at: new Date().toISOString(),
         misconfigured,
@@ -80,8 +91,8 @@ export async function POST(request) {
       verified,
       misconfigured,
       verification:  projectConfig?.verification || null,
-      apex_a:        ['76.76.21.21'],
-      cname_target:  'cname.vercel-dns.com',
+      apex_a:        prevData.apex_a       || ['216.198.79.1'],
+      cname_target:  prevData.cname_target || 'cname.vercel-dns.com',
     })
   } catch (err) {
     return errorResponse(err)
