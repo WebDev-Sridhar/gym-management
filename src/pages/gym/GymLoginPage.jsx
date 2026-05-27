@@ -302,7 +302,7 @@ export default function GymLoginPage() {
       // Tag the reset link with the gym slug so ResetPasswordPage can route
       // the user back to THIS gym's login after a successful reset, not the
       // SaaS owner login. Without the tag, members from a path-based gym URL
-      // (gymmobius.app/iron-paradise/login) end up at /login (SaaS) after
+      // (gymmobius.com/iron-paradise/login) end up at /login (SaaS) after
       // reset — wrong audience, wrong branding.
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: `${window.location.origin}/reset-password?gym=${encodeURIComponent(gym.slug)}`,

@@ -4,8 +4,8 @@ This SaaS supports three URL surfaces per gym, gated by subscription tier:
 
 | Tier | URL | Phase shipped |
 |---|---|---|
-| Starter | `gymmobius.app/iron-paradise` | Phase 0 (today) |
-| Pro / Premium | `iron-paradise.gymmobius.app` | **Phase 1 (live)** |
+| Starter | `gymmobius.com/iron-paradise` | Phase 0 (today) |
+| Pro / Premium | `iron-paradise.gymmobius.com` | **Phase 1 (live)** |
 | Premium / Enterprise | `ironparadise.com` | Phase 2 (next) |
 
 Phase 1 is implemented in the codebase. This document tells you what to do
@@ -15,7 +15,7 @@ in Vercel + at your domain registrar so subdomains actually resolve.
 
 ## ── Phase 1 — Subdomains (live)
 
-You need **wildcard DNS** so any `*.gymmobius.app` request reaches Vercel,
+You need **wildcard DNS** so any `*.gymmobius.com` request reaches Vercel,
 then a corresponding **Vercel domain entry** so Vercel knows to serve our
 project for those hosts.
 
@@ -34,13 +34,13 @@ One-time setup. Infinite subdomains.
    ```
 2. **Vercel dashboard → Project → Settings → Domains → Add Domain**:
    ```
-   *.gymmobius.app
+   *.gymmobius.com
    ```
    Vercel will verify the wildcard CNAME and auto-provision Let's Encrypt
    SSL covering every subdomain. (Subject Alternative Name wildcard cert.)
-3. Confirm green checkmark next to `*.gymmobius.app` in the Vercel dashboard.
+3. Confirm green checkmark next to `*.gymmobius.com` in the Vercel dashboard.
 
-That's it. Now `anything.gymmobius.app` resolves to the project. The
+That's it. Now `anything.gymmobius.com` resolves to the project. The
 middleware classifies the host and serves the right gym.
 
 #### Path B — Vercel Free (workaround, scales to ~50 domains)
@@ -56,7 +56,7 @@ VERCEL_TEAM_ID     = <team_xxxx — only if project is in a team scope>
 ```
 
 The codebase needs a tiny addition to wire this up — call
-`addDomainToVercel(`${subdomain}.gymmobius.app`)` from
+`addDomainToVercel(`${subdomain}.gymmobius.com`)` from
 `updateGymSubdomain` in `src/services/membershipService.js`. The helper
 lives in `src/lib/vercel.js` (shipped in Phase 2). On Path A this call
 is a no-op because the wildcard already covers it.
@@ -73,11 +73,11 @@ Set these in **Vercel Project → Settings → Environment Variables**
 
 | Variable | Value | Used in |
 |---|---|---|
-| `VITE_MAIN_DOMAIN` | `gymmobius.app` | Frontend + middleware host detection |
+| `VITE_MAIN_DOMAIN` | `gymmobius.com` | Frontend + middleware host detection |
 | `VITE_SUPABASE_URL` | Your Supabase project URL | Frontend + middleware OG fetch |
 | `VITE_SUPABASE_ANON_KEY` | Anon key | Frontend + middleware OG fetch |
 
-`VITE_MAIN_DOMAIN` falls back to `gymmobius.app` if unset, so production
+`VITE_MAIN_DOMAIN` falls back to `gymmobius.com` if unset, so production
 works without it — but it's required for staging/preview environments
 where the main domain might differ.
 
@@ -102,12 +102,12 @@ for local dev. To test subdomain behaviour locally:
 
 1. Add to `/etc/hosts` (`C:\Windows\System32\drivers\etc\hosts` on Windows):
    ```
-   127.0.0.1   gymmobius.app
-   127.0.0.1   iron-paradise.gymmobius.app
-   127.0.0.1   pulse-fitness.gymmobius.app
+   127.0.0.1   gymmobius.com
+   127.0.0.1   iron-paradise.gymmobius.com
+   127.0.0.1   pulse-fitness.gymmobius.com
    ```
 2. Start the dev server: `npm run dev`
-3. Visit `http://iron-paradise.gymmobius.app:5173` in your browser.
+3. Visit `http://iron-paradise.gymmobius.com:5173` in your browser.
 
 Subdomain routing in dev runs entirely client-side — the Vercel middleware
 only fires in deployed environments. So you can verify the React routing
@@ -122,15 +122,15 @@ After deploying with Path A or B, sanity-check:
 
 | Test | Expected |
 |---|---|
-| Visit `gymmobius.app` | Landing page renders (unchanged) |
-| Visit `gymmobius.app/some-real-slug` (gym has no subdomain) | Gym page renders, OG tags reflect gym |
-| Visit `gymmobius.app/some-real-slug` (gym claimed subdomain `paradise`) | 301 → `https://paradise.gymmobius.app` |
-| Visit `paradise.gymmobius.app` | Gym page renders, internal links go to `/about` not `/some-real-slug/about` |
-| Visit `paradise.gymmobius.app/about` | About page renders |
-| Visit `paradise.gymmobius.app` then look at the tab title | `Some Real Gym — Train with us` (from `useDocumentHead`) |
+| Visit `gymmobius.com` | Landing page renders (unchanged) |
+| Visit `gymmobius.com/some-real-slug` (gym has no subdomain) | Gym page renders, OG tags reflect gym |
+| Visit `gymmobius.com/some-real-slug` (gym claimed subdomain `paradise`) | 301 → `https://paradise.gymmobius.com` |
+| Visit `paradise.gymmobius.com` | Gym page renders, internal links go to `/about` not `/some-real-slug/about` |
+| Visit `paradise.gymmobius.com/about` | About page renders |
+| Visit `paradise.gymmobius.com` then look at the tab title | `Some Real Gym — Train with us` (from `useDocumentHead`) |
 | Inspect HTML response in DevTools Network tab | `<title>` and `<meta property="og:*">` already contain gym data (injected by middleware) |
-| Visit `random-not-real-gym.gymmobius.app` | "GYM NOT FOUND" screen renders |
-| Visit `api.gymmobius.app` (reserved) | Treated as main domain → landing page (since `api` is reserved) |
+| Visit `random-not-real-gym.gymmobius.com` | "GYM NOT FOUND" screen renders |
+| Visit `api.gymmobius.com` (reserved) | Treated as main domain → landing page (since `api` is reserved) |
 
 ---
 
@@ -163,7 +163,7 @@ How it works:
    repeatedly. Once Vercel confirms DNS, status flips to ✓ Verified.
 6. Vercel auto-provisions Let's Encrypt SSL ~60s after verification.
    "SSL active" pill appears in the dashboard.
-7. Visitors to `gymmobius.app/iron-paradise` get **301 redirected** to
+7. Visitors to `gymmobius.com/iron-paradise` get **301 redirected** to
    `https://ironparadise.com` (canonical URL hierarchy).
 
 Removal cleans up both the apex and `www` from Vercel.

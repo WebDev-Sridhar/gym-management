@@ -2,7 +2,7 @@
 // Body: { planName, price, durationDays }
 //
 // Uses the PLATFORM Razorpay account (env: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
-// — NOT the gym's keys. Gym owners pay GymOS for the SaaS via the platform
+// — NOT the gym's keys. Gym owners pay Gymmobius for the SaaS via the platform
 // account. Per-gym keys are only for gyms collecting from their members.
 //
 // Creates a Razorpay Order, inserts a pending subscription row, returns

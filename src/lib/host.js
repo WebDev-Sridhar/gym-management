@@ -3,8 +3,8 @@
  * rest of the app (router, GymContext, link builders, middleware) can
  * branch without scattering hostname string-checks across the codebase.
  *
- *   kind = 'main'      → gymmobius.app (or www.gymmobius.app, or localhost)
- *   kind = 'subdomain' → iron-paradise.gymmobius.app   (Pro+ feature)
+ *   kind = 'main'      → gymmobius.com (or www.gymmobius.com, or localhost)
+ *   kind = 'subdomain' → iron-paradise.gymmobius.com   (Pro+ feature)
  *   kind = 'custom'    → ironparadise.com               (Premium feature)
  *
  * The middleware can't import from `src/`, so it duplicates this logic.
@@ -14,9 +14,9 @@
 
 import { RESERVED_SUBDOMAINS } from './slug'
 
-// Set VITE_MAIN_DOMAIN=gymmobius.app in your .env.
+// Set VITE_MAIN_DOMAIN=gymmobius.com in your .env.
 // Falls back to the production domain so prod works without the env var set.
-export const MAIN_DOMAIN = (import.meta.env?.VITE_MAIN_DOMAIN || 'gymmobius.vercel.app').toLowerCase()
+export const MAIN_DOMAIN = (import.meta.env?.VITE_MAIN_DOMAIN || 'gymmobius.com').toLowerCase()
 
 /** Normalise a host string: lowercase, strip port, strip trailing dot. */
 function normaliseHost(host) {
@@ -67,7 +67,7 @@ export function detectHost(host) {
   if (h === MAIN_DOMAIN || h === `www.${MAIN_DOMAIN}`) return { kind: 'main', host: h }
 
   if (h.endsWith(`.${MAIN_DOMAIN}`)) {
-    const sub = h.slice(0, -1 * (MAIN_DOMAIN.length + 1)) // strip ".gymmobius.app"
+    const sub = h.slice(0, -1 * (MAIN_DOMAIN.length + 1)) // strip ".gymmobius.com"
     if (!sub || sub.includes('.')) return { kind: 'main', host: h } // e.g. deep.sub.x → treat as main
     if (RESERVED_SUBDOMAINS.has(sub)) return { kind: 'main', host: h }
     return { kind: 'subdomain', subdomain: sub, host: h }

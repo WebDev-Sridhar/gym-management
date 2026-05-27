@@ -9,7 +9,7 @@ const GymContext = createContext(null)
 
 /**
  * GymProvider — resolves a gym from EITHER the URL path (`/iron-paradise/...`)
- * or the host (`iron-paradise.gymmobius.app`, or a verified custom domain).
+ * or the host (`iron-paradise.gymmobius.com`, or a verified custom domain).
  *
  * Resolution order:
  *   1. host = subdomain → lookup by subdomain

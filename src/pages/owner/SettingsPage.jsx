@@ -1448,7 +1448,7 @@ function ChangeUrlModal({ gymId, currentSlug, onClose, onSaved }) {
             <label className="block text-xs font-medium text-gray-500 mb-1.5">New URL slug</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-mono select-none pointer-events-none">
-                {typeof window !== 'undefined' ? window.location.host : 'gymmobius.app'}/
+                {typeof window !== 'undefined' ? window.location.host : 'gymmobius.com'}/
               </span>
               <input
                 value={draft}
@@ -1711,7 +1711,7 @@ function SubdomainModal({ gymId, gymSlug, currentSubdomain, onClose, onSaved }) 
 
           <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
             <p className="text-[11px] text-gray-600 leading-relaxed">
-              After save, <span className="font-mono">gymmobius.app/{gymSlug}</span> will redirect to your new subdomain. Existing posters / shared links keep working.
+              After save, <span className="font-mono">gymmobius.com/{gymSlug}</span> will redirect to your new subdomain. Existing posters / shared links keep working.
             </p>
           </div>
         </div>

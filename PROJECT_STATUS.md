@@ -68,8 +68,8 @@ The 20% that needs work before scaling beyond that:
 - `branch_id` (added in `multi_branch_v1` migration on 2026-05-19) is a **sub-tenant** boundary, currently enforced at the app layer only via `applyBranchFilter()` — RLS stays gym-scoped in v1
 - Starter/Pro orgs get one auto-created "Main" branch; Enterprise can create more
 - Three tenant URL surfaces:
-  - `gymmobius.app/iron-paradise` (path-based, Starter)
-  - `iron-paradise.gymmobius.app` (subdomain, Pro+)
+  - `gymmobius.com/iron-paradise` (path-based, Starter)
+  - `iron-paradise.gymmobius.com` (subdomain, Pro+)
   - `ironparadise.com` (custom domain, Premium)
 
 ### Auth + role systems
@@ -223,7 +223,7 @@ Verdict legend: ✅ Fully Implemented · 🟡 Partially Implemented · 🔴 Not 
 
 | Feature | Status | Notes |
 |---|---|---|
-| Phase 1: subdomains (`*.gymmobius.app`) | ✅ | Wildcard CNAME → Vercel. |
+| Phase 1: subdomains (`*.gymmobius.com`) | ✅ | Wildcard CNAME → Vercel. |
 | Phase 2: custom domains via Vercel Domains API | ✅ | `/api/domain/*` routes, auto-claim www, client-side auto-poll for verification. Per-gym SSL automatic. |
 | Phase 3a: SSL pill, www indicator, www→apex 301 | ✅ | |
 | Phase 3b: scheduled health check, downgrade enforcement, email on status change | 🔴 | Roadmap. |

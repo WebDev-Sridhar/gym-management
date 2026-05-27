@@ -34,7 +34,7 @@ const FEATURE_RULES = {
   custom_seo:           ['pro', 'premium'],   // override meta description, OG image, keywords
 
   // ── Domains ────────────────────────────────────────────────────────────
-  custom_subdomain:     ['pro', 'premium'],   // iron-paradise.gymmobius.app  (Phase 1)
+  custom_subdomain:     ['pro', 'premium'],   // iron-paradise.gymmobius.com  (Phase 1)
   custom_domain:        ['premium'],          // ironparadise.com             (Phase 2)
 
   // ── Multi-branch (gym chains) ──────────────────────────────────────────

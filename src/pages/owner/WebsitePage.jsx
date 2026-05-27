@@ -883,7 +883,7 @@ function SeoPanel({ gym, gymId, planName, onSave }) {
                 </div>
                 <div className="px-4 py-3 border-t border-gray-100">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide truncate">
-                    {typeof window !== 'undefined' ? window.location.host : 'gymmobius.app'}
+                    {typeof window !== 'undefined' ? window.location.host : 'gymmobius.com'}
                   </p>
                   <p className="text-sm font-semibold text-gray-900 mt-0.5 leading-snug line-clamp-2">{effectiveTitle}</p>
                   <p className="text-xs text-gray-500 mt-1 leading-relaxed line-clamp-3">{effectiveDesc}</p>
@@ -1044,7 +1044,7 @@ function CustomDomainPanel({ gym, planName, onSave }) {
     >
       <SectionHeader
         title="Custom Domain"
-        description="Replace gymmobius.app with your own domain. We auto-provision SSL once your DNS resolves. Visitors to the old URL are 301-redirected to your custom domain."
+        description="Replace gymmobius.com with your own domain. We auto-provision SSL once your DNS resolves. Visitors to the old URL are 301-redirected to your custom domain."
       />
 
       <div className="grid lg:grid-cols-5 gap-6">
@@ -1233,7 +1233,7 @@ function CustomDomainPanel({ gym, planName, onSave }) {
               <ul className="space-y-1 list-disc list-inside marker:text-indigo-400">
                 <li>Visitors reach your gym at your own domain — no Gymmobius branding in the URL</li>
                 <li>HTTPS / SSL provisioned automatically by Vercel</li>
-                <li>Old <span className="font-mono">gymmobius.app/{gym?.slug}</span> links 301-redirect to your domain</li>
+                <li>Old <span className="font-mono">gymmobius.com/{gym?.slug}</span> links 301-redirect to your domain</li>
                 <li>Better SEO — your gym's domain authority is independent</li>
               </ul>
             </div>

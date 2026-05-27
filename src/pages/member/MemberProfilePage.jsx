@@ -39,7 +39,7 @@ export default function MemberProfilePage() {
     setLoggingOut(true)
     const slug = gymSlug
     // On the main host, prefix with the slug so the user lands on the
-    // gym-branded login at gymmobius.app/{slug}/login. On tenant hosts
+    // gym-branded login at gymmobius.com/{slug}/login. On tenant hosts
     // (subdomain / custom domain) the slug isn't part of the URL — use
     // bare /login which resolves to GymLoginPage via TenantRoutes.
     const target = (slug && isMainHost()) ? `/${slug}/login` : '/login'

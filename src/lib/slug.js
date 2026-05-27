@@ -1,5 +1,5 @@
 /**
- * Slug utilities for gym public URLs (gymmobius.app/{slug}).
+ * Slug utilities for gym public URLs (gymmobius.com/{slug}).
  *
  * Source of truth for:
  *   - reserved words that conflict with app routes

@@ -107,14 +107,14 @@ const gymChildRoutes = (
 
 
 // Routes block rendered when the visitor lands on a tenant host
-// (iron-paradise.gymmobius.app or a verified custom domain). No marketing
+// (iron-paradise.gymmobius.com or a verified custom domain). No marketing
 // pages, no owner dashboard — the owner always uses the main host.
 //
 // `/auth/callback` and `/reset-password` are mounted as siblings of GymLayout
 // (not nested under it) so they render bare, without gym chrome. Required
 // on tenant hosts because Supabase email links use the originating host as
-// `redirectTo` — a member who signs up at iron-paradise.gymmobius.app
-// receives a confirmation link that lands at iron-paradise.gymmobius.app/auth/
+// `redirectTo` — a member who signs up at iron-paradise.gymmobius.com
+// receives a confirmation link that lands at iron-paradise.gymmobius.com/auth/
 // callback. Without these routes, the link 404s.
 //
 // `/member-app` and `/trainer-dashboard` mounted here so that AuthCallback

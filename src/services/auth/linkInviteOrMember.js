@@ -56,7 +56,7 @@ export async function linkInviteOrMember(authUser, options = {}) {
   //    (typically: gym-portal login). Two sub-cases:
   //
   //    a) Owner using a gym portal. Owners belong on the SaaS login at
-  //       gymmobius.app. Signing them in here would navigate to
+  //       gymmobius.com. Signing them in here would navigate to
   //       /owner-dashboard which doesn't even exist on tenant hosts (blank
   //       page), and on the main host it'd take them to THEIR gym (not the
   //       one whose portal they used) — confusing either way.

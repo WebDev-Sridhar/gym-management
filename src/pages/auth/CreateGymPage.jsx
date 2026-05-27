@@ -229,16 +229,16 @@ export default function CreateGymPage() {
                   {slugStatus !== 'taken' && (
                     <span className="text-gray-400">
                       Your URL: <span className={`font-semibold tracking-tight ${slugStatus === 'available' ? 'text-emerald-600' : 'text-violet-600'}`}>
-                        gymmobius.app/{nameSlug}
+                        gymmobius.com/{nameSlug}
                       </span>
                     </span>
                   )}
                   {slugStatus === 'taken' && (
                     <span className="text-amber-700">
-                      <span className="line-through text-gray-400 font-mono mr-1">gymmobius.app/{nameSlug}</span>
+                      <span className="line-through text-gray-400 font-mono mr-1">gymmobius.com/{nameSlug}</span>
                       is taken — you'll get{' '}
                       <span className="text-violet-600 font-semibold tracking-tight">
-                        gymmobius.app/{fallbackSlug || `${nameSlug}-XXXX`}
+                        gymmobius.com/{fallbackSlug || `${nameSlug}-XXXX`}
                       </span>
                     </span>
                   )}

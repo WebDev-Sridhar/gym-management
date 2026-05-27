@@ -16,7 +16,7 @@ export async function fetchGymBySlug(slug) {
 
 /**
  * Fetch gym by subdomain (Pro+ feature) — used when the visitor lands on
- * iron-paradise.gymmobius.app. Same column projection as fetchGymBySlug
+ * iron-paradise.gymmobius.com. Same column projection as fetchGymBySlug
  * so the rest of the page treats the result identically.
  */
 export async function fetchGymBySubdomain(subdomain) {

@@ -39,8 +39,8 @@ You run **one Supabase Auth instance** with **one set of `auth.users` rows** sha
 
 | App | Mounted at | Auth layout | Login surface |
 |---|---|---|---|
-| SaaS marketing + owner dashboard | `gymmobius.app` | `LoginPage`, `SignupPage` (App.jsx:151-156) | Same form for everyone |
-| Tenant gym public website | `:slug.gymmobius.app`, custom domains, OR `/<slug>` on main host | `GymLoginPage`, `GymJoinPage` (App.jsx:95-96) | Branded per gym |
+| SaaS marketing + owner dashboard | `gymmobius.com` | `LoginPage`, `SignupPage` (App.jsx:151-156) | Same form for everyone |
+| Tenant gym public website | `:slug.gymmobius.com`, custom domains, OR `/<slug>` on main host | `GymLoginPage`, `GymJoinPage` (App.jsx:95-96) | Branded per gym |
 | Member / Trainer dashboards | `/member-app`, `/trainer-dashboard` | No login of their own — entered via either SaaS login or gym login | — |
 
 Two Supabase clients (`src/services/supabaseClient.js`):
@@ -54,7 +54,7 @@ A third `supabaseAnon` (no session) is used by public-checkout services.
 
 `App.jsx:53-55` computes `HOST_KIND` from `window.location.hostname` exactly once at app boot. If it's `subdomain`/`custom`, only `TenantRoutes` (gym public pages) renders. If `main`, the full Routes tree mounts — including `/login`, `/owner-dashboard`, `/:gymSlug`, etc.
 
-→ **Key implication:** an owner cannot reach the dashboard from `iron-paradise.gymmobius.app` — `/owner-dashboard` doesn't exist in `TenantRoutes`. They must use the bare `gymmobius.app` host.
+→ **Key implication:** an owner cannot reach the dashboard from `iron-paradise.gymmobius.com` — `/owner-dashboard` doesn't exist in `TenantRoutes`. They must use the bare `gymmobius.com` host.
 
 ### Classification (see Section 12 for detail)
 
@@ -148,7 +148,7 @@ The owner-signup Google flow and the member-signup Google flow are **literally t
      └─ navigate('/login')                ← hard-coded SaaS login
 ```
 
-`GymLoginPage:235` *also* sends reset emails with `redirectTo: {origin}/reset-password`. Same target. So a member who triggers "Forgot password" from `iron-paradise.gymmobius.app/login` clicks an email link, lands on `{origin}/reset-password` (SaaS host), sets new password, then `ResetPasswordPage:60` bounces them to `/login` (SaaS owner login form, not their gym's). **Already broken UX today.**
+`GymLoginPage:235` *also* sends reset emails with `redirectTo: {origin}/reset-password`. Same target. So a member who triggers "Forgot password" from `iron-paradise.gymmobius.com/login` clicks an email link, lands on `{origin}/reset-password` (SaaS host), sets new password, then `ResetPasswordPage:60` bounces them to `/login` (SaaS owner login form, not their gym's). **Already broken UX today.**
 
 ### 2.5 Trainer — Login
 
@@ -162,7 +162,7 @@ Two duplicates of the same invite-claim logic — `AuthCallbackPage:147-163` and
 ### 2.6 Member — Login (Gym Portal)
 
 ```
-/{slug}/login  (or  {slug}.gymmobius.app/login  in TenantRoutes)
+/{slug}/login  (or  {slug}.gymmobius.com/login  in TenantRoutes)
   └─ signInWithEmail
      ├─ setAccessToken(session.access_token) — seeded MANUALLY
      ├─ fetchUserProfile → null?
@@ -305,11 +305,11 @@ That last branch — no member match + no `?gym` tag → routed to owner onboard
 
 | Where the session token actually lives | Notes |
 |---|---|
-| `localStorage` keys with `sb-` prefix | Per-origin. Tokens written under `gymmobius.app` are NOT accessible from `iron-paradise.gymmobius.app`. |
+| `localStorage` keys with `sb-` prefix | Per-origin. Tokens written under `gymmobius.com` are NOT accessible from `iron-paradise.gymmobius.com`. |
 | `gym:lastSlug` localStorage key | Set on every successful profile load to remember which gym to redirect *deleted* members back to. |
 | Module-level `_accessToken` in supabaseClient.js | In-memory only, lost on full reload. Re-seeded from `getSession()` via AuthContext. |
 
-**Consequence:** Logging in on `gymmobius.app/iron-paradise/login` and then navigating to `iron-paradise.gymmobius.app` is **a new origin → not signed in**. The user has to log in *again* on the subdomain. There is no cross-host session sharing, and your current architecture has no plan to add one.
+**Consequence:** Logging in on `gymmobius.com/iron-paradise/login` and then navigating to `iron-paradise.gymmobius.com` is **a new origin → not signed in**. The user has to log in *again* on the subdomain. There is no cross-host session sharing, and your current architecture has no plan to add one.
 
 ### 4.4 Role / gym / branch persistence
 
@@ -412,11 +412,11 @@ TenantRoutes  (App.jsx:111-119)
     └── (same gymChildRoutes — login, join, about, etc.)
 ```
 
-**No `/owner-dashboard`, `/member-app`, `/trainer-dashboard` exist here.** Members who try to deep-link to their app from `iron-paradise.gymmobius.app/member-app` get a route not found.
+**No `/owner-dashboard`, `/member-app`, `/trainer-dashboard` exist here.** Members who try to deep-link to their app from `iron-paradise.gymmobius.com/member-app` get a route not found.
 
 ### 6.3 Route-structure problems
 
-- **Owner dashboard, member app, trainer dashboard live next to SaaS marketing routes** at the same domain. Bookmark for `gymmobius.app/owner-dashboard` works only because the SaaS host serves the SPA fallback.
+- **Owner dashboard, member app, trainer dashboard live next to SaaS marketing routes** at the same domain. Bookmark for `gymmobius.com/owner-dashboard` works only because the SaaS host serves the SPA fallback.
 - **Member app + trainer dashboard have no tenant context in their URL.** `/member-app` knows nothing about which gym the user belongs to. It relies entirely on `useAuth().gymId`. If a user has rows in two gyms (rare today, but possible if `findMemberByEmail` picked the wrong row — your hardened lookup logs a warning but still picks one), they're silently routed to whichever was returned first.
 - **Reset password is global.** The recovery link points to SaaS host. Member portals never have their own reset surface.
 - **Reserved-subdomain handling in `host.js`** is the gatekeeper preventing tenant routes from clobbering `www`/`admin`/etc. — if you add new top-level paths (e.g. `/status`), you need to add the corresponding subdomain to `RESERVED_SUBDOMAINS`. Easy to forget.
@@ -452,7 +452,7 @@ TenantRoutes  (App.jsx:111-119)
 
 - **Magic link** (`sendMagicLink`) is wired in `authService.js` but **never called** from any UI. Dead code awaiting removal or activation.
 - **Phone OTP** is explicitly deprecated (`authService.js:110-131`) but exports kept "so in-flight references don't crash before the next release ships."
-- **Reset URL is hard-coded to `${origin}/reset-password`** in both SaaS LoginPage and GymLoginPage. There's no way to send a gym-portal reset where the post-reset destination is the gym's URL. → A member who resets from `iron-paradise.gymmobius.app` ends up on the SaaS host with no gym context, sees `/login` (owner form), gets confused.
+- **Reset URL is hard-coded to `${origin}/reset-password`** in both SaaS LoginPage and GymLoginPage. There's no way to send a gym-portal reset where the post-reset destination is the gym's URL. → A member who resets from `iron-paradise.gymmobius.com` ends up on the SaaS host with no gym context, sees `/login` (owner form), gets confused.
 - **No callback for "successful reset"**. After `updateUser({ password })`, `ResetPasswordPage` calls `signOut()` and navigates to `/login`. Members lose their session and have to re-authenticate on the wrong portal.
 
 ---
@@ -481,7 +481,7 @@ TenantRoutes  (App.jsx:111-119)
 1. **Profile creation lives in the page itself.** GymLoginPage:138-176 inlines all the link-as-member-or-trainer logic. Same code, different file, as AuthCallback. → Bug fix in one is invisible in the other (e.g., the phone-fallback path was added to AuthCallback only).
 2. **`refreshProfile` is called from the gym page** to close the race that AuthContext caused. The gym page knows nothing about why this is needed — it's there because someone fixed a "page doesn't render after login" bug. Coupling between layers.
 3. **GymLoginPage explicitly seeds `setAccessToken`** before its data queries. SaaS LoginPage doesn't. → Implies SaaS LoginPage was written first, and the data-client model evolved later, but the older code wasn't updated. A future SaaS LoginPage change that issues a data query immediately after sign-in could surface the same bug GymLoginPage already worked around.
-4. **Branding context is read from `useGym()`** — but `useGym()` is only available because `GymLayout` mounts `GymProvider`. If you ever want a "gym-aware login" hosted at a different URL (e.g. `gymmobius.app/login?gym=…`), the page would need either its own context resolver or a new wrapper.
+4. **Branding context is read from `useGym()`** — but `useGym()` is only available because `GymLayout` mounts `GymProvider`. If you ever want a "gym-aware login" hosted at a different URL (e.g. `gymmobius.com/login?gym=…`), the page would need either its own context resolver or a new wrapper.
 
 ### 10.3 Branding/context confusion
 
@@ -496,17 +496,17 @@ TenantRoutes  (App.jsx:111-119)
 
 | Host kind | URL example | `/login` resolves to | Session cookie scope | Reset link target |
 |---|---|---|---|---|
-| `main` | `gymmobius.app` | SaaS `LoginPage` | `.gymmobius.app` (per-origin) | `gymmobius.app/reset-password` |
-| `main` with path slug | `gymmobius.app/iron-paradise/login` | `GymLoginPage` | `gymmobius.app` | `gymmobius.app/reset-password` |
-| `subdomain` | `iron-paradise.gymmobius.app/login` | `GymLoginPage` (via TenantRoutes) | `iron-paradise.gymmobius.app` | `iron-paradise.gymmobius.app/reset-password` (but `/reset-password` doesn't exist in TenantRoutes!) |
+| `main` | `gymmobius.com` | SaaS `LoginPage` | `.gymmobius.com` (per-origin) | `gymmobius.com/reset-password` |
+| `main` with path slug | `gymmobius.com/iron-paradise/login` | `GymLoginPage` | `gymmobius.com` | `gymmobius.com/reset-password` |
+| `subdomain` | `iron-paradise.gymmobius.com/login` | `GymLoginPage` (via TenantRoutes) | `iron-paradise.gymmobius.com` | `iron-paradise.gymmobius.com/reset-password` (but `/reset-password` doesn't exist in TenantRoutes!) |
 | `custom` | `ironparadise.com/login` | `GymLoginPage` | `ironparadise.com` | `ironparadise.com/reset-password` (also missing in TenantRoutes!) |
 | `localhost` | `localhost:5173/iron-paradise/login` | `GymLoginPage` | `localhost` | `localhost:5173/reset-password` |
 
 ### 11.2 Critical issues this exposes
 
-1. **`/reset-password` is missing from `TenantRoutes`.** A member who clicks a reset link generated from `iron-paradise.gymmobius.app/login` lands on `iron-paradise.gymmobius.app/reset-password` → **404 / route not found** since TenantRoutes only contains `gymChildRoutes`. They have no recovery path.
+1. **`/reset-password` is missing from `TenantRoutes`.** A member who clicks a reset link generated from `iron-paradise.gymmobius.com/login` lands on `iron-paradise.gymmobius.com/reset-password` → **404 / route not found** since TenantRoutes only contains `gymChildRoutes`. They have no recovery path.
 2. **`/auth/callback` is missing from `TenantRoutes`.** Email-confirmation links generated when signup happens on a subdomain land on `{subdomain}/auth/callback` → also no route. (Today this works only because `GymJoinPage` builds `redirectTo: ${window.location.origin}/auth/callback` which on the subdomain origin would 404.) Verify by attempting a fresh signup from a subdomain — likely already broken.
-3. **Session is per-origin.** A member with sessions on `gymmobius.app` cannot use them on `iron-paradise.gymmobius.app` or `ironparadise.com`. You have NO single-sign-on across subdomains today. If the product expects "sign in once at the gym site, use any tenant URL," that's a separate feature you haven't built.
+3. **Session is per-origin.** A member with sessions on `gymmobius.com` cannot use them on `iron-paradise.gymmobius.com` or `ironparadise.com`. You have NO single-sign-on across subdomains today. If the product expects "sign in once at the gym site, use any tenant URL," that's a separate feature you haven't built.
 4. **OAuth callback URLs must be whitelisted in Supabase Auth** for every host. Adding a new custom domain requires manually updating Supabase's "Redirect URLs" list. There's no automation for that today.
 5. **Hard-coded `${window.location.origin}` redirects** (in `signInWithGoogle`, `signUpWithEmail`, `resetPasswordForEmail`) mean every host has its own callback URL — which is good for isolation, bad because every URL must be allowlisted.
 
@@ -532,7 +532,7 @@ This is **hybrid auth with context-mixing**.
 **Scalability risks:**
 
 - Each new role (e.g. `branch_manager`, `receptionist`) compounds the role-routing matrix in 4 places.
-- Each new tenant-host type (e.g. `*.partner.gymmobius.app` reseller subdomains) breaks `HOST_KIND` assumptions and forces another branch in `TenantRoutes`.
+- Each new tenant-host type (e.g. `*.partner.gymmobius.com` reseller subdomains) breaks `HOST_KIND` assumptions and forces another branch in `TenantRoutes`.
 - The member-app today has *no* tenant-aware URL. The day a member belongs to two gyms (multi-gym membership), the routing can't represent it.
 
 ---
@@ -575,7 +575,7 @@ Goal: split **SaaS Platform Auth** from **Gym App Auth** so each has clear bound
 ```
 ┌─────────────────────────────────────┐    ┌─────────────────────────────────────┐
 │      SaaS Platform Auth             │    │       Gym App Auth                  │
-│  (gymmobius.app)                    │    │  (subdomain or custom domain)       │
+│  (gymmobius.com)                    │    │  (subdomain or custom domain)       │
 ├─────────────────────────────────────┤    ├─────────────────────────────────────┤
 │ Surfaces:                           │    │ Surfaces:                           │
 │  /login           owner only        │    │  /login           member + trainer  │

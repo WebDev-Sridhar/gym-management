@@ -327,7 +327,7 @@ async function processSaasReminders(supabase: SupabaseClient) {
         languageCode: 'en',
         bodyValues: [
           ownerName,
-          sub.plan_name ?? 'GymOS',
+          sub.plan_name ?? 'Gymmobius',
           daysLeft === 0 ? 'today' : `in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`,
           billingUrl,
         ],

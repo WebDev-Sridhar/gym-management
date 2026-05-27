@@ -38,7 +38,7 @@ interface Body { email?: string }
 // MAIN_DOMAIN env var mirrors VITE_MAIN_DOMAIN on the frontend — keep both
 // pointed at the same canonical SaaS host so portal URLs in emails match
 // what the user expects to see in their browser.
-const MAIN_DOMAIN = Deno.env.get('MAIN_DOMAIN') ?? 'gymmobius.vercel.app'
+const MAIN_DOMAIN = Deno.env.get('MAIN_DOMAIN') ?? 'gymmobius.com'
 
 Deno.serve(async (req) => {
   const cors = handleCorsPreflight(req)

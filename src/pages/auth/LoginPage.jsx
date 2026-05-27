@@ -493,9 +493,7 @@ export default function LoginPage() {
                   Join for free
                 </Link>
               </p>
-              <p className="text-center text-xs text-gray-400 mt-2">
-                {'Members & trainers — sign in with the email your gym registered for you.'}
-              </p>
+          
             </>
           )}
 
