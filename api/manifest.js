@@ -113,10 +113,15 @@ function buildTenantManifest(gym, origin) {
     background_color: '#000000',
     theme_color: themeColor,
     orientation: 'portrait-primary',
+    // Only purpose:'any' — gym owners upload arbitrary logos that aren't
+    // designed for the maskable safe-zone convention (centered content +
+    // solid background filling the canvas). Declaring a transparent PNG as
+    // maskable causes Chrome to fill the transparent corners with black on
+    // the Android splash screen, producing a black rounded-square behind
+    // the logo even when background_color is white.
     icons: [
       { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   }
 }
@@ -131,10 +136,17 @@ const GENERIC_MANIFEST = {
   background_color: '#ffffff',
   theme_color: '#6366f1',
   orientation: 'portrait-primary',
+  // Maskable purpose deliberately omitted — the existing 192/512 PNGs have
+  // transparent backgrounds and aren't designed with a maskable safe zone,
+  // so Chrome on Android was rendering a black rounded square behind the
+  // logo on the install splash screen. With purpose:'any' only, the OS
+  // renders the PNG as-is and the transparent areas show the splash's
+  // background_color (white). Trade-off: launcher icon on Android Q+
+  // adaptive-icon devices won't perfectly match other apps' adaptive shape,
+  // but that's a minor cosmetic loss vs. the splash regression we just fixed.
   icons: [
     { src: '/favicon/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: '/favicon/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-    { src: '/favicon/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   ],
 }
 

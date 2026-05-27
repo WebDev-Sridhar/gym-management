@@ -5,6 +5,7 @@ import { Home, Users, Dumbbell, User } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 import { TrainerDataProvider } from '../../store/TrainerDataContext'
 import { supabaseData as supabase } from '../../services/supabaseClient'
+import { useDocumentHead } from '../../hooks/useDocumentHead'
 import ScreenShell from '../trainer/ScreenShell'
 
 // Direct imports — no Outlet, no lazy loading
@@ -59,10 +60,22 @@ export default function TrainerLayout() {
 
   useEffect(() => {
     if (!gymId) return
-    supabase.from('gyms').select('name, logo_url').eq('id', gymId).single()
+    // theme_color pulled in alongside name/logo so the per-gym browser
+    // tab UI (favicon + theme-color meta) matches the gym's brand.
+    supabase.from('gyms').select('name, logo_url, theme_color').eq('id', gymId).single()
       .then(({ data }) => { if (data) setGym(data) })
       .catch(() => {})
   }, [gymId])
+
+  // Per-gym browser tab identity. Restores SaaS defaults on unmount —
+  // important because /trainer-dashboard is reachable on both main host and
+  // tenant hosts, and navigating away shouldn't leave the gym favicon
+  // stuck on the next page.
+  useDocumentHead({
+    title:      gym?.name ? `${gym.name} — Trainer` : undefined,
+    favicon:    gym?.logo_url || undefined,
+    themeColor: gym?.theme_color || undefined,
+  })
 
   function goTo(path) {
     // replace:true — tab hops don't stack in browser history.

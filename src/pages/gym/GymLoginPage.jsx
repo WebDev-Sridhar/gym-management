@@ -8,6 +8,7 @@ import PasswordInput from '../../components/ui/PasswordInput'
 import { useAuth } from '../../store/AuthContext'
 import { linkInviteOrMember } from '../../services/auth/linkInviteOrMember'
 import { roleHome } from '../../lib/onboarding'
+import { isMainHost, MAIN_DOMAIN } from '../../lib/host'
 
 const inputStyle = {
   width: '100%',
@@ -49,7 +50,7 @@ export default function GymLoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const returnTo = safeReturnUrl(searchParams.get('return'))
-  const { refreshProfile } = useAuth()
+  const { refreshProfile, initialized, isAuthenticated, profile, role } = useAuth()
 
   const [step, setStep]         = useState('email') // 'email' | 'password' | 'forgot' | 'verify-email'
   const [email, setEmail]       = useState('')
@@ -84,6 +85,49 @@ export default function GymLoginPage() {
     const id = setTimeout(() => setVerifyCooldown(s => s - 1), 1000)
     return () => clearTimeout(id)
   }, [verifyCooldown])
+
+  // Already-authed auto-redirect. Owner equivalent of PublicRoute's "if
+  // authed, navigate to roleHome" behavior — GymLoginPage isn't wrapped in
+  // PublicRoute (it's nested inside gymChildRoutes), so without this a
+  // member reopening /{slug}/login with a live session sees the email form
+  // and thinks persistence is broken.
+  //
+  // Only fires when idle on the email step — guarded against preempting
+  // an in-progress handleLogin / forgot-password / verify-email flow.
+  //
+  // Branches:
+  //   - Right gym member/trainer → roleHome (honors ?return= for members)
+  //   - Owner                    → cross-host redirect to main /owner-dashboard
+  //   - Wrong gym, or no profile → render the form (user signs in fresh)
+  useEffect(() => {
+    if (!gym) return
+    if (!initialized) return
+    if (loading) return
+    if (step !== 'email') return
+    if (!isAuthenticated || !profile) return
+
+    if (role === 'owner') {
+      // Owners don't belong on a gym portal. Cross-host nav back to SaaS.
+      if (isMainHost()) {
+        navigate('/owner-dashboard', { replace: true })
+      } else {
+        window.location.href = `https://${MAIN_DOMAIN}/owner-dashboard`
+      }
+      return
+    }
+
+    if ((role === 'member' || role === 'trainer') && profile.gym_id === gym.id) {
+      const target = (role === 'member' && returnTo) ? returnTo : roleHome(role)
+      navigate(target, { replace: true })
+      return
+    }
+
+    // Wrong gym (member of a different gym opening this gym's portal) or
+    // some odd state — render the form so they can sign in with a different
+    // account if they want. Cross-gym is detected on fresh sign-in by
+    // linkInviteOrMember, which surfaces the proper "wrong gym" error.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gym, initialized, isAuthenticated, profile, role, step, loading])
 
   // Cross-tab password-reset detection.
   // When the user clicks the reset link in a *new* tab, Supabase updates the
