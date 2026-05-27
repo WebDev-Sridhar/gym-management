@@ -27,8 +27,13 @@ function devManifestPlugin(): Plugin {
     theme_color: '#6366f1',
     orientation: 'portrait-primary',
     icons: [
-      { src: '/favicon/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+      { src: '/favicon/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/favicon/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
       { src: '/favicon/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+    screenshots: [
+      { src: '/screenshots/desktop.png', sizes: '1280x720', type: 'image/png', form_factor: 'wide', label: 'Gymmobius dashboard' },
+      { src: '/screenshots/mobile.png',  sizes: '390x844',  type: 'image/png', label: 'Gymmobius on mobile' },
     ],
   }
 
