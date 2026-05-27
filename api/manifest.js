@@ -118,10 +118,6 @@ function buildTenantManifest(gym, origin) {
       { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any' },
       { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
-    screenshots: [
-      { src: `${origin}/screenshots/desktop.png`, sizes: '1280x720', type: 'image/png', form_factor: 'wide',   label: `${name} dashboard` },
-      { src: `${origin}/screenshots/mobile.png`,  sizes: '390x844',  type: 'image/png', label: `${name} on mobile` },
-    ],
   }
 }
 
@@ -139,10 +135,6 @@ const GENERIC_MANIFEST = {
     { src: '/favicon/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: '/favicon/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
     { src: '/favicon/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-  ],
-  screenshots: [
-    { src: '/screenshots/desktop.png', sizes: '1280x720', type: 'image/png', form_factor: 'wide', label: 'Gymmobius dashboard' },
-    { src: '/screenshots/mobile.png',  sizes: '390x844',  type: 'image/png', label: 'Gymmobius on mobile' },
   ],
 }
 
