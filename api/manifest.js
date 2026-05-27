@@ -120,7 +120,7 @@ function buildTenantManifest(gym, origin) {
     ],
     screenshots: [
       { src: `${origin}/screenshots/desktop.png`, sizes: '1280x720', type: 'image/png', form_factor: 'wide', label: `${name} dashboard` },
-      { src: `${origin}/screenshots/mobile.png`, sizes: '390x844', type: 'image/png', label: `${name} on mobile` },
+      { src: `${origin}/screenshots/mobile.png`, sizes: '385x843', type: 'image/png', label: `${name} on mobile` },
     ],
 
   }

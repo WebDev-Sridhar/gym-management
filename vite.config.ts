@@ -33,7 +33,7 @@ function devManifestPlugin(): Plugin {
     ],
     screenshots: [
       { src: '/screenshots/desktop.png', sizes: '1280x720', type: 'image/png', form_factor: 'wide', label: 'Gymmobius dashboard' },
-      { src: '/screenshots/mobile.png',  sizes: '390x844',  type: 'image/png', label: 'Gymmobius on mobile' },
+      { src: '/screenshots/mobile.png',  sizes: '385x843',  type: 'image/png', label: 'Gymmobius on mobile' },
     ],
 
   }
