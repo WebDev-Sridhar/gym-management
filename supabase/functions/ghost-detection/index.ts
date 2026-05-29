@@ -1,80 +1,143 @@
-// Scheduled cron — pg_cron job "ghost-detection-daily" (daily 04:30 UTC).
-// Calls the RPC public.get_ghost_members(inactive_days := 5), then sends a
-// "we miss you" WhatsApp to each returned member via Twilio.
+// Scheduled cron — pg_cron job "ghost-detection-daily" (daily 04:30 UTC =
+// 10:00 IST). Calls public.get_ghost_members(inactive_days := 5), then fires
+// a `ghost_reminder` notification per ghost through the central notification
+// engine.
 //
-// NOTE: this is the LEGACY Twilio path. The newer `daily-summary` function
-// uses the shared notifications.ts module (Interakt + Resend). Migration of
-// ghost detection onto that shared path is a future task.
+// Audit C6 rebuild: previously this function used Twilio directly and was
+// not scheduled. Now:
+//   - Routes through sendNotification (Interakt WhatsApp + Resend email
+//     fallback + audit row in `notifications`)
+//   - Scheduled via 20260528_cron_secret_and_ghost_schedule.sql
+//   - Authenticates against CRON_SECRET (not the service-role key — audit C7)
 //
-// Auth: requires Bearer CRON_SECRET in Authorization header.
+// Idempotency: the get_ghost_members RPC implicitly dedupes per-day (ghosts
+// only become ghosts after N consecutive missing days). A per-day unique
+// constraint on `notifications(member_id, type, date(sent_at))` would be
+// a stronger safeguard if double-fires ever appear — left as a follow-up.
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { sendWhatsApp } from './twilio.ts'
+import { sendNotification } from '../_shared/notifications.ts'
+
+interface GhostRow {
+  member_name: string
+  gym_name:    string
+  plan_name:   string | null
+  phone:       string | null
+  days_absent: number
+}
 
 Deno.serve(async (req: Request) => {
+  // Audit C7 — validate CRON_SECRET (not service-role key). See daily-summary
+  // for the full rationale.
+  const cronSecret = Deno.env.get('CRON_SECRET')
+  if (!cronSecret) {
+    console.error('ghost-detection: CRON_SECRET env not configured')
+    return new Response('cron secret not configured', { status: 500 })
+  }
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!token || token !== cronSecret) {
+    return new Response('unauthorized', { status: 401 })
+  }
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  )
+
+  const startedAt = new Date().toISOString()
+
   try {
-    const CRON_SECRET = Deno.env.get('CRON_SECRET')
-    const authHeader = req.headers.get('Authorization') || ''
-    const token = authHeader.replace('Bearer ', '')
+    const { data: ghosts, error } = await supabase
+      .rpc('get_ghost_members', { inactive_days: 5 }) as { data: GhostRow[] | null; error: unknown }
 
-    if (CRON_SECRET && token !== CRON_SECRET) {
-      return new Response('Unauthorized', { status: 401 })
-    }
+    if (error) throw new Error(`get_ghost_members RPC failed: ${(error as Error).message ?? error}`)
 
-    const adminClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
-
-    const { data: ghosts, error } = await adminClient.rpc('get_ghost_members', {
-      inactive_days: 5,
-    })
-
-    if (error) throw new Error(`RPC failed: ${error.message}`)
-
-    console.log(`Found ${ghosts?.length || 0} ghost members`)
-
-    if (!ghosts || ghosts.length === 0) {
-      return new Response(
-        JSON.stringify({ sent: 0, message: 'No ghost members' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      )
-    }
-
+    const total = ghosts?.length ?? 0
     let sent = 0
     let failed = 0
-    const results: Array<Record<string, unknown>> = []
+    let skipped = 0
 
-    for (const g of ghosts) {
-      const message =
-        `Hi ${g.member_name}! 👋 We noticed you haven't visited ${g.gym_name} in ${g.days_absent} days. ` +
-        `Your ${g.plan_name || 'membership'} is still active — don't let it go to waste! ` +
-        `Come back and crush your goals. We miss you! 💪🔥`
+    for (const g of ghosts ?? []) {
+      if (!g.phone) { skipped++; continue }
 
-      const result = await sendWhatsApp(g.phone, message)
+      // The RPC doesn't return member_id / gym_id (we'd need to alter it).
+      // Match by phone for now — phones are gym-unique per the members
+      // create-guard, so this resolves a single member reliably. Daily
+      // cron + bounded ghost count means the extra round-trip is fine.
+      const { data: member } = await supabase
+        .from('members')
+        .select('id, gym_id, email')
+        .eq('phone', g.phone)
+        .ilike('name', g.member_name)         // belt + suspenders: name+phone == almost certainly unique
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle()
 
-      if (result.success) {
-        sent++
-        results.push({ member: g.member_name, gym: g.gym_name, days_absent: g.days_absent, status: result.dryRun ? 'dry_run' : 'sent' })
-      } else {
+      if (!member?.id || !member.gym_id) {
+        // Ghost row from the RPC didn't match a current member row. Could
+        // be a member deleted between the RPC call and this lookup — rare,
+        // log + skip rather than crash.
+        console.warn('ghost-detection: no member match for ghost', { name: g.member_name, phone: g.phone })
+        skipped++
+        continue
+      }
+
+      try {
+        const result = await sendNotification({
+          supabase,
+          gymId:    member.gym_id,
+          type:     'ghost_reminder',
+          memberId: member.id,
+          triggeredBy: 'cron',
+          metadata: {
+            daysInactive: g.days_absent,
+            planName:     g.plan_name ?? 'Membership',
+            // No portalUrl yet — would require resolving the gym's slug
+            // here. Email template renders fine without it (button just
+            // omitted). Follow-up: pass portalUrl once we add the gym
+            // slug to the RPC return.
+          },
+        })
+
+        if (result.status === 'failed') failed++
+        else                            sent++
+      } catch (sendErr) {
+        console.error('ghost-detection: send failed for member', member.id, sendErr)
         failed++
-        results.push({ member: g.member_name, gym: g.gym_name, days_absent: g.days_absent, status: 'failed', error: result.error })
       }
     }
 
-    const summary = { total: ghosts.length, sent, failed, results }
-    console.log('Ghost detection summary:', JSON.stringify(summary))
+    const summary = {
+      job_name: 'ghost-detection',
+      total, sent, failed, skipped,
+      started_at:  startedAt,
+      finished_at: new Date().toISOString(),
+    }
 
-    return new Response(JSON.stringify(summary), {
-      status: 200,
+    await supabase.from('cron_runs').insert({
+      job_name: 'ghost-detection',
+      status:   'success',
+      details:  summary,
+    })
+
+    return new Response(JSON.stringify({ ok: true, ...summary }), {
+      status:  200,
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    console.error('ghost-detection error:', err)
-    return new Response(
-      JSON.stringify({ error: (err as Error).message || 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
-    )
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('ghost-detection failed:', message)
+    await supabase.from('cron_runs').insert({
+      job_name: 'ghost-detection',
+      status:   'failed',
+      details:  { error: message, started_at: startedAt },
+    })
+    return new Response(JSON.stringify({ ok: false, error: message }), {
+      status:  500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 })

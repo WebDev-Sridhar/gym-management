@@ -156,6 +156,21 @@ export async function markPaymentPaid({ paymentId, paymentMethod }) {
     }
   }
 
+  // Fire payment confirmation via the central notification engine. The
+  // engine lives server-side, so we go through a tiny edge-function bridge.
+  // Non-fatal: payment is already paid + member already extended in DB; a
+  // notification provider blip should never undo any of that. Owners can
+  // see the failure in the notifications audit table and re-send manually.
+  if (data.member?.id) {
+    try {
+      await supabase.functions.invoke('send-payment-confirmation', {
+        body: { paymentId: data.id },
+      })
+    } catch (notifErr) {
+      console.error('markPaymentPaid: notification dispatch failed:', notifErr)
+    }
+  }
+
   return data
 }
 

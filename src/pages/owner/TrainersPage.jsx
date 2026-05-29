@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
-import { fetchTrainerInvites, createTrainerInvite, deleteTrainerInvite } from '../../services/membershipService'
+import { fetchTrainerInvites, createTrainerInvite, deleteTrainerInvite, sendTrainerInvite } from '../../services/membershipService'
 import { fetchTrainers, updateTrainer, removeTrainer } from '../../services/trainerService'
 import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
@@ -52,6 +52,11 @@ export default function TrainersPage() {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [branchId, setBranchId] = useState('')
+  // Audit C4 — fire trainer_invite email after creating the invite. Default
+  // true: the trainer can't sign up until they know the URL, and email is
+  // the canonical channel for that. Owner can uncheck if they plan to share
+  // the link out-of-band (in person, via existing chat, etc.).
+  const [sendInviteOnCreate, setSendInviteOnCreate] = useState(true)
 
   useEffect(() => {
     if (!showForm) return
@@ -134,8 +139,22 @@ export default function TrainersPage() {
         branchId: branchId || (isAllBranches ? null : selectedBranchId),
         name: name.trim(), phone: phone.trim(), email: email.trim(),
       })
+
+      // Best-effort invite email — the trainer_invites row is already
+      // written, so the trainer can still claim by signing up at the gym
+      // portal even if the email fails. We surface failures in console
+      // only; owner can resend later via the (future) per-row action.
+      if (sendInviteOnCreate && invite?.email) {
+        try {
+          await sendTrainerInvite(invite.id)
+        } catch (inviteErr) {
+          console.warn('sendTrainerInvite failed (invite already created):', inviteErr.message)
+        }
+      }
+
       setInvites(prev => [invite, ...prev])
       setName(''); setPhone(''); setEmail(''); setBranchId('')
+      setSendInviteOnCreate(true)   // reset to default for next add
       setShowForm(false)
     } catch (err) {
       setError(err.message || 'Failed to add trainer')
@@ -220,11 +239,42 @@ export default function TrainersPage() {
                 </div>
               )}
             </div>
+            {/* Invite email — fires after the trainer_invites row is
+                written. Default on; uncheck if the owner plans to share
+                the link out-of-band. Disabled when email is empty (edge fn
+                rejects 400 either way). */}
+            <label className={`flex items-start gap-3 select-none ${email.trim() ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+              <input
+                type="checkbox"
+                checked={sendInviteOnCreate && !!email.trim()}
+                onChange={(e) => setSendInviteOnCreate(e.target.checked)}
+                disabled={!email.trim()}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <span>
+                <span className="block text-sm font-medium text-gray-900">Send invite email</span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  {email.trim()
+                    ? `We'll email ${email.trim()} with a link to the gym portal where they sign up.`
+                    : 'Add a login email above to send an invite.'}
+                </span>
+              </span>
+            </label>
+
             {error && <p className="text-red-500 text-xs">{error}</p>}
+            <div className="flex gap-3">
             <button type="submit" disabled={submitting}
               className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50">
               {submitting ? 'Adding...' : 'Send Invite'}
             </button>
+                <button
+              type="button"
+              onClick={() => {setShowForm(false); setError(''); setName(''); setPhone(''); setEmail(''); setBranchId('')}}   
+              className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>  
           </form>
         </div>
       )}

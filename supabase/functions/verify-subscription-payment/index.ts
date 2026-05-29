@@ -14,6 +14,7 @@ import {
   HttpError,
 } from '../_shared/auth.ts'
 import { hmacSha256Hex, timingSafeEqual } from '../_shared/razorpay.ts'
+import { sendNotification } from '../_shared/notifications.ts'
 
 interface Body {
   razorpayOrderId: string
@@ -25,7 +26,7 @@ Deno.serve(async (req) => {
   const cors = handleCorsPreflight(req); if (cors) return cors
 
   try {
-    const { gymId } = await requireOwner(req)
+    const { gymId, userId } = await requireOwner(req)
     const body = await req.json() as Body
 
     if (!body.razorpayOrderId || !body.razorpayPaymentId || !body.razorpaySignature) {
@@ -140,6 +141,37 @@ Deno.serve(async (req) => {
     await supabase.from('gyms')
       .update({ onboarding_step: 'subscribed' })
       .eq('id', gymId)
+
+    // Fire SaaS receipt through the notification engine. Recipient is the
+    // owner (userId from the JWT). Wrapped in try/catch — the payment IS
+    // active in DB regardless of whether the receipt dispatches; we never
+    // want a Resend blip to fail the verify call and confuse the frontend
+    // into thinking renewal didn't go through.
+    //
+    // The `amount` comes from the pending subscription row we initially
+    // selected; we re-fetch here to get the canonical value the user paid.
+    try {
+      const { data: paidSub } = await supabase
+        .from('subscriptions')
+        .select('plan_name, amount')
+        .eq('id', sub.id).single()
+
+      await sendNotification({
+        supabase,
+        gymId,
+        type: 'saas_payment_receipt',
+        userId,
+        triggeredBy: 'webhook',
+        metadata: {
+          subscription_id: sub.id,
+          planName: paidSub?.plan_name ?? sub.plan_name,
+          amount: Number(paidSub?.amount ?? 0),
+          expiresAt: expiresAt.toISOString(),
+        },
+      })
+    } catch (notifErr) {
+      console.error('verify-subscription-payment: saas_payment_receipt send failed:', notifErr)
+    }
 
     return jsonResponse({
       ok: true,

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
-import { fetchMembers, createMember, assignPlan, fetchPlans } from '../../services/membershipService'
+import { fetchMembers, createMember, assignPlan, fetchPlans, sendMemberInvite } from '../../services/membershipService'
 import { recordManualPayment } from '../../services/paymentService'
 import { fetchTrainers } from '../../services/trainerService'
 import { AnimatePresence } from 'framer-motion'
@@ -63,6 +63,12 @@ export default function MembersPage() {
   // Plan-payment state (only meaningful when newPlanId is set)
   const [alreadyPaid, setAlreadyPaid] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  // Audit C5 — fire `member_invite` notification on create if checked.
+  // Default true: the most common case is owner-adds-member-then-wants-them-
+  // to-set-up-the-app. Owner can uncheck (e.g. for a phone-only walk-in
+  // member who'll never log in). Skipped automatically if no email — the
+  // create form already requires email today, but the guard belongs here too.
+  const [sendInviteOnCreate, setSendInviteOnCreate] = useState(true)
   const [trainers, setTrainers] = useState([])
 
   // Default the add-member branch to the active view, or first branch if "all"
@@ -141,9 +147,24 @@ export default function MembersPage() {
         }
       }
 
+      // Fire the member-invite email (best-effort). Non-fatal: the member is
+      // already created in the DB; a Resend blip should never undo that.
+      // Owner can re-send manually from the member detail view later (TODO
+      // once that affordance exists). Skipped if owner unchecked or the
+      // member has no email — the edge fn would reject 400 either way, but
+      // checking client-side avoids the wasted invoke.
+      if (sendInviteOnCreate && member?.email) {
+        try {
+          await sendMemberInvite(member.id)
+        } catch (inviteErr) {
+          console.warn('sendMemberInvite failed (member already created):', inviteErr.message)
+        }
+      }
+
       setMembers((prev) => [member, ...prev])
       setNewName(''); setNewPhone(''); setNewEmail(''); setNewPlanId('')
       setAlreadyPaid(false); setPaymentMethod('cash')
+      setSendInviteOnCreate(true)   // reset to default for next add
       setShowAddForm(false)
     } catch (err) {
       setError(err.message || 'Failed to add member')
@@ -302,11 +323,42 @@ export default function MembersPage() {
               </div>
             )}
 
+            {/* Invite email — fires after the member is created. Default
+                on; uncheck for phone-only walk-ins who'll never log in.
+                Greyed out / hidden when no email is entered (the edge fn
+                would 400 anyway). Same checkbox pattern as "Already paid". */}
+            <label className={`flex items-start gap-3 select-none ${newEmail.trim() ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+              <input
+                type="checkbox"
+                checked={sendInviteOnCreate && !!newEmail.trim()}
+                onChange={(e) => setSendInviteOnCreate(e.target.checked)}
+                disabled={!newEmail.trim()}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <span>
+                <span className="block text-sm font-medium text-gray-900">Send invite email</span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  {newEmail.trim()
+                    ? `We'll email ${newEmail.trim()} with a link to set up their member account.`
+                    : 'Add an email above to send an invite.'}
+                </span>
+              </span>
+            </label>
+
             {error && <p className="text-red-500 text-xs">{error}</p>}
+             <div className="flex items-center gap-3">
             <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2">
               {submitting && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               {submitting ? 'Adding...' : 'Add Member'}
             </button>
+            <button
+              type="button"
+              onClick={() => {setShowAddForm(false); setError(''); setNewName(''); setNewPhone(''); setNewEmail(''); setNewPlanId(''); setNewBranchId(''); setAlreadyPaid(false); setSendInviteOnCreate(false)}}   
+              className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            </div>
           </form>
         </div>
       )}

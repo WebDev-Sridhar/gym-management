@@ -282,6 +282,58 @@ export async function updateMember({ memberId, name, phone, email }) {
   if (phone !== undefined) updates.phone = phone?.trim() || null
   if (email !== undefined) updates.email = email?.trim().toLowerCase() || null
 
+  // Pre-flight duplicate check on phone/email changes. Without this, the
+  // edit form let two members in the same gym share the same email or
+  // phone — same conflict class that createMember already guards against,
+  // just on the update path. We compare against the CURRENT row first so
+  // we only check fields that have actually changed; a pre-existing
+  // duplicate stored elsewhere shouldn't block an unrelated name-only edit.
+  const phoneChanging = updates.phone !== undefined
+  const emailChanging = updates.email !== undefined
+  if ((phoneChanging && updates.phone) || (emailChanging && updates.email)) {
+    const { data: current, error: curErr } = await supabase
+      .from('members')
+      .select('gym_id, phone, email')
+      .eq('id', memberId)
+      .single()
+    if (curErr) throw curErr
+    if (!current?.gym_id) throw new Error('Member not found')
+
+    const currentEmail = current.email?.toLowerCase() || null
+    if (emailChanging && updates.email && updates.email !== currentEmail) {
+      const { data: emailHit } = await supabase
+        .from('members')
+        .select('id, name')
+        .eq('gym_id', current.gym_id)
+        .is('deleted_at', null)
+        .ilike('email', updates.email)
+        .neq('id', memberId)
+        .limit(1)
+        .maybeSingle()
+      if (emailHit) {
+        throw new Error(
+          `Another member in this gym already uses email ${updates.email} (${emailHit.name}).`
+        )
+      }
+    }
+    if (phoneChanging && updates.phone && updates.phone !== current.phone) {
+      const { data: phoneHit } = await supabase
+        .from('members')
+        .select('id, name')
+        .eq('gym_id', current.gym_id)
+        .is('deleted_at', null)
+        .eq('phone', updates.phone)
+        .neq('id', memberId)
+        .limit(1)
+        .maybeSingle()
+      if (phoneHit) {
+        throw new Error(
+          `Another member in this gym already uses phone ${updates.phone} (${phoneHit.name}).`
+        )
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('members')
     .update(updates)
@@ -515,6 +567,34 @@ export async function deleteTrainerInvite(inviteId) {
     .eq('id', inviteId)
 
   if (error) throw error
+}
+
+// ─── Invite Emails (audit C4 + C5) ───
+//
+// Owner-triggered "Send invite" actions. Each calls a thin edge-function
+// wrapper that fires the corresponding notification through the central
+// engine, so the audit trail in `notifications` is unified with everything
+// else. Email-first today; falls back to WhatsApp once templates are
+// approved + the per-gym whatsapp_enabled toggle is on.
+
+/** Fires a `member_invite` notification (email) for the given member. */
+export async function sendMemberInvite(memberId) {
+  const { data, error } = await supabase.functions.invoke('send-member-invite', {
+    body: { memberId },
+  })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
+/** Fires a `trainer_invite` notification (email) for the given trainer_invites row. */
+export async function sendTrainerInvite(inviteId) {
+  const { data, error } = await supabase.functions.invoke('send-trainer-invite', {
+    body: { inviteId },
+  })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
 }
 
 // ─── Analytics ───

@@ -1,7 +1,11 @@
 // POST /functions/v1/expire-stale-records
 // Cron-only. Marks expired SaaS subscriptions and gym memberships.
 //
-// Auth: requires Bearer service-role key (cron sets this from vault).
+// Auth: requires Bearer CRON_SECRET (cron sets this from vault). Audit C7:
+// the bearer used to be the service-role key, which is the worst possible
+// credential to spread across request headers — one leaked log line and the
+// whole DB is owned. CRON_SECRET is a scoped credential whose only privilege
+// is "trigger this cron"; service-role stays env-only for the DB client.
 // Deployed with verify_jwt=false so cron can hit it without a user JWT.
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
@@ -10,14 +14,18 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization') ?? ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  if (!token || token !== serviceKey) {
+  const cronSecret = Deno.env.get('CRON_SECRET')
+  if (!cronSecret) {
+    console.error('expire-stale-records: CRON_SECRET env not configured')
+    return new Response('cron secret not configured', { status: 500 })
+  }
+  if (!token || token !== cronSecret) {
     return new Response('unauthorized', { status: 401 })
   }
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
-    serviceKey,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   )
 

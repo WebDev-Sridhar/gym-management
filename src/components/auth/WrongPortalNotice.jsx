@@ -1,5 +1,3 @@
-import { useState } from 'react'
-
 // Phase 5 hard-split UX. Replaces the Phase 4 PortalRedirectNotice (a soft
 // nudge that still continued to /member-app). After Phase 5, the SaaS surface
 // rejects non-owner sign-ins: the user gets pointed at their gym's branded
@@ -16,43 +14,14 @@ import { useState } from 'react'
 //     LoginPage uses this to clear local state. Sign-out itself is handled
 //     by the caller BEFORE rendering this component.
 //
-// Find-my-gym affordance: collapsed by default, expands into an email lookup
-// form. The /functions/v1/find-my-gym edge function (Phase 5) silently emails
-// the user their gym URL if the address matches a member/trainer row. Anti-
-// enumeration: always renders "If {email} is registered, we've sent the link"
-// regardless of whether a match was found.
+// Find-my-gym lookup form was removed: the screen already shows the user
+// their gym name + portal URL (they signed in successfully — we KNOW who
+// they are), so an email-it-to-me affordance was strictly redundant. The
+// underlying /functions/v1/find-my-gym edge function stays deployed for
+// future use (e.g., a public "Find my gym" page that doesn't require a
+// successful sign-in), but nothing in the app currently calls it.
 export default function WrongPortalNotice({ gym, onSignOut }) {
-  const [showLookup, setShowLookup] = useState(false)
-  const [lookupEmail, setLookupEmail] = useState('')
-  const [lookupBusy, setLookupBusy] = useState(false)
-  const [lookupMsg, setLookupMsg] = useState('')
-  const [lookupErr, setLookupErr] = useState('')
-
   const portalHref = `/${gym.slug}/login`
-
-  async function handleLookup(e) {
-    e.preventDefault()
-    const email = lookupEmail.trim()
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setLookupErr('Enter a valid email address')
-      return
-    }
-    setLookupBusy(true); setLookupErr(''); setLookupMsg('')
-    try {
-      const { supabase } = await import('../../services/supabaseClient')
-      const { error } = await supabase.functions.invoke('find-my-gym', {
-        body: { email },
-      })
-      if (error) throw error
-      // Anti-enumeration: identical message regardless of match.
-      setLookupMsg(`If ${email} is registered with a gym on Gymmobius, we've emailed you the link.`)
-      setLookupEmail('')
-    } catch (err) {
-      setLookupErr(err.message || 'Could not look up your gym. Try again later.')
-    } finally {
-      setLookupBusy(false)
-    }
-  }
 
   return (
     <div className="text-center space-y-5">
@@ -84,54 +53,6 @@ export default function WrongPortalNotice({ gym, onSignOut }) {
           gymmobius.com{portalHref}
         </a>
       </p>
-
-      <div className="pt-4 border-t border-gray-100">
-        {!showLookup ? (
-          <button
-            type="button"
-            onClick={() => setShowLookup(true)}
-            className="text-xs text-gray-500 hover:text-gray-800"
-          >
-            Don't know your gym? Look it up by email →
-          </button>
-        ) : (
-          <form onSubmit={handleLookup} className="text-left space-y-3">
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Email
-            </label>
-            <input
-              type="email"
-              value={lookupEmail}
-              onChange={(e) => setLookupEmail(e.target.value)}
-              placeholder="your@email.com"
-              autoFocus
-              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all"
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={lookupBusy}
-                className="flex-1 py-2 bg-gray-900 text-white text-xs font-semibold rounded-lg hover:bg-black transition-colors disabled:opacity-50"
-              >
-                {lookupBusy ? 'Sending…' : 'Send my gym link'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowLookup(false); setLookupErr(''); setLookupMsg('') }}
-                className="px-3 py-2 text-xs text-gray-500 hover:text-gray-800"
-              >
-                Cancel
-              </button>
-            </div>
-            {lookupErr && (
-              <p className="text-xs text-red-600">{lookupErr}</p>
-            )}
-            {lookupMsg && (
-              <p className="text-xs text-emerald-600">{lookupMsg}</p>
-            )}
-          </form>
-        )}
-      </div>
     </div>
   )
 }

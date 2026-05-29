@@ -100,7 +100,7 @@ function PlanForm({ initial, onSave, onCancel }) {
         <p className="text-red-500 text-xs">{error}</p>
       )}
 
-      <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+      <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={submitting}

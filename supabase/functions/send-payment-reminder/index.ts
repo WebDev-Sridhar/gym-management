@@ -30,7 +30,8 @@ import {
 import { decryptSecret, byteaToBytes } from '../_shared/crypto.ts'
 import { createPaymentLink } from '../_shared/razorpay.ts'
 import { buildUpiLink } from '../_shared/upi.ts'
-import { sendInteraktTemplate, normalizeIndianPhone } from '../_shared/interakt.ts'
+import { normalizeIndianPhone } from '../_shared/interakt.ts'
+import { sendNotification } from '../_shared/notifications.ts'
 
 interface Body {
   paymentId?: string
@@ -144,6 +145,37 @@ Deno.serve(async (req) => {
       throw new HttpError(400, 'payment has no associated plan')
     }
 
+    // Audit H2 — backend 24h throttle on manual reminders. PaymentsPage
+    // already disables the button when a reminder was sent in the last 24h
+    // (UI compute via `lastReminderForMember`), but that check is per-tab
+    // and bypassed by: a second browser tab, a hard refresh after the button
+    // re-enables, or any direct API caller. The DB has a same-day unique
+    // index on (payment_id, day) too (audit H3), but that throws as a 500;
+    // the throttle here surfaces a clean 429 with an actionable message
+    // before any Razorpay link creation or Interakt API call.
+    //
+    // Skip for brand-new payments (no payment_id passed = freshly created
+    // here = no prior reminders). The check runs only when body.paymentId
+    // was provided, which is the spam-prone re-send case.
+    if (body.paymentId) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const { data: recent } = await supabase
+        .from('payment_reminders')
+        .select('id, sent_at')
+        .eq('payment_id', payment.id)
+        .gte('sent_at', since)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (recent) {
+        const lastSent = new Date(recent.sent_at)
+        const hoursAgo = Math.floor((Date.now() - lastSent.getTime()) / (60 * 60 * 1000))
+        throw new HttpError(429,
+          `A reminder for this payment was already sent ${hoursAgo === 0 ? 'less than an hour' : `${hoursAgo}h`} ago. ` +
+          `Please wait at least 24 hours between reminders.`)
+      }
+    }
+
     const phone = normalizeIndianPhone(payment.member.phone)
     const memberName = payment.member.name ?? 'Member'
     const planName = payment.plan.name ?? 'Membership'
@@ -232,72 +264,79 @@ Deno.serve(async (req) => {
       templateName = TEMPLATE_UPI
     }
 
-    // ── Send via Interakt ──────────────────────────────────────────────────
-    let interaktId: string | undefined
+    // ── Route through the central notification engine ─────────────────────
+    // The engine handles WhatsApp dispatch via Interakt AND automatically
+    // falls back to email (Resend) if WhatsApp fails or the member has no
+    // phone. It also inserts the unified `notifications` audit row for us,
+    // so we only need to write the legacy `payment_reminders` row below
+    // (still consumed by PaymentsPage's UI dedup + display).
+    //
+    // templateOverride lets us pick between payment_reminder_upi and
+    // payment_reminder_link per-message; the engine's type-level default
+    // (`payment_reminder_link`) is the fallback when the override is absent.
+    let notifResult: Awaited<ReturnType<typeof sendNotification>> | null = null
     let sendErr: string | undefined
 
     try {
-      const result = await sendInteraktTemplate({
-        countryCode: phone.countryCode,
-        phoneNumber: phone.phoneNumber,
-        templateName,
-        languageCode: 'en',
-        bodyValues: [memberName, planName, amountFormatted, payLink],
-        callbackData: payment.id,
-      })
-      interaktId = result.id
-    } catch (err) {
-      sendErr = err instanceof Error ? err.message : String(err)
-    }
-
-    // Always log the attempt (success or failure) to both the legacy reminders
-    // table (for existing UIs) and the unified notifications table.
-    await Promise.all([
-      supabase.from('payment_reminders').insert({
-        gym_id: gymId,
-        branch_id: payment.branch_id,
-        payment_id: payment.id,
-        member_id: payment.member.id,
-        channel: 'whatsapp',
-        provider: 'interakt',
-        template_name: templateName,
-        status: sendErr ? 'failed' : 'sent',
-        provider_message_id: interaktId ?? null,
-        link_sent: payLink,
-        error: sendErr ?? null,
-        triggered_by: 'manual',
-      }),
-      supabase.from('notifications').insert({
-        gym_id: gymId,
-        branch_id: payment.branch_id,
-        member_id: payment.member.id,
+      notifResult = await sendNotification({
+        supabase,
+        gymId,
         type: 'payment_reminder',
-        channels: ['whatsapp'],
-        status: sendErr ? 'failed' : 'sent',
-        triggered_by: 'manual',
+        memberId: payment.member.id,
+        triggeredBy: 'manual',
+        recipientName: memberName,
+        recipientPhone: payment.member.phone,
         metadata: {
           payment_id: payment.id,
           planName,
           amount: amountRupees,
           payLink,
+          templateOverride: templateName,
+          callbackData: payment.id,
         },
-        channel_results: {
-          whatsapp: sendErr
-            ? { status: 'failed', error: sendErr }
-            : { status: 'sent', id: interaktId ?? null },
-        },
-        sent_at: new Date().toISOString(),
-      }),
-    ])
+      })
+    } catch (err) {
+      sendErr = err instanceof Error ? err.message : String(err)
+    }
+
+    const wa = notifResult?.channelResults.whatsapp
+    const em = notifResult?.channelResults.email
+    const whatsappSent = wa?.status === 'sent'
+    const emailFallbackSent = em?.status === 'sent'
+    const whatsappError = wa?.error ?? sendErr ?? null
+
+    // Legacy `payment_reminders` row — still read by PaymentsPage for the
+    // 24h UI dedup and the "last sent" column. Records ONLY the WhatsApp
+    // attempt (channel='whatsapp'); the unified `notifications` table has
+    // the full multi-channel record.
+    await supabase.from('payment_reminders').insert({
+      gym_id: gymId,
+      branch_id: payment.branch_id,
+      payment_id: payment.id,
+      member_id: payment.member.id,
+      channel: 'whatsapp',
+      provider: 'interakt',
+      template_name: templateName,
+      status: whatsappSent ? 'sent' : 'failed',
+      provider_message_id: wa?.id ?? null,
+      link_sent: payLink,
+      error: whatsappError,
+      triggered_by: 'manual',
+    })
 
     return jsonResponse({
       ok: true,
       paymentId: payment.id,
       payLink,
       templateName,
-      providerMessageId: interaktId ?? null,
-      whatsappSent: !sendErr,
-      whatsappError: sendErr ?? null,
+      providerMessageId: wa?.id ?? null,
+      whatsappSent,
+      whatsappError,
+      // Engine attempted an email fallback because WhatsApp failed AND
+      // the member has an email AND email is enabled for this gym. Useful
+      // for the UI to surface "WhatsApp failed but we emailed instead".
+      emailFallbackSent,
+      notificationStatus: notifResult?.status ?? 'failed',
     })
   } catch (err) {
     return errorResponse(err)

@@ -170,6 +170,73 @@ Removal cleans up both the apex and `www` from Vercel.
 
 ---
 
+## ── Phase 2.5 — Add the custom domain to Supabase Auth redirect allowlist
+
+> **Audit H7**: required step. Without it, password-reset and email-
+> confirmation links sent from the new custom domain silently break.
+
+When a gym claims `ironparadise.com` (or `members.ironparadise.com`,
+etc.) and a member triggers password reset from `https://ironparadise.com/login`,
+the app calls:
+
+```js
+supabase.auth.resetPasswordForEmail(email, {
+  redirectTo: `${window.location.origin}/reset-password?gym=<slug>`,
+})
+```
+
+`window.location.origin` is `https://ironparadise.com`, so the reset link
+Supabase emails to the user points at `https://ironparadise.com/reset-password?...`.
+
+**Supabase Auth rejects that link unless `https://ironparadise.com` is in
+the project's redirect allowlist.** The reset email lands in the user's
+inbox; they click; Supabase opens a "URL not allowed" error page. The member
+is stuck with no recovery path.
+
+### What to do for EVERY new verified custom domain
+
+When the dashboard flips a gym's `domain_status` to `verified`, an operator
+(or automation, see "Future work" below) must:
+
+1. Open **Supabase Dashboard → Authentication → URL Configuration**
+2. In the **Redirect URLs** allowlist, add:
+   - `https://{custom-domain}/**`
+   - `https://www.{custom-domain}/**`   *(if www variant was auto-claimed)*
+3. Click **Save**
+
+The `/**` wildcard covers `/reset-password`, `/auth/callback`, and any
+future redirect paths the SPA may add. Without the wildcard you'd need to
+re-add the allowlist entry every time a new redirect route ships.
+
+### How to find affected gyms
+
+```sql
+SELECT id, name, custom_domain, domain_verified_at
+FROM gyms
+WHERE custom_domain IS NOT NULL
+  AND domain_status = 'verified'
+ORDER BY domain_verified_at DESC;
+```
+
+Compare against the current allowlist. Anything in the table that's NOT in
+the allowlist has a broken reset-password flow.
+
+### Future work
+
+A `domain-verified` webhook from the `/api/domain/verify` function could
+push to Supabase's [Management API](https://supabase.com/docs/reference/management-api)
+to add the allowlist entry automatically. Two reasons we haven't done it:
+
+1. Supabase's Management API for URL config is in beta and rate-limited
+2. Manual review is a useful gate against accidentally allowlisting a
+   domain a verified gym never actually pointed at us
+
+Until that automation exists, this is a **manual ops step** to run after
+every new custom-domain verification. The dashboard panel showing pending
+verifications is your queue.
+
+---
+
 ## ── Phase 3a additions (live)
 
 | Feature | What it does |

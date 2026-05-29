@@ -11,16 +11,27 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sendNotification } from '../_shared/notifications.ts'
 
 Deno.serve(async (req) => {
+  // Audit C7 — validate against the dedicated CRON_SECRET, not the
+  // service-role key. The service-role key bypasses RLS on every table;
+  // putting it in request headers means a leaked log line owns the whole
+  // database. CRON_SECRET is a scoped credential whose only privilege is
+  // "trigger this cron". Service-role key is still used internally (via
+  // SUPABASE_SERVICE_ROLE_KEY env) to build the DB client below — it just
+  // never appears on the wire.
   const auth = req.headers.get('Authorization') ?? ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  if (!token || token !== serviceKey) {
+  const cronSecret = Deno.env.get('CRON_SECRET')
+  if (!cronSecret) {
+    console.error('daily-summary: CRON_SECRET env not configured')
+    return new Response('cron secret not configured', { status: 500 })
+  }
+  if (!token || token !== cronSecret) {
     return new Response('unauthorized', { status: 401 })
   }
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
-    serviceKey,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   )
 

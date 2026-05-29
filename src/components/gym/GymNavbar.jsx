@@ -106,7 +106,7 @@ export default function GymNavbar() {
           <div className="flex items-center gap-3">
             <Link
               to={`${base}/login`}
-              className="hidden md:inline-flex items-center justify-center px-4 py-2 text-sm font-semibold transition-all duration-300 hover:opacity-80 rounded-lg"
+              className=" md:inline-flex items-center justify-center px-4 py-2 text-sm font-semibold transition-all duration-300 hover:opacity-80 rounded-lg"
               style={{ color: textMutedColor, border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}` }}
             >
               Member Login

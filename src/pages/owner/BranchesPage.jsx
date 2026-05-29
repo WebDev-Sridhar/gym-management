@@ -83,7 +83,7 @@ function BranchForm({ initial, onSave, onCancel, submitLabel }) {
 
       {error && <p className="text-red-500 text-xs">{error}</p>}
 
-      <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+      <div className="flex items-center gap-3 ">
         <button
           type="submit" disabled={submitting}
           className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"

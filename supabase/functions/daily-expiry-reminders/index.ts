@@ -11,12 +11,15 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 import { decryptSecret, byteaToBytes } from '../_shared/crypto.ts'
 import { createPaymentLink } from '../_shared/razorpay.ts'
 import { buildUpiLink } from '../_shared/upi.ts'
-import { sendInteraktTemplate, normalizeIndianPhone } from '../_shared/interakt.ts'
+import { normalizeIndianPhone } from '../_shared/interakt.ts'
+import { sendNotification } from '../_shared/notifications.ts'
 
 const TEMPLATE_UPI         = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI')   ?? 'payment_reminder_upi'
 const TEMPLATE_LINK        = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK')  ?? 'payment_reminder_link'
-const TEMPLATE_SAAS_EXPIRY = Deno.env.get('INTERAKT_TEMPLATE_SAAS_EXPIRY')   ?? 'saas_expiry_reminder'
-const PUBLIC_APP_URL       = Deno.env.get('PUBLIC_APP_URL')                   ?? 'https://app.gymos.in'
+// TEMPLATE_SAAS_EXPIRY was removed when the SaaS branch moved to the
+// notifications engine — engine's templateName('saas_expiry_alert') reads
+// the same INTERAKT_TEMPLATE_SAAS_EXPIRY env var.
+const PUBLIC_APP_URL       = Deno.env.get('PUBLIC_APP_URL')                   ?? 'https://app.gymmobius.com'
 
 function generatePayToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16))
@@ -29,15 +32,22 @@ const MEMBER_REMIND_DAYS = [3, 1, 0]      // before/on expiry
 const SAAS_REMIND_DAYS   = [7, 3, 1, 0]
 
 Deno.serve(async (req) => {
+  // Audit C7 — validate CRON_SECRET (not service-role key). See daily-summary
+  // for the full rationale.
   const auth = req.headers.get('Authorization') ?? ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  if (!token || token !== serviceKey) {
+  const cronSecret = Deno.env.get('CRON_SECRET')
+  if (!cronSecret) {
+    console.error('daily-expiry-reminders: CRON_SECRET env not configured')
+    return new Response('cron secret not configured', { status: 500 })
+  }
+  if (!token || token !== cronSecret) {
     return new Response('unauthorized', { status: 401 })
   }
 
   const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!, serviceKey,
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   )
 
@@ -247,34 +257,57 @@ async function sendMemberReminder(
     templateName = TEMPLATE_UPI
   }
 
-  let interaktId: string | undefined
+  // Route through the central notification engine — gets us automatic
+  // email fallback if Interakt is degraded, plus a proper notifications
+  // audit row. Legacy `payment_reminders` insert stays for backward-compat
+  // with PaymentsPage's UI dedup. templateOverride preserves the
+  // UPI-vs-Razorpay template distinction (engine's default for
+  // payment_reminder is payment_reminder_link).
+  let notifResult: Awaited<ReturnType<typeof sendNotification>> | null = null
   let sendErr: string | undefined
   try {
-    const result = await sendInteraktTemplate({
-      countryCode: phone.countryCode,
-      phoneNumber: phone.phoneNumber,
-      templateName,
-      languageCode: 'en',
-      bodyValues: [memberName, planName, amountFormatted, payLink],
-      callbackData: paymentId!,
+    notifResult = await sendNotification({
+      supabase,
+      gymId: gym.id,
+      type: 'payment_reminder',
+      memberId: member.id,
+      triggeredBy: 'cron',
+      recipientName: memberName,
+      recipientPhone: member.phone,
+      metadata: {
+        payment_id: paymentId!,
+        planName,
+        amount,
+        payLink,
+        templateOverride: templateName,
+        callbackData: paymentId!,
+      },
     })
-    interaktId = result.id
   } catch (err) {
     sendErr = err instanceof Error ? err.message : String(err)
   }
+
+  const wa = notifResult?.channelResults.whatsapp
+  const whatsappSent = wa?.status === 'sent'
+  const whatsappError = wa?.error ?? sendErr ?? null
 
   await supabase.from('payment_reminders').insert({
     gym_id: gym.id, branch_id: member.branch_id ?? null,
     payment_id: paymentId!, member_id: member.id,
     channel: 'whatsapp', provider: 'interakt',
     template_name: templateName,
-    status: sendErr ? 'failed' : 'sent',
-    provider_message_id: interaktId ?? null,
-    link_sent: payLink, error: sendErr ?? null,
+    status: whatsappSent ? 'sent' : 'failed',
+    provider_message_id: wa?.id ?? null,
+    link_sent: payLink, error: whatsappError,
     triggered_by: 'cron',
   })
 
-  if (sendErr) throw new Error(sendErr)
+  // Only throw if BOTH primary AND email fallback failed. A successful
+  // email fallback keeps the cron counter as "sent" — the member was
+  // actually reached, just via a different channel.
+  if (notifResult?.status === 'failed') {
+    throw new Error(whatsappError ?? 'notification dispatch failed')
+  }
 }
 
 // ─── SaaS subscription reminders (gym owner notifications) ────────────────
@@ -304,36 +337,50 @@ async function processSaasReminders(supabase: SupabaseClient) {
     if (!SAAS_REMIND_DAYS.includes(daysLeft)) { stats.skipped++; continue }
     stats.found++
 
-    // Find an owner of this gym with a phone number
+    // Find an owner of this gym. Pull id + email too — the engine uses
+    // these for the audit row (notifications.user_id) and for email
+    // fallback when WhatsApp fails. Previously we required a phone (no
+    // fallback existed); now an owner with no phone but a valid email
+    // still gets reminded via email.
     const { data: owner } = await supabase
       .from('users')
-      .select('name, phone')
+      .select('id, name, phone, email')
       .eq('gym_id', sub.gym_id).eq('role', 'owner')
-      .not('phone', 'is', null)
       .limit(1)
       .maybeSingle()
 
-    if (!owner?.phone) { stats.skipped++; continue }
+    if (!owner || (!owner.phone && !owner.email)) { stats.skipped++; continue }
 
     try {
-      const phone = normalizeIndianPhone(owner.phone)
       const ownerName = owner.name ?? 'Gym Owner'
-      const billingUrl = (Deno.env.get('PUBLIC_APP_URL') ?? 'https://app.gymos.in') + '/billing'
+      const billingUrl = (Deno.env.get('PUBLIC_APP_URL') ?? 'https://app.gymmobius.com') + '/billing'
 
-      await sendInteraktTemplate({
-        countryCode: phone.countryCode,
-        phoneNumber: phone.phoneNumber,
-        templateName: TEMPLATE_SAAS_EXPIRY,
-        languageCode: 'en',
-        bodyValues: [
-          ownerName,
-          sub.plan_name ?? 'Gymmobius',
-          daysLeft === 0 ? 'today' : `in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`,
+      // Route through the engine — gets us WhatsApp via Interakt with
+      // automatic email fallback (Resend), plus an audit row that the
+      // previous direct-Interakt path was missing entirely (audit H5).
+      const notifResult = await sendNotification({
+        supabase,
+        gymId: sub.gym_id,
+        type: 'saas_expiry_alert',
+        userId: owner.id,
+        triggeredBy: 'cron',
+        recipientName: ownerName,
+        recipientPhone: owner.phone,
+        recipientEmail: owner.email,
+        metadata: {
+          subscription_id: sub.id,
+          planName: sub.plan_name ?? 'Gymmobius',
+          daysLeft,
           billingUrl,
-        ],
-        callbackData: sub.id,
+          callbackData: sub.id,
+        },
       })
-      stats.sent++
+
+      if (notifResult.status === 'failed') {
+        stats.failed++
+      } else {
+        stats.sent++
+      }
     } catch (err) {
       console.error(`saas reminder for gym ${sub.gym_id} failed:`, err)
       stats.failed++
