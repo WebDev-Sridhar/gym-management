@@ -1,11 +1,20 @@
+import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
+import { useBranch } from '../../store/BranchContext'
 import {
   LayoutDashboard, Users, UserCheck, QrCode, ClipboardList, CreditCard,
   BarChart2, Megaphone, MessageSquare, Settings, HelpCircle, Gem,FolderKanban,
   MapPin,
 } from 'lucide-react'
 import { canAccess } from '../../lib/featureGates'
+import { fetchVerificationPendingCount } from '../../services/paymentService'
+
+// Audit H6 — how often the Sidebar polls for payments.verification_pending
+// count so the Payments badge stays fresh while the owner is in the
+// dashboard. Mirrors Topbar's enquiries poll cadence so we don't
+// double-up on a custom interval.
+const VERIFICATION_POLL_MS = 60_000
 
 const sections = [
   {
@@ -53,7 +62,7 @@ const sections = [
   },
 ]
 
-function SidebarLink({ to, label, Icon, end }) {
+function SidebarLink({ to, label, Icon, end, badge }) {
   return (
     <NavLink
       to={to}
@@ -67,16 +76,61 @@ function SidebarLink({ to, label, Icon, end }) {
       }
     >
       <Icon size={17} strokeWidth={1.9} />
-      <span>{label}</span>
+      <span className="flex-1">{label}</span>
+      {badge != null && badge > 0 && (
+        // Red-pill counter for items that need owner attention. Audit H6:
+        // currently used for payments.status='verification_pending'. Cap at
+        // 9+ so the pill stays one digit wide; truncate longer numbers.
+        <span
+          aria-label={`${badge} pending`}
+          style={{
+            background: '#ef4444',
+            color: '#fff',
+            fontSize: 10,
+            fontWeight: 700,
+            padding: '1px 7px',
+            borderRadius: 999,
+            lineHeight: 1.4,
+            minWidth: 18,
+            textAlign: 'center',
+          }}
+        >
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
     </NavLink>
   )
 }
 
 export default function Sidebar() {
   const navigate = useNavigate()
-  const { subscription, gymName } = useAuth()
+  const { subscription, gymName, gymId } = useAuth()
+  const { selectedBranchId } = useBranch()
 
   const planName = subscription?.plan_name || 'Starter'
+
+  // Audit H6 — poll payments.verification_pending count so the Payments
+  // link shows a red badge when members have tapped "I Paid" via UPI but
+  // the owner hasn't verified yet. Without this, the UPI flow has zero
+  // owner-side alerting: the member is left waiting silently for activation.
+  //
+  // 60s cadence matches the Topbar's enquiries poll — same noise budget;
+  // covers the case where the dashboard is left open across a verification.
+  // Branch-aware so the count respects the active branch context.
+  const [verificationPendingCount, setVerificationPendingCount] = useState(0)
+  useEffect(() => {
+    if (!gymId) return
+    let cancelled = false
+
+    function load() {
+      fetchVerificationPendingCount(gymId, selectedBranchId).then(n => {
+        if (!cancelled) setVerificationPendingCount(n)
+      })
+    }
+    load()
+    const id = setInterval(load, VERIFICATION_POLL_MS)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [gymId, selectedBranchId])
 
   return (
     <aside
@@ -102,7 +156,14 @@ export default function Sidebar() {
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {visible.map(link => (
-                  <SidebarLink key={link.label} {...link} />
+                  <SidebarLink
+                    key={link.label}
+                    {...link}
+                    // Inject per-link badge counts. Currently only Payments
+                    // surfaces a badge (verification_pending). Other links
+                    // get `undefined` → renders without the pill.
+                    badge={link.to === '/owner-dashboard/payments' ? verificationPendingCount : undefined}
+                  />
                 ))}
               </div>
             </div>

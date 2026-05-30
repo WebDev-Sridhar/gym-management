@@ -3,6 +3,31 @@ import { applyBranchFilter } from '../lib/branchQuery'
 import { computeRenewalDates } from './membershipService'
 
 /**
+ * Audit H6 — return the count of payments awaiting owner verification for
+ * the given gym (+ optional branch). Used by Sidebar to render a badge on
+ * the Payments nav link so owners notice unverified UPI "I Paid" submissions
+ * without having to open the page.
+ *
+ * `head: true` + `count: 'exact'` returns ONLY the count in a separate
+ * header — no row data shipped over the wire. Cheap to poll every 60s.
+ */
+export async function fetchVerificationPendingCount(gymId, branchId) {
+  if (!gymId) return 0
+  let q = supabase
+    .from('payments')
+    .select('*', { count: 'exact', head: true })
+    .eq('gym_id', gymId)
+    .eq('status', 'verification_pending')
+  q = applyBranchFilter(q, branchId)
+  const { count, error } = await q
+  if (error) {
+    console.warn('fetchVerificationPendingCount failed:', error.message)
+    return 0
+  }
+  return count ?? 0
+}
+
+/**
  * Fetch all payments for a gym, with member and plan details.
  */
 export async function fetchPayments(gymId, branchId) {
