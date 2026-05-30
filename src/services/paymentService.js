@@ -104,6 +104,27 @@ export async function recordManualPayment({
     .insert(row)
     .select('*, member:members(id, name, phone, email), plan:plans(id, name, price, duration_days)')
     .single()
+
+  // 23505 = unique_violation on payments_one_pending_per_member_plan. A
+  // concurrent tab/click already inserted a pending row for this same
+  // (member, plan). Return the existing row instead of failing so the UI
+  // converges to the same end-state as the winning tab. Without this guard
+  // the second tab would surface a confusing "duplicate key" error to the
+  // owner even though their intent (one pending payment) was already met.
+  if (error && error.code === '23505') {
+    const { data: existing, error: readErr } = await supabase
+      .from('payments')
+      .select('*, member:members(id, name, phone, email), plan:plans(id, name, price, duration_days)')
+      .eq('member_id', memberId)
+      .eq('plan_id', planId)
+      .eq('status', 'pending')
+      .in('source', ['manual', 'upi', 'link'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (readErr) throw readErr
+    if (existing) return existing
+  }
   if (error) throw error
   return data
 }
@@ -146,6 +167,15 @@ export async function deletePayment(paymentId) {
  */
 export async function markPaymentPaid({ paymentId, paymentMethod }) {
   const now = new Date().toISOString()
+  // Critical idempotency guard: only flip pending → paid. Without the
+  // status='pending' filter, a UI double-click (or any other re-fire) would
+  // re-run the WHOLE side-effect chain: re-extend the membership (anchored
+  // on the now-extended expiry → 2× duration), re-invoke send-payment-
+  // confirmation → duplicate receipt email. Bug seen on 2026-05-29 for
+  // payment cdbd4bb4… — member got 2 receipts ~600ms apart.
+  //
+  // .maybeSingle so a "no rows updated" (already paid) returns data=null
+  // instead of throwing PGRST116. That lets us early-return cleanly.
   const { data, error } = await supabase
     .from('payments')
     .update({
@@ -155,10 +185,24 @@ export async function markPaymentPaid({ paymentId, paymentMethod }) {
       paid_at: now,
     })
     .eq('id', paymentId)
+    .eq('status', 'pending')
     .select('*, member:members(id, name, phone, email, expiry_date, join_date), plan:plans(id, name, price, duration_days)')
-    .single()
+    .maybeSingle()
 
   if (error) throw error
+
+  // Already paid (concurrent call won the race, or genuine double-fire) —
+  // skip extend + notification. Read the existing row so the caller still
+  // gets the canonical post-state to render. No side effects re-run.
+  if (!data) {
+    const { data: existing, error: readErr } = await supabase
+      .from('payments')
+      .select('*, member:members(id, name, phone, email, expiry_date, join_date), plan:plans(id, name, price, duration_days)')
+      .eq('id', paymentId)
+      .single()
+    if (readErr) throw readErr
+    return existing
+  }
 
   // Extend the membership if the payment is linked to a plan + member.
   // Non-fatal: payment update already committed; if extend fails the owner

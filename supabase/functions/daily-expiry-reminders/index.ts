@@ -181,7 +181,31 @@ async function sendMemberReminder(
       payment_method: gym.payment_mode,
       due_date: member.expiry_date,
     })
-    if (insErr) throw new Error(`insert payment failed: ${insErr.message}`)
+    // 23505 = payments_one_pending_per_member_plan. Another caller (a
+    // manual Remind click, a prior cron iteration that retried, or this
+    // cron racing with itself) already inserted a pending row for the
+    // same (member, plan). Re-use that row so the reminder still goes
+    // out (against the pre-existing link) instead of failing the run.
+    if (insErr && (insErr as { code?: string }).code === '23505') {
+      const { data: existing, error: readErr } = await supabase
+        .from('payments')
+        .select('id, razorpay_payment_link_id, razorpay_link_url')
+        .eq('member_id', member.id)
+        .eq('plan_id', member.plan.id)
+        .eq('status', 'pending')
+        .in('source', ['manual', 'upi', 'link'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (readErr || !existing) {
+        throw new Error(`insert payment failed: ${insErr.message}; lookup after 23505 also failed: ${readErr?.message ?? 'no row'}`)
+      }
+      paymentId = existing.id
+      link_url = existing.razorpay_link_url ?? null
+      link_id  = existing.razorpay_payment_link_id ?? null
+    } else if (insErr) {
+      throw new Error(`insert payment failed: ${insErr.message}`)
+    }
   } else {
     const { data: existing } = await supabase
       .from('payments').select('razorpay_link_url, razorpay_payment_link_id')
@@ -222,7 +246,7 @@ async function sendMemberReminder(
           description: `${gym.name} — ${planName}`,
           customer: { name: memberName, contact: phone.countryCode + phone.phoneNumber },
           notify: { sms: false, email: false },
-          reference_id: paymentId,
+          reference_id: paymentId!,
           notes: {
             type: 'membership', gym_id: gym.id,
             payment_id: paymentId!, member_id: member.id, plan_id: member.plan.id,

@@ -121,20 +121,54 @@ Deno.serve(async (req) => {
           payment_method: gym.payment_mode,
           due_date: body.dueDate ?? null,
         })
-      if (insErr) throw new Error(`failed to insert payment: ${insErr.message}`)
-
-      payment = {
-        id: newPaymentId,
-        gym_id: gymId,
-        branch_id: member.branch_id ?? null,
-        member_id: member.id,
-        plan_id: plan.id,
-        amount: plan.price,
-        status: 'pending',
-        razorpay_payment_link_id: null,
-        razorpay_link_url: null,
-        member: { id: member.id, name: member.name, phone: member.phone },
-        plan: { id: plan.id, name: plan.name, price: plan.price },
+      // 23505 on payments_one_pending_per_member_plan: a concurrent Remind
+      // (other tab / cron run) already created a pending row for this
+      // (member, plan). Re-use it — sending against the existing row is the
+      // exact same user-facing outcome as creating a new one would have been,
+      // and avoids a duplicate payment link + duplicate WhatsApp/email.
+      if (insErr && (insErr as { code?: string }).code === '23505') {
+        const { data: existing, error: readErr } = await supabase
+          .from('payments')
+          .select('id, gym_id, branch_id, member_id, plan_id, amount, status, razorpay_payment_link_id, razorpay_link_url')
+          .eq('member_id', member.id)
+          .eq('plan_id', plan.id)
+          .eq('status', 'pending')
+          .in('source', ['manual', 'upi', 'link'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (readErr || !existing) {
+          throw new Error(`failed to fetch existing pending after 23505: ${readErr?.message ?? 'no row'}`)
+        }
+        payment = {
+          id: existing.id,
+          gym_id: existing.gym_id,
+          branch_id: existing.branch_id,
+          member_id: existing.member_id,
+          plan_id: existing.plan_id,
+          amount: existing.amount,
+          status: 'pending',
+          razorpay_payment_link_id: existing.razorpay_payment_link_id ?? null,
+          razorpay_link_url: existing.razorpay_link_url ?? null,
+          member: { id: member.id, name: member.name, phone: member.phone },
+          plan: { id: plan.id, name: plan.name, price: plan.price },
+        }
+      } else if (insErr) {
+        throw new Error(`failed to insert payment: ${insErr.message}`)
+      } else {
+        payment = {
+          id: newPaymentId,
+          gym_id: gymId,
+          branch_id: member.branch_id ?? null,
+          member_id: member.id,
+          plan_id: plan.id,
+          amount: plan.price,
+          status: 'pending',
+          razorpay_payment_link_id: null,
+          razorpay_link_url: null,
+          member: { id: member.id, name: member.name, phone: member.phone },
+          plan: { id: plan.id, name: plan.name, price: plan.price },
+        }
       }
     }
 

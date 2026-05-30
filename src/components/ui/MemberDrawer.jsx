@@ -554,6 +554,15 @@ function PaymentsTab({ member, gymId }) {
   const [payments, setPayments]             = useState([])
   const [loading, setLoading]               = useState(true)
   const [markingId, setMarkingId]           = useState(null)
+  // Separate from markingId: markingId tracks which row's "Mark Paid" form
+  // is OPEN; confirmingId tracks which row is mid-API-call. Without this,
+  // a fast double-click on "Confirm Paid" fires markPaymentPaid twice → DB
+  // re-extends membership + send-payment-confirmation invokes twice → 2
+  // receipt emails. Bug seen 2026-05-29 for payment cdbd4bb4… (Srivijay
+  // received 2 receipts ~600ms apart). The backend got a status='pending'
+  // guard too, but the client-side disable kills the symptom before the
+  // network round-trip even starts.
+  const [confirmingId, setConfirmingId]     = useState(null)
   const [payMethod, setPayMethod]           = useState('cash')
   const [reminderBusy, setReminderBusy]     = useState(null)
   const [lastReminders, setLastReminders]   = useState(new Map())
@@ -585,11 +594,16 @@ function PaymentsTab({ member, gymId }) {
   }, [member.id, gymId])
 
   async function handleMarkPaid(paymentId) {
+    // Bail if this row is already mid-call. Pure UX guard for fast double-
+    // clicks (React StrictMode dev double-render also takes this path).
+    // Backend has its own status='pending' idempotency check.
+    if (confirmingId === paymentId) return
+    setConfirmingId(paymentId)
     try {
       const updated = await markPaymentPaid({ paymentId, paymentMethod: payMethod })
       setPayments(prev => prev.map(p => p.id === paymentId ? updated : p))
     } catch (err) { dialog.alert(err.message || 'Failed to mark paid') }
-    finally { setMarkingId(null); setPayMethod('cash') }
+    finally { setConfirmingId(null); setMarkingId(null); setPayMethod('cash') }
   }
 
   async function handleRemind(paymentId) {
@@ -732,9 +746,12 @@ function PaymentsTab({ member, gymId }) {
                 ]}
               />
               <div className="flex gap-2">
-                <button onClick={() => handleMarkPaid(p.id)}
-                  className="flex-1 py-2 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 cursor-pointer">
-                  Confirm Paid
+                <button
+                  onClick={() => handleMarkPaid(p.id)}
+                  disabled={confirmingId === p.id}
+                  className="flex-1 py-2 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {confirmingId === p.id ? 'Confirming…' : 'Confirm Paid'}
                 </button>
                 <button onClick={() => { setMarkingId(null); setPayMethod('cash') }}
                   className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 cursor-pointer">
