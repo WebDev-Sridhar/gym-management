@@ -236,7 +236,10 @@ async function handlePaymentCaptured(
       plan: { name: string } | null
     } | null }
   if (payment?.plan_id && payment?.member_id) {
-    await extendMembership(supabase, payment.member_id, payment.plan_id)
+    // Idempotent per payment.id — safe to race with the user-browser
+    // verify-payment call for the same Razorpay capture. See
+    // _shared/membershipExpiry.ts header.
+    await extendMembership(supabase, payment.id)
     await firePaymentConfirmation(supabase, gymId, {
       id: payment.id, member_id: payment.member_id, amount: payment.amount, plan: payment.plan,
     })
@@ -271,7 +274,10 @@ async function handlePaymentLinkPaid(
       plan: { name: string } | null
     } | null }
   if (payment?.plan_id && payment?.member_id) {
-    await extendMembership(supabase, payment.member_id, payment.plan_id)
+    // Idempotent per payment.id — payment.link.paid is a separate Razorpay
+    // event from payment.captured for the same underlying transaction, and
+    // both can land in the same window. See _shared/membershipExpiry.ts.
+    await extendMembership(supabase, payment.id)
     await firePaymentConfirmation(supabase, gymId, {
       id: payment.id, member_id: payment.member_id, amount: payment.amount, plan: payment.plan,
     })

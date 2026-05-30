@@ -97,7 +97,10 @@ interface ChannelResult {
 
 export interface SendNotificationResult {
   notificationId: string
-  status: 'sent' | 'partial' | 'failed'
+  // 'skipped' = recipient opted out (M1 suppression); engine never tried
+  //            to dispatch. Distinct from 'failed' (tried and provider
+  //            rejected) so dashboard alerting can ignore it.
+  status: 'sent' | 'partial' | 'failed' | 'skipped'
   channelResults: Record<Channel, ChannelResult | undefined>
 }
 
@@ -124,6 +127,38 @@ export async function sendNotification(p: SendNotificationParams): Promise<SendN
   // Daily summary respects its own toggle — short-circuit if disabled
   if (type === 'daily_summary' && gym.daily_summary_enabled === false) {
     return { notificationId: '', status: 'sent', channelResults: {} as Record<Channel, ChannelResult | undefined> }
+  }
+
+  // Audit M1 — per-member opt-out. If this member has unsubscribed (manual
+  // owner block today, Interakt STOP webhook tomorrow), record the attempt
+  // as 'skipped' and short-circuit. Owner-facing notifications (no memberId,
+  // userId only) bypass this check — owners control their own dispatch via
+  // the per-channel gym toggles, not via the suppression flag.
+  if (memberId) {
+    const { data: m } = await supabase
+      .from('members').select('unsubscribed').eq('id', memberId).maybeSingle()
+    if (m?.unsubscribed) {
+      const { data: skippedRow } = await supabase
+        .from('notifications')
+        .insert({
+          gym_id: gymId,
+          user_id: userId ?? null,
+          member_id: memberId,
+          type,
+          channels: [],
+          status: 'skipped',
+          metadata: { ...metadata, suppressed_reason: 'member_unsubscribed' },
+          triggered_by: triggeredBy,
+          sent_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+      return {
+        notificationId: skippedRow?.id ?? '',
+        status: 'skipped',
+        channelResults: {} as Record<Channel, ChannelResult | undefined>,
+      }
+    }
   }
 
   // 2. Resolve recipient contact

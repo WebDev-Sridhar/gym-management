@@ -99,7 +99,9 @@ Deno.serve(async (req) => {
     // create-public-order already cleared deleted_at on the member row for
     // the public-checkout re-join path, so we don't need to set it here.
     if (payment.plan_id && payment.member_id) {
-      await extendMembership(supabase, payment.member_id, payment.plan_id)
+      // Idempotent per payment.id — safe to race with razorpay-webhook for
+      // the same Razorpay capture. See _shared/membershipExpiry.ts header.
+      await extendMembership(supabase, payment.id)
     }
 
     const memberInfo = await fetchMemberInfo(supabase, payment.member_id, payment.plan_id)

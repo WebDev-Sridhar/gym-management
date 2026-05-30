@@ -71,13 +71,30 @@ Deno.serve(async (req) => {
             .eq('gym_id', gym.id)
             .eq('status', 'paid')
             .gte('paid_at', `${today}T00:00:00Z`),
+          // Audit M5 — `.limit(1)` guards against gyms that somehow ended
+          // up with multiple `role='owner'` rows. Multi-owner isn't a
+          // supported product state today, but without the limit a stray
+          // duplicate would make .maybeSingle() throw and kill the daily
+          // summary for that gym entirely. Two other call-sites already
+          // have this guard (razorpay-webhook, daily-expiry-reminders) —
+          // this one was the outlier.
           supabase.from('users')
             .select('id, name, phone, email')
             .eq('gym_id', gym.id)
             .eq('role', 'owner')
+            .order('created_at', { ascending: true })
+            .limit(1)
             .maybeSingle(),
         ])
 
+        // Audit M3 — pendingAmount + revenueToday are summed JS-side from
+        // every matching row. Fine at current scale (typical gym: <200
+        // pending), wasteful above ~5k pending where we'd ship megabytes
+        // of `amount` columns just to sum them. Migrate to a
+        // gym_daily_summary_metrics(gym_id, day) RPC that returns the four
+        // aggregates in one round-trip when the first gym crosses that bar.
+        // Until then the round-trip count is the same and the JSON size
+        // doesn't matter.
         const pendingCount  = pendingRes.count ?? 0
         const pendingAmount = (pendingRes.data ?? []).reduce((s: number, r: { amount: number }) => s + Number(r.amount || 0), 0)
         const expiringCount = expiringRes.count ?? 0

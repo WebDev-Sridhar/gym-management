@@ -105,8 +105,10 @@ Deno.serve(async (req) => {
 
     // Extend plan: if linked, assign to member with anchor-with-grace so
     // active renewals stack on top of unused days instead of resetting.
+    // Idempotent per payment.id — safe to race with razorpay-webhook for
+    // the same Razorpay capture. See _shared/membershipExpiry.ts header.
     if (payment.plan_id && payment.member_id) {
-      await extendMembership(supabase, payment.member_id, payment.plan_id)
+      await extendMembership(supabase, payment.id)
     }
 
     // Fire payment confirmation through the notification engine. The engine
