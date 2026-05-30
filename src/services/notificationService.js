@@ -30,11 +30,23 @@ export async function updateGymCommSettings(gymId, prefs) {
 
 // ─── Notification log ─────────────────────────────────────────────────────
 
+// SaaS notifications (platform → owner) share the notifications table with
+// gym↔member traffic because both carry the owner's gym_id, but they're a
+// different conversation: receipts for the owner's own Gymmobius subscription,
+// expiry alerts for the SaaS plan, etc. The CommunicationPage is a gym-comm
+// console — surfacing platform notices in it would be confusing ("why is my
+// SaaS receipt in my members' activity log?") and would let an owner think
+// the per-gym channel toggles control SaaS delivery (they don't, and shouldn't).
+// Excluded centrally here so every reader of fetchNotifications gets the
+// same filter.
+const SAAS_NOTIFICATION_TYPES = ['saas_payment_receipt', 'saas_expiry_alert']
+
 export async function fetchNotifications(gymId, { type = null, status = null, limit = 50, branchId = null } = {}) {
   let q = supabase
     .from('notifications')
     .select('id, type, channels, status, metadata, channel_results, triggered_by, created_at, sent_at, member:members(id, name, phone, email)')
     .eq('gym_id', gymId)
+    .not('type', 'in', `(${SAAS_NOTIFICATION_TYPES.join(',')})`)
     .order('created_at', { ascending: false })
     .limit(limit)
 

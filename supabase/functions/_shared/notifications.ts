@@ -14,7 +14,19 @@ import {
   memberInviteEmail,
   trainerInviteEmail,
   ghostReminderEmail,
+  paymentReminderEmail,
+  expiryAlertEmail,
+  saasExpiryAlertEmail,
+  SAAS_REPLY_EMAIL,
 } from './emailTemplates.ts'
+
+// SaaS-side notification types — their emails render in saasShell, reply_to
+// goes to the SaaS support inbox (not the gym). Every other type is treated
+// as a gym email (reply_to = gym.email).
+const SAAS_TYPES: ReadonlySet<NotificationType> = new Set([
+  'saas_expiry_alert',
+  'saas_payment_receipt',
+])
 
 export type NotificationType =
   | 'payment_reminder'
@@ -98,10 +110,12 @@ export interface SendNotificationResult {
 export async function sendNotification(p: SendNotificationParams): Promise<SendNotificationResult> {
   const { supabase, gymId, type, metadata, userId, memberId, triggeredBy = 'system' } = p
 
-  // 1. Load gym prefs + brand
+  // 1. Load gym prefs + brand + reply contact (gym.email is passed through
+  //    to template footers + Resend reply_to so members reach the gym, not
+  //    the unmonitored noreply@gymmobius.com mailbox).
   const { data: gym } = await supabase
     .from('gyms')
-    .select('id, name, theme_color, whatsapp_enabled, email_enabled, daily_summary_enabled')
+    .select('id, name, email, theme_color, whatsapp_enabled, email_enabled, daily_summary_enabled')
     .eq('id', gymId)
     .single()
 
@@ -240,7 +254,7 @@ async function sendEmailChannel(args: {
   email: string | null
   name: string | null
   metadata: Record<string, unknown>
-  gym: { name: string | null; theme_color: string | null }
+  gym: { name: string | null; email: string | null; theme_color: string | null }
 }): Promise<ChannelResult> {
   if (!args.email) return { status: 'skipped', error: 'no email address' }
 
@@ -310,45 +324,50 @@ async function sendEmailChannel(args: {
         break
       // Owner-facing SaaS subscription expiry. Distinct from `expiry_alert`
       // (member membership expiry) — different subject, billing URL instead
-      // of a per-payment link, gym branding stays Gymmobius-side.
-      case 'saas_expiry_alert': {
-        const daysLeft = Number(args.metadata.daysLeft ?? 0)
-        const planName = String(args.metadata.planName ?? 'Gymmobius')
-        const billingUrl = typeof args.metadata.billingUrl === 'string' ? args.metadata.billingUrl : null
-        const subject = daysLeft === 0
-          ? `Your ${planName} subscription expires today`
-          : `Your ${planName} subscription expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
-        const html = `
-          <p>Hi ${args.name ?? 'there'},</p>
-          <p>Your <b>${planName}</b> subscription for <b>${args.gym.name ?? 'your gym'}</b> ${
-            daysLeft === 0 ? 'expires today' : `expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
-          }. Renew now to keep full dashboard access without interruption.</p>
-          ${billingUrl ? `<p><a href="${billingUrl}" style="background:#6366f1;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;">Renew subscription</a></p>` : ''}
-        `
-        tpl = { subject, html }
+      // of a per-payment link, renders in saasShell (Gymmobius brand + logo).
+      case 'saas_expiry_alert':
+        tpl = saasExpiryAlertEmail({
+          ownerName:  args.name ?? 'there',
+          planName:   String(args.metadata.planName ?? 'Gymmobius'),
+          daysLeft:   Number(args.metadata.daysLeft ?? 0),
+          gymName:    args.gym.name,
+          billingUrl: typeof args.metadata.billingUrl === 'string' ? args.metadata.billingUrl : null,
+        })
         break
-      }
-      // Generic fallback for reminder/expiry types: terse subject + link
       case 'payment_reminder':
+        tpl = paymentReminderEmail({
+          memberName: args.name ?? 'Member',
+          planName:   String(args.metadata.planName ?? 'Membership'),
+          amount:     Number(args.metadata.amount ?? 0),
+          payLink:    typeof args.metadata.payLink === 'string' ? args.metadata.payLink : null,
+          gym:        args.gym,
+        })
+        break
       case 'expiry_alert':
-      default: {
-        const subject = args.type === 'payment_reminder'
-          ? `Payment due — ${args.gym.name ?? 'your gym'}`
-          : `Membership expiring soon`
-        const link = typeof args.metadata.payLink === 'string' ? args.metadata.payLink : null
-        const amt = args.metadata.amount != null ? `₹${Number(args.metadata.amount).toLocaleString('en-IN')}` : ''
-        const html = `
-          <p>Hi ${args.name ?? 'Member'},</p>
-          <p>${args.type === 'payment_reminder'
-            ? `Your payment of <b>${amt}</b> for ${String(args.metadata.planName ?? 'your membership')} is due.`
-            : `Your membership at ${args.gym.name ?? 'the gym'} is expiring soon.`}</p>
-          ${link ? `<p><a href="${link}" style="background:${args.gym.theme_color || '#8B5CF6'};color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;">Complete payment</a></p>` : ''}
-        `
-        tpl = { subject, html }
-      }
+        tpl = expiryAlertEmail({
+          memberName: args.name ?? 'Member',
+          daysLeft:   Number(args.metadata.daysLeft ?? 0),
+          payLink:    typeof args.metadata.payLink === 'string' ? args.metadata.payLink : null,
+          gym:        args.gym,
+        })
+        break
     }
 
-    const result = await sendEmail({ to: args.email, subject: tpl.subject, html: tpl.html })
+    // Reply contact: SaaS types go to the SaaS support inbox; everything
+    // else replies to the gym so members reach the gym instead of bouncing
+    // off the unmonitored noreply@gymmobius.com From address. If the gym
+    // hasn't set an email, we omit reply_to entirely (Resend keeps the
+    // From address as the reply destination, which is at least honest).
+    const replyTo = SAAS_TYPES.has(args.type)
+      ? SAAS_REPLY_EMAIL
+      : (args.gym.email ?? undefined)
+
+    const result = await sendEmail({
+      to: args.email,
+      subject: tpl.subject,
+      html: tpl.html,
+      replyTo,
+    })
     return { status: 'sent', id: result.id }
   } catch (err) {
     return { status: 'failed', error: err instanceof Error ? err.message : String(err) }

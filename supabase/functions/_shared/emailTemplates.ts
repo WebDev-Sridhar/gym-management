@@ -1,26 +1,70 @@
 // Inline HTML email templates. Pure functions — return { subject, html }.
-// No external image deps so they render in every client. Brand color is the
-// gym's theme_color (falls back to violet).
+// Two visual shells:
+//   - gymShell: gym-branded (gym name in header, gym.theme_color, gym email
+//     as the reply contact). Used for every member-facing and owner-facing
+//     gym-business email — payment receipts, reminders, invites, etc.
+//   - saasShell: platform-branded (Gymmobius logo + name, platform indigo,
+//     SaaS support email as the reply contact). Used for SaaS-side emails —
+//     subscription receipts and renewal alerts.
+//
+// "From" addresses are configured in resend.ts (RESEND_FROM env var,
+// default `Gymmobius <noreply@gymmobius.com>`). Since the noreply mailbox
+// is unmonitored, every email sets reply_to via the notification engine so
+// human replies land somewhere real:
+//   - gym emails    → gym.email
+//   - SaaS emails   → SAAS_SUPPORT_EMAIL below
+// Both shells also call this out in the footer so users don't waste a reply
+// to noreply@gymmobius.com.
 
 interface GymCtx {
   name?: string | null
   theme_color?: string | null
+  email?: string | null   // Used as reply contact in the gym-shell footer
 }
 
-function shell(brand: string, body: string): string {
+// SaaS-side constants. Logo is fetched by the recipient's email client, so
+// it MUST be served on a public, https URL. Keep the asset stable — email
+// clients cache logos aggressively and a 404 leaves a broken-image icon.
+const SAAS_LOGO_URL = Deno.env.get('SAAS_LOGO_URL')
+  ?? 'https://gymmobius.com/logo.png'
+const SAAS_SUPPORT_EMAIL = Deno.env.get('SAAS_SUPPORT_EMAIL')
+  ?? 'gymmobius.support@gmail.com'
+const SAAS_BRAND_NAME  = 'Gymmobius'
+const SAAS_BRAND_COLOR = '#6366f1'   // platform indigo
+
+function safe(s: string | null | undefined, fallback = ''): string {
+  if (s == null) return fallback
+  return String(s).replace(/[<>&]/g, (c) => c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;')
+}
+
+function btn(url: string, label: string, brand: string): string {
+  return `<a href="${url}" style="display:inline-block;background:${brand};color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">${label}</a>`
+}
+
+// Gym-branded shell. Header = gym name on the gym's theme color. Footer
+// surfaces the gym's own email so members reach the gym, not the SaaS.
+// If gym.email is missing we omit the "contact" line entirely rather than
+// invite a reply to the noreply mailbox.
+function gymShell(gym: GymCtx, body: string): string {
+  const brand   = gym.theme_color || '#8B5CF6'
+  const gymName = safe(gym.name, 'Your gym')
+  const gymEmail = gym.email ? safe(gym.email) : null
+  const footer = gymEmail
+    ? `Replies to this email aren't monitored. For help, contact <b>${gymName}</b> at <a href="mailto:${gymEmail}" style="color:${brand};text-decoration:none;">${gymEmail}</a>.`
+    : `Replies to this email aren't monitored. Please contact your gym directly for help.`
   return `
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"/><title>Gymmobius</title></head>
+<html><head><meta charset="utf-8"/><title>${gymName}</title></head>
 <body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);">
-        <tr><td style="background:${brand};padding:18px 24px;color:#fff;font-weight:700;font-size:14px;letter-spacing:1px;">Gymmobius</td></tr>
+        <tr><td style="background:${brand};padding:18px 24px;color:#fff;font-weight:700;font-size:15px;letter-spacing:0.5px;">${gymName}</td></tr>
         <tr><td style="padding:28px 28px 32px;color:#1f2937;font-size:15px;line-height:1.6;">
           ${body}
         </td></tr>
-        <tr><td style="background:#fafafa;padding:14px 24px;color:#9ca3af;font-size:12px;border-top:1px solid #f0f0f0;">
-          You received this because you have an account on Gymmobius. Reply to this email if you need help.
+        <tr><td style="background:#fafafa;padding:14px 24px;color:#9ca3af;font-size:12px;border-top:1px solid #f0f0f0;line-height:1.5;">
+          ${footer}
         </td></tr>
       </table>
     </td></tr>
@@ -28,14 +72,41 @@ function shell(brand: string, body: string): string {
 </body></html>`
 }
 
-function btn(url: string, label: string, brand: string): string {
-  return `<a href="${url}" style="display:inline-block;background:${brand};color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">${label}</a>`
+// SaaS-branded shell. Header = Gymmobius logo + name on platform indigo.
+// Footer routes replies to gymmobius.support@gmail.com.
+//
+// Logo is rendered via <img> with explicit width/height because Outlook
+// ignores CSS dimensions on images. vertical-align:middle keeps the logo
+// aligned with the wordmark across the major clients.
+function saasShell(body: string): string {
+  return `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><title>${SAAS_BRAND_NAME}</title></head>
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);">
+        <tr><td style="background:${SAAS_BRAND_COLOR};padding:18px 24px;color:#fff;">
+          <img src="${SAAS_LOGO_URL}" alt="" width="22" height="22" style="vertical-align:middle;display:inline-block;border:0;margin-right:10px;border-radius:5px;"/>
+          <span style="vertical-align:middle;font-weight:700;font-size:15px;letter-spacing:0.5px;">${SAAS_BRAND_NAME}</span>
+        </td></tr>
+        <tr><td style="padding:28px 28px 32px;color:#1f2937;font-size:15px;line-height:1.6;">
+          ${body}
+        </td></tr>
+        <tr><td style="background:#fafafa;padding:14px 24px;color:#9ca3af;font-size:12px;border-top:1px solid #f0f0f0;line-height:1.5;">
+          Replies to this email aren't monitored. For support, email
+          <a href="mailto:${SAAS_SUPPORT_EMAIL}" style="color:${SAAS_BRAND_COLOR};text-decoration:none;">${SAAS_SUPPORT_EMAIL}</a>.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
 }
 
-function safe(s: string | null | undefined, fallback = ''): string {
-  if (s == null) return fallback
-  return String(s).replace(/[<>&]/g, (c) => c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;')
-}
+// Re-export the reply-contact constants so the notification engine can use
+// them for the Resend `reply_to` field. Keeping these in one file means a
+// future support-email change touches one place.
+export const SAAS_REPLY_EMAIL = SAAS_SUPPORT_EMAIL
 
 // ─── Templates ──────────────────────────────────────────────────────────────
 
@@ -62,7 +133,7 @@ export function paymentConfirmationEmail(args: {
     </table>
     <div style="color:#374151;">Your membership at <b>${gymName}</b> is now active. See you at the gym!</div>
   `
-  return { subject: `✓ Payment received — ${gymName}`, html: shell(brand, body) }
+  return { subject: `✓ Payment received — ${gymName}`, html: gymShell(args.gym, body) }
 }
 
 export function welcomeEmail(args: {
@@ -79,7 +150,7 @@ export function welcomeEmail(args: {
     <div style="color:#374151;margin-bottom:22px;">Show this email at reception on your first visit. We'll get you set up.</div>
     ${args.loginUrl ? btn(args.loginUrl, 'Open my dashboard', brand) : ''}
   `
-  return { subject: `Welcome to ${gymName}`, html: shell(brand, body) }
+  return { subject: `Welcome to ${gymName}`, html: gymShell(args.gym, body) }
 }
 
 export function dailySummaryEmail(args: {
@@ -90,7 +161,6 @@ export function dailySummaryEmail(args: {
   expiringCount: number
   revenueToday: number
 }): { subject: string; html: string } {
-  const brand = args.gym.theme_color || '#8B5CF6'
   const gymName = safe(args.gym.name, 'Your gym')
   const date = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
@@ -120,12 +190,63 @@ export function dailySummaryEmail(args: {
     </table>
     <div style="color:#6b7280;font-size:13px;">Open the Gymmobius dashboard for full details.</div>
   `
-  return { subject: `📊 ${gymName} — daily summary`, html: shell(brand, body) }
+  return { subject: `📊 ${gymName} — daily summary`, html: gymShell(args.gym, body) }
+}
+
+// Payment reminder. Was previously an inline <p>...</p> in notifications.ts
+// with no shell, no gym name, no consistent styling. Now matches the rest:
+// gym-branded header, structured plan/amount summary, prominent pay CTA.
+export function paymentReminderEmail(args: {
+  memberName: string
+  planName: string
+  amount: number
+  payLink?: string | null
+  gym: GymCtx
+}): { subject: string; html: string } {
+  const brand = args.gym.theme_color || '#8B5CF6'
+  const gymName = safe(args.gym.name, 'Your gym')
+  const body = `
+    <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:6px;">Payment due</div>
+    <div style="color:#6b7280;margin-bottom:22px;">Hi ${safe(args.memberName)} — a quick reminder that your membership payment to <b>${gymName}</b> is due.</div>
+    <table role="presentation" width="100%" style="background:#f9fafb;border:1px solid #f0f0f0;border-radius:10px;padding:18px;margin-bottom:22px;">
+      <tr><td style="color:#6b7280;font-size:13px;padding-bottom:6px;">Plan</td><td align="right" style="color:#111827;font-weight:600;">${safe(args.planName)}</td></tr>
+      <tr><td style="color:#6b7280;font-size:13px;">Amount due</td><td align="right" style="color:${brand};font-weight:700;font-size:18px;">₹${Number(args.amount).toLocaleString('en-IN')}</td></tr>
+    </table>
+    ${args.payLink ? btn(args.payLink, 'Complete payment', brand) : ''}
+    <div style="color:#6b7280;font-size:13px;margin-top:22px;">Already paid? You can ignore this — it can take a few minutes for our records to update.</div>
+  `
+  return { subject: `Payment due — ${gymName}`, html: gymShell(args.gym, body) }
+}
+
+// Member-facing membership expiry. Sent by the daily cron 3/1/0 days before
+// expiry_date. Companion to paymentReminderEmail but framed around the
+// expiring date rather than a specific due amount.
+export function expiryAlertEmail(args: {
+  memberName: string
+  daysLeft: number
+  payLink?: string | null
+  gym: GymCtx
+}): { subject: string; html: string } {
+  const brand = args.gym.theme_color || '#8B5CF6'
+  const gymName = safe(args.gym.name, 'your gym')
+  const expiryText = args.daysLeft === 0
+    ? 'expires today'
+    : `expires in ${args.daysLeft} day${args.daysLeft !== 1 ? 's' : ''}`
+  const body = `
+    <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:6px;">Your membership ${expiryText}</div>
+    <div style="color:#6b7280;margin-bottom:22px;">Hi ${safe(args.memberName)} — your membership at <b>${gymName}</b> ${expiryText}. Renew now to keep your access uninterrupted.</div>
+    ${args.payLink ? btn(args.payLink, 'Renew now', brand) : ''}
+  `
+  const subject = args.daysLeft === 0
+    ? `Your ${gymName} membership expires today`
+    : `${gymName} — membership expires in ${args.daysLeft} day${args.daysLeft !== 1 ? 's' : ''}`
+  return { subject, html: gymShell(args.gym, body) }
 }
 
 // SaaS subscription receipt — owner-facing version of paymentConfirmationEmail.
 // Same structure but the closing line talks about dashboard access, not
 // "see you at the gym" (the owner is the customer here, not a member).
+// Renders in saasShell so it carries the Gymmobius brand + logo.
 export function saasPaymentReceiptEmail(args: {
   ownerName: string
   planName: string
@@ -133,7 +254,7 @@ export function saasPaymentReceiptEmail(args: {
   expiresAt?: string | null
   gymName?: string | null
 }): { subject: string; html: string } {
-  const brand = '#6366f1'   // platform indigo — SaaS receipts aren't gym-branded
+  const brand = SAAS_BRAND_COLOR
   const planName = safe(args.planName, 'Gymmobius')
   const gymName  = safe(args.gymName, 'your gym')
   const expiry = args.expiresAt
@@ -150,7 +271,33 @@ export function saasPaymentReceiptEmail(args: {
     </table>
     <div style="color:#374151;">Your <b>${planName}</b> subscription for <b>${gymName}</b> is active. Open the owner dashboard to manage members, payments, and more.</div>
   `
-  return { subject: `✓ ${planName} subscription renewed`, html: shell(brand, body) }
+  return { subject: `✓ ${planName} subscription renewed`, html: saasShell(body) }
+}
+
+// SaaS subscription expiry — was previously inline HTML in notifications.ts
+// with no shell. Now uses saasShell for brand consistency with the receipt.
+export function saasExpiryAlertEmail(args: {
+  ownerName: string
+  planName: string
+  daysLeft: number
+  gymName?: string | null
+  billingUrl?: string | null
+}): { subject: string; html: string } {
+  const brand = SAAS_BRAND_COLOR
+  const planName = safe(args.planName, 'Gymmobius')
+  const gymName  = safe(args.gymName, 'your gym')
+  const expiryText = args.daysLeft === 0
+    ? 'expires today'
+    : `expires in ${args.daysLeft} day${args.daysLeft !== 1 ? 's' : ''}`
+  const body = `
+    <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:6px;">Your subscription ${expiryText}</div>
+    <div style="color:#6b7280;margin-bottom:22px;">Hi ${safe(args.ownerName)} — your <b>${planName}</b> subscription for <b>${gymName}</b> ${expiryText}. Renew now to keep full dashboard access without interruption.</div>
+    ${args.billingUrl ? btn(args.billingUrl, 'Renew subscription', brand) : ''}
+  `
+  const subject = args.daysLeft === 0
+    ? `Your ${planName} subscription expires today`
+    : `Your ${planName} subscription expires in ${args.daysLeft} day${args.daysLeft !== 1 ? 's' : ''}`
+  return { subject, html: saasShell(body) }
 }
 
 // Phase 5 find-my-gym lookup. Sent from the public /functions/v1/find-my-gym
@@ -158,6 +305,9 @@ export function saasPaymentReceiptEmail(args: {
 // and uses the lookup form on the SaaS wrong-portal screen. Anti-enumeration:
 // we send the email only when there's a matching record, but the API always
 // returns success either way so callers can't probe for registered emails.
+//
+// Uses gymShell (not saas) — the recipient cares about reaching their gym,
+// and the gym's branding makes it instantly recognisable.
 export function findMyGymEmail(args: {
   gym: GymCtx
   portalUrl: string
@@ -172,7 +322,7 @@ export function findMyGymEmail(args: {
     <div style="color:${brand};font-size:13px;word-break:break-all;margin-top:4px;"><a href="${args.portalUrl}" style="color:${brand};text-decoration:underline;">${args.portalUrl}</a></div>
     <div style="color:#9ca3af;font-size:12px;margin-top:22px;">Didn't request this? You can safely ignore this email — no changes were made to your account.</div>
   `
-  return { subject: `Your Gymmobius gym portal — ${gymName}`, html: shell(brand, body) }
+  return { subject: `Your Gymmobius gym portal — ${gymName}`, html: gymShell(args.gym, body) }
 }
 
 // Audit C5 — member invite. Sent when an owner clicks "Send invite" on a
@@ -194,9 +344,9 @@ export function memberInviteEmail(args: {
     ${btn(args.portalUrl, `Set up my account`, brand)}
     <div style="color:#6b7280;font-size:13px;margin-top:22px;">Bookmark this URL so it's always one tap away:</div>
     <div style="color:${brand};font-size:13px;word-break:break-all;margin-top:4px;"><a href="${args.portalUrl}" style="color:${brand};text-decoration:underline;">${args.portalUrl}</a></div>
-    <div style="color:#9ca3af;font-size:12px;margin-top:22px;">Didn't expect this? Reply to this email or ignore it — no account is created until you sign up yourself.</div>
+    <div style="color:#9ca3af;font-size:12px;margin-top:22px;">Didn't expect this? You can safely ignore this email — no account is created until you sign up yourself.</div>
   `
-  return { subject: `You're invited to ${gymName}`, html: shell(brand, body) }
+  return { subject: `You're invited to ${gymName}`, html: gymShell(args.gym, body) }
 }
 
 // Audit C6 — ghost recall. Sent by the daily ghost-detection cron when a
@@ -216,9 +366,8 @@ export function ghostReminderEmail(args: {
     <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:6px;">We've missed you at ${gymName} 💪</div>
     <div style="color:#6b7280;margin-bottom:22px;">Hi ${safe(args.memberName)} — it's been ${args.daysInactive} days since your last check-in. Your goals are waiting; we'd love to see you back this week.</div>
     ${args.portalUrl ? btn(args.portalUrl, `Open my dashboard`, brand) : ''}
-    <div style="color:#6b7280;font-size:13px;margin-top:22px;">Not feeling it this week? Reply to this email and let your trainer know — they can help you plan your comeback.</div>
   `
-  return { subject: `We've missed you at ${gymName}`, html: shell(brand, body) }
+  return { subject: `We've missed you at ${gymName}`, html: gymShell(args.gym, body) }
 }
 
 // Audit C4 — trainer invite. Sent when an owner adds a trainer via the
@@ -239,7 +388,7 @@ export function trainerInviteEmail(args: {
     ${btn(args.portalUrl, `Claim my trainer account`, brand)}
     <div style="color:#6b7280;font-size:13px;margin-top:22px;">Use this URL to sign up:</div>
     <div style="color:${brand};font-size:13px;word-break:break-all;margin-top:4px;"><a href="${args.portalUrl}" style="color:${brand};text-decoration:underline;">${args.portalUrl}</a></div>
-    <div style="color:#9ca3af;font-size:12px;margin-top:22px;">Important: sign up with this same email address so we can link your invite. Didn't expect this? You can safely ignore — no account is created until you sign up.</div>
+    <div style="color:#9ca3af;font-size:12px;margin-top:22px;">Important: sign up with this same email address so we can link your invite.</div>
   `
-  return { subject: `You're invited as a trainer at ${gymName}`, html: shell(brand, body) }
+  return { subject: `You're invited as a trainer at ${gymName}`, html: gymShell(args.gym, body) }
 }

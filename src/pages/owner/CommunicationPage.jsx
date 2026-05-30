@@ -74,9 +74,17 @@ function Toggle({ value, onChange, disabled }) {
         value ? 'bg-indigo-600' : 'bg-gray-300'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
-      <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform ${
-        value ? 'translate-x-5' : 'translate-x-0'
-      }`} />
+      {/* Inline backgroundColor wins over the global dark-mode .bg-white
+          override in src/index.css (which repaints every .bg-white to the
+          owner-surface dark color). The toggle knob needs to stay white
+          in both themes — switching it to a dark color makes the knob
+          disappear into the indigo track in dark mode. */}
+      <span
+        style={{ backgroundColor: '#fff' }}
+        className={`pointer-events-none inline-block h-5 w-5 rounded-full shadow transform transition-transform ${
+          value ? 'translate-x-5' : 'translate-x-0'
+        }`}
+      />
     </button>
   )
 }
@@ -186,14 +194,14 @@ export default function CommunicationPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-gray-900">WhatsApp messages</p>
-              <p className="text-xs text-gray-500 mt-0.5">Payment reminders, expiry alerts, daily summary</p>
+              <p className="text-xs text-gray-500 mt-0.5">Payment reminders, expiry alerts, daily summary, win-back nudges</p>
             </div>
             <Toggle value={prefs.whatsapp_enabled} onChange={(v) => setPrefs({ ...prefs, whatsapp_enabled: v })} />
           </div>
           <div className="flex items-center justify-between gap-4 pt-4 border-t border-gray-100">
             <div>
               <p className="text-sm font-medium text-gray-900">Email</p>
-              <p className="text-xs text-gray-500 mt-0.5">Payment receipts and fallback when WhatsApp fails</p>
+              <p className="text-xs text-gray-500 mt-0.5">Payment receipts, member &amp; trainer invites, plus fallback when WhatsApp fails</p>
             </div>
             <Toggle value={prefs.email_enabled} onChange={(v) => setPrefs({ ...prefs, email_enabled: v })} />
           </div>
@@ -205,6 +213,13 @@ export default function CommunicationPage() {
             <Toggle value={prefs.daily_summary_enabled} onChange={(v) => setPrefs({ ...prefs, daily_summary_enabled: v })} />
           </div>
         </div>
+
+        {/* Make the test-button bypass visible — owners testing a channel
+            shouldn't be confused when the test fires even though they
+            toggled the channel off above. */}
+        <p className="text-xs text-gray-400 mt-4">
+          Tests below fire regardless of these toggles so you can verify a channel before enabling it.
+        </p>
 
         <button
           onClick={handleSave}

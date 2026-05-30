@@ -180,34 +180,84 @@ Deno.serve(async (req) => {
     }
 
     // Audit H2 — backend 24h throttle on manual reminders. PaymentsPage
-    // already disables the button when a reminder was sent in the last 24h
-    // (UI compute via `lastReminderForMember`), but that check is per-tab
-    // and bypassed by: a second browser tab, a hard refresh after the button
-    // re-enables, or any direct API caller. The DB has a same-day unique
-    // index on (payment_id, day) too (audit H3), but that throws as a 500;
-    // the throttle here surfaces a clean 429 with an actionable message
+    // already disables the button when a reminder was sent in the last 24h,
+    // but that check is per-tab and bypassed by: a second browser tab, a
+    // hard refresh after the button re-enables, or any direct API caller.
+    // The throttle here surfaces a clean 429 with an actionable message
     // before any Razorpay link creation or Interakt API call.
     //
-    // Skip for brand-new payments (no payment_id passed = freshly created
-    // here = no prior reminders). The check runs only when body.paymentId
-    // was provided, which is the spam-prone re-send case.
-    if (body.paymentId) {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      const { data: recent } = await supabase
-        .from('payment_reminders')
-        .select('id, sent_at')
-        .eq('payment_id', payment.id)
-        .gte('sent_at', since)
-        .order('sent_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (recent) {
-        const lastSent = new Date(recent.sent_at)
-        const hoursAgo = Math.floor((Date.now() - lastSent.getTime()) / (60 * 60 * 1000))
-        throw new HttpError(429,
-          `A reminder for this payment was already sent ${hoursAgo === 0 ? 'less than an hour' : `${hoursAgo}h`} ago. ` +
-          `Please wait at least 24 hours between reminders.`)
-      }
+    // Runs UNCONDITIONALLY (was previously gated on body.paymentId). After
+    // the 23505 handler above started returning an existing pending row for
+    // the no-paymentId path, "no paymentId" no longer means "fresh payment
+    // with no prior reminders" — it can also mean "we lost a race and got
+    // handed a row that the winning tab just sent against". The throttle
+    // catches that case too.
+    const throttleSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const { data: recent } = await supabase
+      .from('payment_reminders')
+      .select('id, sent_at')
+      .eq('payment_id', payment.id)
+      .gte('sent_at', throttleSince)
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (recent) {
+      const lastSent = new Date(recent.sent_at)
+      const hoursAgo = Math.floor((Date.now() - lastSent.getTime()) / (60 * 60 * 1000))
+      throw new HttpError(429,
+        `A reminder for this payment was already sent ${hoursAgo === 0 ? 'less than an hour' : `${hoursAgo}h`} ago. ` +
+        `Please wait at least 24 hours between reminders.`)
+    }
+
+    // CLAIM the reminder slot BEFORE dispatching. The H3 partial unique
+    // index `payment_reminders_one_per_day_per_payment` (payment_id +
+    // date_trunc('day', sent_at)) serializes concurrent dispatches at the
+    // DB layer. Whichever tab's INSERT lands first wins the slot; any other
+    // concurrent caller gets 23505 here and short-circuits BEFORE invoking
+    // Interakt / Resend.
+    //
+    // Was previously inserted AFTER sendNotification — meaning the dispatch
+    // happened first, the audit row second. Two tabs racing both dispatched
+    // (sending two WhatsApp messages + two emails) and only one of the
+    // audit-row inserts succeeded; the second 23505 was silently swallowed.
+    // Observed 2026-05-30 for member 726e4849: one payment, one audit row,
+    // but two notifications rows ~11s apart.
+    //
+    // We insert with status='queued' (the only "in-flight" value the
+    // payment_reminders.status CHECK accepts) and link_sent=null, then
+    // UPDATE both after sendNotification returns.
+    const reminderRowId = crypto.randomUUID()
+    const { error: claimErr } = await supabase
+      .from('payment_reminders')
+      .insert({
+        id: reminderRowId,
+        gym_id: gymId,
+        branch_id: payment.branch_id,
+        payment_id: payment.id,
+        member_id: payment.member.id,
+        channel: 'whatsapp',
+        provider: 'interakt',
+        template_name: 'pending',  // overwritten in the post-dispatch UPDATE
+        status: 'queued',
+        link_sent: null,
+        triggered_by: 'manual',
+      })
+    if (claimErr && (claimErr as { code?: string }).code === '23505') {
+      // Another tab claimed the slot for today. Return a successful
+      // response so the user-facing tab doesn't show a spurious error;
+      // the winning tab is responsible for the actual dispatch.
+      return jsonResponse({
+        ok: true,
+        paymentId: payment.id,
+        deduped: true,
+        whatsappSent: true,        // optimistic — winning tab's dispatch outcome unknown here
+        whatsappError: null,
+        emailFallbackSent: false,
+        notificationStatus: 'deduped',
+      })
+    }
+    if (claimErr) {
+      throw new Error(`failed to claim reminder slot: ${claimErr.message}`)
     }
 
     const phone = normalizeIndianPhone(payment.member.phone)
@@ -339,24 +389,16 @@ Deno.serve(async (req) => {
     const emailFallbackSent = em?.status === 'sent'
     const whatsappError = wa?.error ?? sendErr ?? null
 
-    // Legacy `payment_reminders` row — still read by PaymentsPage for the
-    // 24h UI dedup and the "last sent" column. Records ONLY the WhatsApp
-    // attempt (channel='whatsapp'); the unified `notifications` table has
-    // the full multi-channel record.
-    await supabase.from('payment_reminders').insert({
-      gym_id: gymId,
-      branch_id: payment.branch_id,
-      payment_id: payment.id,
-      member_id: payment.member.id,
-      channel: 'whatsapp',
-      provider: 'interakt',
+    // Fill in the result on the row we CLAIMED above. The row already
+    // exists with status='queued' — flip to 'sent'/'failed' and record the
+    // template + payLink + provider message id now that they're known.
+    await supabase.from('payment_reminders').update({
       template_name: templateName,
       status: whatsappSent ? 'sent' : 'failed',
       provider_message_id: wa?.id ?? null,
       link_sent: payLink,
       error: whatsappError,
-      triggered_by: 'manual',
-    })
+    }).eq('id', reminderRowId)
 
     return jsonResponse({
       ok: true,

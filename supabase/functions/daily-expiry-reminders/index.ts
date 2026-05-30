@@ -281,12 +281,43 @@ async function sendMemberReminder(
     templateName = TEMPLATE_UPI
   }
 
+  // CLAIM the reminder slot BEFORE dispatching. The H3 partial unique
+  // index `payment_reminders_one_per_day_per_payment` serializes concurrent
+  // dispatches at the DB layer — if a manual Remind, an earlier cron run,
+  // or a parallel cron pass already inserted a row for this payment today,
+  // the INSERT below returns 23505 and we short-circuit before invoking
+  // Interakt / Resend. Without this ordering, the dispatch fires twice and
+  // only the audit-row insert dedupes (silently), so the member receives
+  // two reminders for one logged event.
+  const reminderRowId = crypto.randomUUID()
+  const { error: claimErr } = await supabase
+    .from('payment_reminders')
+    .insert({
+      id: reminderRowId,
+      gym_id: gym.id,
+      branch_id: member.branch_id ?? null,
+      payment_id: paymentId!,
+      member_id: member.id,
+      channel: 'whatsapp',
+      provider: 'interakt',
+      template_name: 'pending',  // overwritten post-dispatch
+      status: 'queued',
+      link_sent: null,
+      triggered_by: 'cron',
+    })
+  if (claimErr && (claimErr as { code?: string }).code === '23505') {
+    // Already reminded today by another caller. Treat as success — the
+    // member is getting the message via the winning caller's dispatch.
+    return
+  }
+  if (claimErr) {
+    throw new Error(`failed to claim reminder slot: ${claimErr.message}`)
+  }
+
   // Route through the central notification engine — gets us automatic
   // email fallback if Interakt is degraded, plus a proper notifications
-  // audit row. Legacy `payment_reminders` insert stays for backward-compat
-  // with PaymentsPage's UI dedup. templateOverride preserves the
-  // UPI-vs-Razorpay template distinction (engine's default for
-  // payment_reminder is payment_reminder_link).
+  // audit row. templateOverride preserves the UPI-vs-Razorpay template
+  // distinction (engine's default for payment_reminder is payment_reminder_link).
   let notifResult: Awaited<ReturnType<typeof sendNotification>> | null = null
   let sendErr: string | undefined
   try {
@@ -315,16 +346,14 @@ async function sendMemberReminder(
   const whatsappSent = wa?.status === 'sent'
   const whatsappError = wa?.error ?? sendErr ?? null
 
-  await supabase.from('payment_reminders').insert({
-    gym_id: gym.id, branch_id: member.branch_id ?? null,
-    payment_id: paymentId!, member_id: member.id,
-    channel: 'whatsapp', provider: 'interakt',
+  // Fill in the result on the row we CLAIMED above.
+  await supabase.from('payment_reminders').update({
     template_name: templateName,
     status: whatsappSent ? 'sent' : 'failed',
     provider_message_id: wa?.id ?? null,
-    link_sent: payLink, error: whatsappError,
-    triggered_by: 'cron',
-  })
+    link_sent: payLink,
+    error: whatsappError,
+  }).eq('id', reminderRowId)
 
   // Only throw if BOTH primary AND email fallback failed. A successful
   // email fallback keeps the cron counter as "sent" — the member was
