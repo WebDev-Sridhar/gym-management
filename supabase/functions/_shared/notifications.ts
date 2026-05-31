@@ -129,15 +129,33 @@ export async function sendNotification(p: SendNotificationParams): Promise<SendN
     return { notificationId: '', status: 'sent', channelResults: {} as Record<Channel, ChannelResult | undefined> }
   }
 
-  // Audit M1 — per-member opt-out. If this member has unsubscribed (manual
-  // owner block today, Interakt STOP webhook tomorrow), record the attempt
-  // as 'skipped' and short-circuit. Owner-facing notifications (no memberId,
-  // userId only) bypass this check — owners control their own dispatch via
-  // the per-channel gym toggles, not via the suppression flag.
+  // 2. Resolve recipient + check suppression in ONE round-trip.
+  //
+  // For member-targeted sends we need both: the M1 `unsubscribed` flag
+  // (gate the dispatch) AND optionally name/phone/email (fallback when the
+  // caller didn't pre-supply them). Doing this in a single SELECT means
+  // even the cron path (which pre-supplies the recipient fields) only pays
+  // for one round-trip to honour the suppression flag instead of two.
+  //
+  // Owner-facing sends (userId, no memberId) bypass the suppression check
+  // — owners control their own dispatch via the per-channel gym toggles,
+  // not via a per-row opt-out. We only hit the users table if the caller
+  // didn't already supply contact details, same as before.
+  let phone = p.recipientPhone ?? null
+  let email = p.recipientEmail ?? null
+  let name  = p.recipientName ?? null
+
   if (memberId) {
     const { data: m } = await supabase
-      .from('members').select('unsubscribed').eq('id', memberId).maybeSingle()
+      .from('members')
+      .select('name, phone, email, unsubscribed')
+      .eq('id', memberId)
+      .maybeSingle()
+
     if (m?.unsubscribed) {
+      // Audit M1 — record the attempt as 'skipped' so the owner can see
+      // "we didn't send because the member opted out" in the activity log,
+      // then short-circuit before any provider call.
       const { data: skippedRow } = await supabase
         .from('notifications')
         .insert({
@@ -159,16 +177,7 @@ export async function sendNotification(p: SendNotificationParams): Promise<SendN
         channelResults: {} as Record<Channel, ChannelResult | undefined>,
       }
     }
-  }
 
-  // 2. Resolve recipient contact
-  let phone = p.recipientPhone ?? null
-  let email = p.recipientEmail ?? null
-  let name  = p.recipientName ?? null
-
-  if (memberId && (!phone || !email || !name)) {
-    const { data: m } = await supabase
-      .from('members').select('name, phone, email').eq('id', memberId).single()
     phone = phone ?? m?.phone ?? null
     email = email ?? m?.email ?? null
     name  = name  ?? m?.name  ?? null
