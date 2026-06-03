@@ -105,53 +105,71 @@ export const TESTIMONIALS = [
   },
 ]
 
+// V3 Task 8: rewritten per PRICING_REVIEW.md V2 §5 + §6 + §7 + §8.
+// - Prices reflect the trust/cost reality calibration (₹599 → ₹799 etc.)
+// - Member caps from §6 (150 / 750 / unlimited)
+// - Trainer caps from §7 (2 / 10 / unlimited)
+// - WhatsApp from §8 (500 / 3,000 / 15,000 per month)
+// - GST line was removed 2026-06-03: not GST-registered yet, so displaying
+//   "+ 18% GST" is a misrepresentation (Section 32 CGST Act). Add back as a
+//   per-plan `gst` field once GSTIN is in place and the edge fn adds 18% on top.
+// - `tier` field is the canonical DB plan_name (matches subscriptions.plan_name
+//   CHECK constraint after 20260601 migration)
+//
+// This is the SOURCE OF TRUTH for marketing surfaces (landing pricing page +
+// homepage embed). The owner-facing BillingPage / SubscriptionPage have their
+// own const for the Razorpay flow — keep the numbers in sync manually until
+// Phase 5 unifies them via a saas_plans DB table.
 export const PRICING_PLANS = [
   {
     name: 'Starter',
-    price: '₹999',
+    tier: 'starter',
+    price: '₹799',
     period: '/month',
-    description: 'For solo studios and gyms with one location. Everything you need to replace your register and start collecting payments online.',
+    description: 'For solo studios and neighborhood gyms running one location.',
     features: [
-      'Up to 100 active members',
-      'Unlimited QR attendance check-ins',
+      'Up to 150 active members',
+      '2 trainer accounts',
+      '500 WhatsApp reminders / month',
       'Razorpay payment collection',
-      'Member mobile app (iOS + Android)',
-      'Basic revenue and attendance reports',
-      'Email support · replies within 1 business day',
+      'Complete multi-page website',
+      'Email support · 1 business day',
     ],
     cta: 'Start free trial',
     highlighted: false,
   },
   {
     name: 'Pro',
-    price: '₹2,499',
+    tier: 'pro',
+    price: '₹1,799',
     period: '/month',
-    description: 'For growing gyms with trainers, multiple plan tiers, and members worth keeping. Adds the automation that pays for itself.',
+    description: 'For growing gyms with trainers, multiple plan tiers, and members worth keeping.',
     features: [
-      'Up to 500 active members',
-      'Everything in Starter',
-      'WhatsApp automation (renewals, reminders, birthdays)',
-      'Trainer accounts with assigned-member workflows',
-      'Ghost-member detection and re-engagement alerts',
-      'Cohort retention and trainer-performance analytics',
-      'Priority support · replies within 4 hours',
+      'Up to 750 active members',
+      '10 trainer accounts',
+      '3,000 WhatsApp reminders / month',
+      'Ghost-detection + cohort retention analytics',
+      'Multi-page website + custom subdomain',
+      'SEO meta overrides',
+      'Same-business-day support',
     ],
     cta: 'Start free trial',
     highlighted: true,
   },
   {
-    name: 'Enterprise',
+    name: 'Premium',
+    tier: 'premium',
     price: '₹4,999',
     period: '/month',
-    description: 'For multi-branch chains and premium fitness brands that need custom domains, dedicated onboarding, and an account manager on call.',
+    description: 'For multi-branch chains and premium fitness brands.',
     features: [
       'Unlimited active members',
-      'Everything in Pro',
-      'Multi-branch dashboards with consolidated reporting',
-      'Custom branding and custom domain for your member portal',
+      'Unlimited trainer accounts',
+      '15,000 WhatsApp / month',
+      'Multi-branch operations + consolidated reporting',
+      'Custom apex domain (yourbrand.com)',
       'API access for finance/CRM integration',
-      'Dedicated onboarding and a named account manager',
-      'Same-business-day SLA · phone + WhatsApp support',
+      '4-hour SLA · phone + WhatsApp support',
     ],
     cta: 'Talk to sales',
     highlighted: false,

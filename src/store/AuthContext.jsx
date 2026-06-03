@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { supabase, setAccessToken } from '../services/supabaseClient'
 import { fetchUserProfile, fetchSubscription } from '../services/userService'
 import { signOut as authSignOut } from '../services/authService'
+import { setSentryUser } from '../lib/sentry'
 
 const AuthContext = createContext(null)
 
@@ -194,10 +195,24 @@ export function AuthProvider({ children }) {
       // never sees an intermediate state
       setProfile(p)
       setSubscription(sub)
+      // V3 launch fix: attach the logged-in user to Sentry's scope so
+      // captured errors include who/which-gym. No-op when Sentry isn't
+      // initialized (local dev without VITE_SENTRY_DSN).
+      if (p?.id) {
+        setSentryUser({
+          id:      p.id,
+          email:   p.email ?? undefined,
+          gym_id:  p.gym_id ?? undefined,
+          role:    p.role ?? undefined,
+        })
+      } else {
+        setSentryUser(null)
+      }
     } catch (err) {
       console.error('Failed to load profile:', err)
       setProfile(null)
       setSubscription(null)
+      setSentryUser(null)
     } finally {
       setLoading(false)
     }
@@ -260,7 +275,29 @@ export function AuthProvider({ children }) {
     gymSlug: profile?.gym_slug ?? null,   // used by member/trainer apps to route logout → /{slug}/login
     // Trainer's pinned branch (null for owners — they use BranchContext to switch)
     branchId: profile?.branch_id ?? null,
-    hasActiveSubscription: !!subscription && new Date(subscription.expires_at) > new Date(),
+    // V3 P0 lifecycle: status is the dominant signal — never report active
+    // for a row the cron has marked expired/cancelled, even if expires_at
+    // somehow drifts to the future (manual SQL edit during testing, clock
+    // skew, etc.). The expires_at gate catches the inverse case: row still
+    // says 'active' but the date has passed and the hourly cron hasn't run
+    // yet (covers the up-to-59 minute window).
+    hasActiveSubscription: !!subscription
+      && subscription.status !== 'expired'
+      && subscription.status !== 'cancelled'
+      && new Date(subscription.expires_at) > new Date(),
+    // V3 Task 10: trial-state helpers consumed by DashboardLayout banner,
+    // SubscriptionPage countdown, and BillingPage "convert" copy.
+    // trialDaysLeft is floored — a trial ending in 23h 59m shows 0 (it's
+    // the last day, not 1 day).
+    isTrial:    subscription?.status === 'trial',
+    trialDaysLeft: subscription?.status === 'trial' && subscription?.expires_at
+      ? Math.max(0, Math.floor((new Date(subscription.expires_at) - new Date()) / 86_400_000))
+      : null,
+    // V3 P0 lifecycle: distinct "expired" flag for the dashboard strip and
+    // bannerConfig predicate. True only for rows the expire-stale-records
+    // cron has flipped to 'expired' (paid subs past their window). Trial
+    // and free + active (Solo Coach) intentionally don't qualify.
+    isExpired: subscription?.status === 'expired',
   }
 
   return (

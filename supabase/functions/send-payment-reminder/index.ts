@@ -32,6 +32,7 @@ import { createPaymentLink } from '../_shared/razorpay.ts'
 import { buildUpiLink } from '../_shared/upi.ts'
 import { normalizeIndianPhone } from '../_shared/interakt.ts'
 import { sendNotification } from '../_shared/notifications.ts'
+import { getWhatsappQuotaState } from '../_shared/whatsappQuota.ts'
 
 interface Body {
   paymentId?: string
@@ -67,6 +68,64 @@ Deno.serve(async (req) => {
       .select('id, name, payment_mode, upi_id, razorpay_enabled')
       .eq('id', gymId).single()
     if (gymErr || !gym) throw new HttpError(404, 'gym not found')
+
+    // V3 P0: hard-stop if the gym's Gymmobius subscription is expired.
+    // Owner must renew before they can send any reminders (WhatsApp OR
+    // email). This is stricter than the Solo Coach fallback the engine
+    // uses for the cron path — for manual sends we want owner-facing
+    // friction now, not silent degradation.
+    const { data: gymSub } = await supabase
+      .from('subscriptions')
+      .select('status, plan_name, expires_at')
+      .eq('gym_id', gymId)
+      .in('status', ['active', 'trial', 'expired'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (gymSub?.status === 'expired') {
+      throw new HttpError(403, 'subscription_expired', {
+        error: 'subscription_expired',
+        message: 'Your Gymmobius subscription has expired. Renew to send reminders.',
+        plan: gymSub.plan_name,
+        expires_at: gymSub.expires_at,
+        blocked: 'send_reminder',
+      })
+    }
+
+    // V3 Task 14: pre-check the WhatsApp quota BEFORE doing any work.
+    // Manual sends must NOT silently fall back to email — owners click
+    // "Remind via WhatsApp" expecting WhatsApp; downgrading without
+    // telling them breaks trust + hides the upgrade opportunity. Throw
+    // a structured 403 so the UI can render the upgrade modal.
+    const quota = await getWhatsappQuotaState(supabase, gymId)
+    const gymPlan = quota.planName
+    if (!quota.whatsappEnabled) {
+      throw new HttpError(403, 'whatsapp_disabled', {
+        error: 'whatsapp_disabled',
+        message:  quota.subStatus === 'trial'
+          ? 'WhatsApp is not available on Solo Coach.'
+          : 'WhatsApp reminders are not included in your current plan. Upgrade to Starter to enable.',
+        plan: gymPlan,
+        sub_status: quota.subStatus,
+        required_plan: 'starter',
+      })
+    }
+    if (quota.remaining <= 0) {
+      throw new HttpError(403, 'whatsapp_quota_exhausted', {
+        error: 'whatsapp_quota_exhausted',
+        message: `You've used all ${quota.cap} WhatsApp reminders this period. ` +
+                 (gymPlan === 'starter' ? 'Upgrade to Pro for 3,000/month.' :
+                  gymPlan === 'pro'     ? 'Upgrade to Premium for 15,000/month.' :
+                                          'Upgrade your plan to send more.'),
+        plan: gymPlan,
+        used: quota.used,
+        cap: quota.cap,
+        period_start: quota.periodStart,
+        required_plan:
+          gymPlan === 'starter' ? 'pro' :
+          gymPlan === 'pro'     ? 'premium' : 'premium',
+      })
+    }
 
     // Resolve payment row + member + plan
     type PaymentRow = {
@@ -192,6 +251,26 @@ Deno.serve(async (req) => {
     // with no prior reminders" — it can also mean "we lost a race and got
     // handed a row that the winning tab just sent against". The throttle
     // catches that case too.
+    // V3 Task 14: Solo Coach trial gets 1 payment reminder per invoice EVER.
+    // (Standard plans keep the 24h throttle below.) Reason: trial users
+    // have a tight 50-message budget; one-per-invoice prevents accidental
+    // burn-through across the same payment getting multiple nudges.
+    if (gymPlan === 'free') {
+      const { count: priorCount } = await supabase
+        .from('payment_reminders')
+        .select('id', { count: 'exact', head: true })
+        .eq('payment_id', payment.id)
+        .neq('status', 'failed')
+      if ((priorCount ?? 0) > 0) {
+        throw new HttpError(403, 'solo_coach_one_per_invoice', {
+          error: 'solo_coach_one_per_invoice',
+          message: 'Solo Coach plan includes 1 reminder per invoice. Upgrade to Starter for unlimited reminders.',
+          plan: gymPlan,
+          required_plan: 'starter',
+        })
+      }
+    }
+
     const throttleSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const { data: recent } = await supabase
       .from('payment_reminders')
@@ -235,6 +314,9 @@ Deno.serve(async (req) => {
         branch_id: payment.branch_id,
         payment_id: payment.id,
         member_id: payment.member.id,
+        // V3 Task 14: pre-check above guarantees WhatsApp will fire — if
+        // quota was exhausted or plan blocked, we threw before reaching
+        // here. Claim row is always whatsapp/interakt.
         channel: 'whatsapp',
         provider: 'interakt',
         template_name: 'pending',  // overwritten in the post-dispatch UPDATE
@@ -389,9 +471,11 @@ Deno.serve(async (req) => {
     const emailFallbackSent = em?.status === 'sent'
     const whatsappError = wa?.error ?? sendErr ?? null
 
-    // Fill in the result on the row we CLAIMED above. The row already
-    // exists with status='queued' — flip to 'sent'/'failed' and record the
-    // template + payLink + provider message id now that they're known.
+    // Fill in the result on the row we CLAIMED above. The pre-check
+    // guaranteed WhatsApp would fire, so we always audit the wa channel
+    // (an Interakt failure that triggered email fallback still records
+    // 'failed' on the WhatsApp claim row — the engine's notifications
+    // row holds the authoritative cross-channel audit).
     await supabase.from('payment_reminders').update({
       template_name: templateName,
       status: whatsappSent ? 'sent' : 'failed',
@@ -406,6 +490,11 @@ Deno.serve(async (req) => {
       payLink,
       templateName,
       providerMessageId: wa?.id ?? null,
+      channelUsed: 'whatsapp',
+      gymPlan,
+      // V3 Task 14: include remaining quota so the UI can refresh its pill
+      // without a second request. Subtract 1 for this successful send.
+      whatsappRemaining: Math.max(0, quota.remaining - (whatsappSent ? 1 : 0)),
       whatsappSent,
       whatsappError,
       // Engine attempted an email fallback because WhatsApp failed AND

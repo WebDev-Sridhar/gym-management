@@ -511,6 +511,10 @@ html.lenis body {
 [data-theme="dark"] [data-theme-aware] .text-violet-600 { color: #c4b5fd !important; }
 [data-theme="dark"] .app-owner .text-violet-700,
 [data-theme="dark"] [data-theme-aware] .text-violet-700 { color: #ddd6fe !important; }
+[data-theme="dark"] .app-owner .text-violet-800,
+[data-theme="dark"] [data-theme-aware] .text-violet-800 { color: #a5b4fc !important; }
+[data-theme="dark"] .app-owner .text-violet-900,
+[data-theme="dark"] [data-theme-aware] .text-violet-900 { color: #b2a2fb !important; }
 [data-theme="dark"] .app-owner .text-emerald-600,
 [data-theme="dark"] [data-theme-aware] .text-emerald-600 { color: #6ee7b7 !important; }
 [data-theme="dark"] .app-owner .text-emerald-700,

@@ -2,10 +2,18 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import AppErrorBoundary from './components/error/AppErrorBoundary'
+import { initSentry } from './lib/sentry'
+
+// V3 launch fix: initialize Sentry before anything renders so first-paint
+// errors are captured too. No-op when VITE_SENTRY_DSN is unset (local dev).
+initSentry()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 )
 

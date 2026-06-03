@@ -71,10 +71,12 @@ export default function GymPricing() {
               <p className="text-xs font-bold tracking-[0.25em] uppercase mb-4 font-sans" style={{ color: 'var(--gym-primary)' }}>
                 {content?.pricing_page_label || 'Membership'}
               </p>
-              <h1 className="font-display text-white tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)' }}>
+              {/* Theme-aware page hero text (white over photo, themed over surface). */}
+              <h1 className="font-display tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)', color: heroImg ? '#fff' : 'var(--gym-text)' }}>
                 {content?.pricing_page_title ? content.pricing_page_title.toUpperCase() : <>CHOOSE YOUR<br />PLAN</>}
               </h1>
-              <p className={`text-white/45 mt-6 font-sans leading-relaxed ${heroAlign === 'center' ? 'max-w-lg mx-auto' : 'max-w-lg'}`}>
+              <p className={`mt-6 font-sans leading-relaxed ${heroAlign === 'center' ? 'max-w-lg mx-auto' : 'max-w-lg'}`}
+                 style={{ color: heroImg ? 'rgba(255,255,255,0.45)' : 'var(--gym-text-muted)' }}>
                 {content?.pricing_page_desc || 'No contracts. No hidden fees. Just premium fitness, priced for real people.'}
               </p>
             </motion.div>

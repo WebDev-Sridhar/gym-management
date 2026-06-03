@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { captureError } from '../../lib/sentry'
 
 export default class MarketingErrorBoundary extends Component {
   constructor(props) {
@@ -11,6 +12,7 @@ export default class MarketingErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    captureError(error, { componentStack: info?.componentStack, surface: 'marketing' })
     // eslint-disable-next-line no-console
     console.error('[MarketingErrorBoundary]', error, info?.componentStack)
   }

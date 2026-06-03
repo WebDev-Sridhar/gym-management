@@ -1,6 +1,8 @@
 ﻿import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
+import UpgradeRequiredModal from '../../components/ui/UpgradeRequiredModal'
 import { fetchMembers, createMember, assignPlan, fetchPlans, sendMemberInvite } from '../../services/membershipService'
 import { recordManualPayment } from '../../services/paymentService'
 import { fetchTrainers } from '../../services/trainerService'
@@ -70,6 +72,11 @@ export default function MembersPage() {
   // create form already requires email today, but the guard belongs here too.
   const [sendInviteOnCreate, setSendInviteOnCreate] = useState(true)
   const [trainers, setTrainers] = useState([])
+  // V3 Task 6: surface the structured quota error from createMember in a
+  // dedicated modal (instead of the inline red text) so the owner gets a
+  // single-click path to Subscription / WhatsApp support.
+  const [upgradeContext, setUpgradeContext] = useState(null)
+  const navigate = useNavigate()
 
   // Default the add-member branch to the active view, or first branch if "all"
   useEffect(() => {
@@ -167,7 +174,14 @@ export default function MembersPage() {
       setSendInviteOnCreate(true)   // reset to default for next add
       setShowAddForm(false)
     } catch (err) {
-      setError(err.message || 'Failed to add member')
+      // V3 Task 6: structured quota error pops the upgrade modal rather
+      // than rendering as a generic inline message (which owners gloss
+      // past — they need the upgrade affordance front and center).
+      if (err.code === 'quota_exceeded' || err.code === 'subscription_expired') {
+        setUpgradeContext(err)
+      } else {
+        setError(err.message || 'Failed to add member')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -483,6 +497,14 @@ export default function MembersPage() {
           />
         )}
       </AnimatePresence>
+
+      {upgradeContext && (
+        <UpgradeRequiredModal
+          context={upgradeContext}
+          onClose={() => setUpgradeContext(null)}
+          onUpgrade={() => { setUpgradeContext(null); navigate('/owner-dashboard/subscription') }}
+        />
+      )}
     </div>
   )
 }

@@ -153,8 +153,8 @@ export async function addTrainerInvite({ gymId, name, phone, email }) {
 }
 
 /**
- * Fetch the active subscription for a gym.
- * Returns null if no active subscription exists.
+ * Fetch the most recent subscription for a gym — active, trial, OR expired.
+ * Returns null only when the gym has literally never had a subscription.
  *
  * Defensive query: orders by created_at DESC and takes the newest row. The
  * verify-subscription-payment and razorpay-webhook handlers now explicitly
@@ -165,13 +165,24 @@ export async function addTrainerInvite({ gymId, name, phone, email }) {
  * set subscription=null, and every page would treat the owner as Starter
  * despite a paid plan. The order/limit shape guarantees one row max
  * regardless of how many actives exist. See gym 25cb9090… on 2026-05-27.
+ *
+ * V3 Task 10: 'trial' included so AuthContext.isTrial / trialDaysLeft and
+ * the DashboardLayout trial countdown banner can read the row.
+ *
+ * V3 P0 lifecycle (2026-06-02): 'expired' also included so the expired
+ * banner / red strip can render. Without it the row was invisible to the
+ * app and the dashboard fell back to literal 'Starter' in DashboardLayout.
+ * `hasActiveSubscription` correctly stays false for expired (it checks
+ * expires_at > now, not status). Service-side guards (loadGymPlan,
+ * getWhatsappQuotaState) still filter to active/trial only — they
+ * intentionally want expired to read as 'free' caps.
  */
 export async function fetchSubscription(gymId) {
   const { data, error } = await supabase
     .from('subscriptions')
     .select('*')
     .eq('gym_id', gymId)
-    .eq('status', 'active')
+    .in('status', ['active', 'trial', 'expired'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()

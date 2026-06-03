@@ -83,15 +83,19 @@ export default function GymAbout() {
               <p className="text-xs font-bold tracking-[0.25em] uppercase mb-4 font-sans" style={{ color: 'var(--gym-primary)' }}>
                 {content?.about_page_label || 'Our Story'}
               </p>
-              <h1 className="font-display text-white tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)' }}>
+              {/* Theme-aware page hero text: white over photo backdrop,
+                  themed text over the gradient/surface fallback. */}
+              <h1 className="font-display tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)', color: heroImg ? '#fff' : 'var(--gym-text)' }}>
                 {content?.about_page_title ? content.about_page_title.toUpperCase() : <>ABOUT<br />{gym.name.toUpperCase()}</>}
               </h1>
               {content?.about_page_desc ? (
-                <p className={`text-white/40 mt-6 font-sans leading-relaxed ${heroAlign === 'center' ? 'max-w-lg mx-auto' : 'max-w-lg'}`}>
+                <p className={`mt-6 font-sans leading-relaxed ${heroAlign === 'center' ? 'max-w-lg mx-auto' : 'max-w-lg'}`}
+                   style={{ color: heroImg ? 'rgba(255,255,255,0.4)' : 'var(--gym-text-muted)' }}>
                   {content.about_page_desc}
                 </p>
               ) : gym.city ? (
-                <div className={`flex items-center gap-2 mt-6 text-white/40 text-sm font-sans ${heroAlign === 'center' ? 'justify-center' : ''}`}>
+                <div className={`flex items-center gap-2 mt-6 text-sm font-sans ${heroAlign === 'center' ? 'justify-center' : ''}`}
+                     style={{ color: heroImg ? 'rgba(255,255,255,0.4)' : 'var(--gym-text-muted)' }}>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />

@@ -7,7 +7,7 @@ import { PRICING_PLANS } from '../constants'
 export const PRICING_CONTENT = {
   seo: {
     title: 'Pricing',
-    description: 'Transparent monthly pricing for gyms of every size. Starter for solo studios, Pro for growing gyms, Enterprise for multi-branch chains. No setup fees, cancel anytime.',
+    description: 'Transparent monthly pricing for gyms of every size. Starter for solo studios, Pro for growing gyms, Premium for multi-branch chains. 30-day free trial, no card required.',
     canonical: ROUTES.PRICING,
     keywords: 'gym software pricing, gymmobius plans, gym management cost, gym saas pricing india',
   },

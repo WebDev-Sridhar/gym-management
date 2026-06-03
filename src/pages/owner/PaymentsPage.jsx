@@ -1,10 +1,13 @@
 ﻿import { useState, useEffect, useRef } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import { fetchPayments } from '../../services/paymentService'
 import { fetchMembers, fetchPlans, fetchGymDetails } from '../../services/membershipService'
 import { sendPaymentReminder, fetchLastReminders } from '../../services/reminderService'
+import { fetchWhatsappQuota } from '../../services/whatsappQuotaService'
+import UpgradeRequiredModal from '../../components/ui/UpgradeRequiredModal'
 
 // Find the most recent reminder across every payment for this member.
 // Used to enforce one manual reminder per member per 24h, so the owner
@@ -70,6 +73,18 @@ function PaymentsSkeleton() {
 export default function PaymentsPage() {
   const { gymId } = useAuth()
   const { selectedBranchId } = useBranch()
+  const navigate = useNavigate()
+
+  // V3 Task 14: WhatsApp is now quota-based, not plan-gated. Starter/Pro/
+  // Premium all allowed (with their respective monthly caps); Solo Coach
+  // trial gets 50 lifetime; post-trial Solo Coach gets 0. The pill in the
+  // header shows {remaining}/{cap}; the Remind button still fires WhatsApp
+  // when remaining > 0 — server pre-checks again on POST and throws a
+  // structured 403 if quota was burned between this render and the click.
+  const [waQuota, setWaQuota] = useState(null)
+  const whatsappAllowed = !!waQuota?.whatsappEnabled && waQuota.remaining > 0
+  const reminderChannelLabel = waQuota?.whatsappEnabled ? 'WhatsApp' : 'Email'
+  const [upgradeContext, setUpgradeContext] = useState(null)
   const [payments, setPayments] = useState([])
   const [members, setMembers] = useState([])
   const [plans, setPlans] = useState([])
@@ -105,10 +120,11 @@ export default function PaymentsPage() {
       fetchPlans(gymId),
       fetchGymDetails(gymId),
       fetchLastReminders(gymId, selectedBranchId).catch(() => new Map()),
+      fetchWhatsappQuota(gymId).catch(() => null),
     ])
-      .then(([pay, mem, pln, g, rem]) => {
+      .then(([pay, mem, pln, g, rem, wa]) => {
         if (cancelled) return
-        setPayments(pay); setMembers(mem); setPlans(pln); setGym(g); setLastReminders(rem)
+        setPayments(pay); setMembers(mem); setPlans(pln); setGym(g); setLastReminders(rem); setWaQuota(wa)
       })
       .catch((err) => console.error('Failed to load payments data:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -167,14 +183,25 @@ export default function PaymentsPage() {
     try {
       const result = await sendPaymentReminder({ memberId: member.id, planId: plan.id })
       setGeneratedLink(result.payLink)
-      const [updated, reminders] = await Promise.all([
+      const [updated, reminders, freshQuota] = await Promise.all([
         fetchPayments(gymId, selectedBranchId),
         fetchLastReminders(gymId, selectedBranchId).catch(() => new Map()),
+        fetchWhatsappQuota(gymId).catch(() => waQuota),
       ])
       setPayments(updated)
       setLastReminders(reminders)
+      setWaQuota(freshQuota)
     } catch (err) {
-      setError(err.message || 'Failed to create payment')
+      // V3 Task 14: structured WhatsApp errors (quota / plan / Solo Coach
+      // 1-per-invoice) open the upgrade modal instead of a flat inline error.
+      if (err.code === 'whatsapp_quota_exhausted' ||
+          err.code === 'whatsapp_disabled' ||
+          err.code === 'solo_coach_one_per_invoice' ||
+          err.code === 'subscription_expired') {
+        setUpgradeContext(err)
+      } else {
+        setError(err.message || 'Failed to create payment')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -358,9 +385,32 @@ export default function PaymentsPage() {
                     {' '}
                     <span className="text-gray-500">({selectedPlan.name})</span>
                   </p>
-                  {selectedMember.phone
-                    ? <p className="text-xs text-gray-400 mt-0.5">via WhatsApp to {selectedMember.phone}</p>
-                    : <p className="text-xs text-red-500 mt-0.5 font-medium">Member has no phone number — add it first</p>}
+                  {(() => {
+                    // V3 P0 lifecycle: expired sub is a hard stop — show
+                    // Renew copy, not Upgrade. The send button still throws
+                    // server-side too (subscription_expired error → modal).
+                    if (waQuota?.isExpired) {
+                      return <p className="text-xs text-red-700 mt-0.5 font-medium">
+                        Subscription expired — <Link to="/owner-dashboard/subscription" className="underline">renew now</Link> to send reminders.
+                      </p>
+                    }
+                    // V3 Task 14: WhatsApp possibility depends on quota,
+                    // not just plan. Three states: enabled+capacity / quota
+                    // exhausted / plan doesn't include WhatsApp at all.
+                    if (whatsappAllowed) {
+                      return selectedMember.phone
+                        ? <p className="text-xs text-gray-400 mt-0.5">via WhatsApp to {selectedMember.phone} · {waQuota.remaining} left this period</p>
+                        : <p className="text-xs text-red-500 mt-0.5 font-medium">Member has no phone number — add it first</p>
+                    }
+                    if (waQuota?.whatsappEnabled && waQuota.remaining <= 0) {
+                      return <p className="text-xs text-amber-700 mt-0.5 font-medium">
+                        WhatsApp quota reached ({waQuota.used}/{waQuota.cap}). <a href="/owner-dashboard/subscription" className="underline">Upgrade</a> for more, or send via Email below.
+                      </p>
+                    }
+                    return selectedMember.email
+                      ? <p className="text-xs text-gray-400 mt-0.5">via Email to {selectedMember.email} — <a href="/owner-dashboard/subscription" className="text-indigo-600 hover:underline">upgrade to Starter</a> for WhatsApp</p>
+                      : <p className="text-xs text-red-500 mt-0.5 font-medium">Member has no email — add it first, or <a href="/owner-dashboard/subscription" className="underline">upgrade to Starter</a> for WhatsApp reminders</p>
+                  })()}
                   {onReminderCooldown && (
                     <p className="text-xs text-amber-700 mt-1 font-medium">
                       Reminder already sent {fmtRelative(recentReminder.last_sent_at)} — wait 24 hours before sending another.
@@ -437,7 +487,7 @@ export default function PaymentsPage() {
                 {submitting && (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {submitting ? 'Sending...' : onReminderCooldown ? 'Already sent today' : 'Create & Send via WhatsApp'}
+                {submitting ? 'Sending...' : onReminderCooldown ? 'Already sent today' : `Create & Send via ${reminderChannelLabel}`}
               </button>
             )}
           </form>
@@ -544,6 +594,14 @@ export default function PaymentsPage() {
           />
         )}
       </AnimatePresence>
+
+      {upgradeContext && (
+        <UpgradeRequiredModal
+          context={upgradeContext}
+          onClose={() => setUpgradeContext(null)}
+          onUpgrade={() => { setUpgradeContext(null); navigate('/owner-dashboard/subscription') }}
+        />
+      )}
     </div>
   )
 }

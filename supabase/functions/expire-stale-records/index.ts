@@ -10,6 +10,21 @@
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { sendNotification } from '../_shared/notifications.ts'
+
+// V3 P0 lifecycle: when a trial expires we auto-convert to Solo Coach
+// (free + active, far-future expires_at) instead of flipping to 'expired'.
+// Per product spec: trial is a 30-day taste of Starter caps; the post-trial
+// fallback is the permanent Solo Coach tier. expires_at on free plans is
+// semantically meaningless — we set it to year 2099 so hasActiveSubscription
+// stays true and the dashboard doesn't render the expired UI for a free user.
+const FAR_FUTURE = '2099-12-31T00:00:00Z'
+
+// V3 P0 lifecycle: orphan 'pending' subscription rows (Razorpay order
+// created but capture never happened) sit forever otherwise. After 1 hour
+// of no capture, mark them 'cancelled' so the next checkout attempt
+// doesn't trip the "you already have a subscription" guard.
+const PENDING_TIMEOUT_MS = 60 * 60 * 1000
 
 Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization') ?? ''
@@ -33,14 +48,131 @@ Deno.serve(async (req) => {
   const today = new Date().toISOString().slice(0, 10)
 
   try {
-    // 1. Expire SaaS subscriptions whose expires_at is in the past
+    // 1a. Paid subscriptions whose expires_at has passed → 'expired'.
+    //     Excludes free + active rows (post-trial Solo Coach) — those have
+    //     a 2099 sentinel expires_at and shouldn't ever expire.
     const { data: subs, error: subErr } = await supabase
       .from('subscriptions')
       .update({ status: 'expired' })
       .eq('status', 'active')
+      .neq('plan_name', 'free')
+      .lt('expires_at', new Date().toISOString())
+      .select('id, gym_id, plan_name')
+    if (subErr) throw subErr
+
+    // 1b. Trial rows whose 30-day window is up → auto-convert to Solo Coach
+    //     (free + active + far-future expires_at). This is the V3 P0 lifecycle
+    //     fix: the previous cron filtered status='active' only and ignored
+    //     trials, so they stayed status='trial' forever after expiry. Backend
+    //     guards (member/trainer cap, WhatsApp engine quota) now correctly
+    //     read 'free' caps because loadGymPlan / getWhatsappQuotaState query
+    //     IN ('active','trial') — converted rows return the free defaults.
+    const { data: trialConverted, error: trialErr } = await supabase
+      .from('subscriptions')
+      .update({
+        status:     'active',
+        plan_name:  'free',
+        expires_at: FAR_FUTURE,
+      })
+      .eq('status', 'trial')
       .lt('expires_at', new Date().toISOString())
       .select('id, gym_id')
-    if (subErr) throw subErr
+    if (trialErr) throw trialErr
+
+    // 1c. Stale 'pending' subscription rows (Razorpay order never captured)
+    //     older than 1h → cancelled. Prevents the "you already have a sub"
+    //     guard in start-trial-subscription / billing flow from blocking
+    //     legitimate retries after an abandoned checkout.
+    const { data: pendingCancelled, error: pendingErr } = await supabase
+      .from('subscriptions')
+      .update({ status: 'cancelled' })
+      .eq('status', 'pending')
+      .lt('created_at', new Date(Date.now() - PENDING_TIMEOUT_MS).toISOString())
+      .select('id, gym_id')
+    if (pendingErr) throw pendingErr
+
+    // 1c-bis. One-time "your subscription expired" notification for each
+    //          paid sub the cron just flipped to 'expired'. bypassExpiredCheck
+    //          in metadata is the chicken-and-egg escape — engine would
+    //          otherwise refuse to send to expired gyms.
+    const paidExpiryNotificationErrors: Array<{ gym_id: string; error: string }> = []
+    for (const sub of subs ?? []) {
+      try {
+        const { data: owner } = await supabase
+          .from('users')
+          .select('id, name, phone, email')
+          .eq('gym_id', sub.gym_id)
+          .eq('role', 'owner')
+          .order('created_at', { ascending: true })
+          .limit(1).maybeSingle()
+        if (!owner) continue
+
+        await sendNotification({
+          supabase,
+          gymId: sub.gym_id,
+          userId: owner.id,
+          type: 'saas_expiry_alert',
+          triggeredBy: 'cron',
+          recipientName:  owner.name,
+          recipientEmail: owner.email,
+          recipientPhone: owner.phone,
+          metadata: {
+            planName:  sub.plan_name ?? 'Gymmobius',
+            daysLeft:  0,
+            reason:    'subscription_expired',
+            billingUrl: `${Deno.env.get('PUBLIC_APP_URL') ?? ''}/owner-dashboard/subscription`,
+            bypassExpiredCheck: true,   // engine skip-rule exception
+          },
+        })
+      } catch (err) {
+        paidExpiryNotificationErrors.push({
+          gym_id: sub.gym_id,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
+    // 1d. One-time "your trial ended" notification for each converted gym.
+    //     Reuses saas_expiry_alert type — semantically closest (owner-facing
+    //     subscription-state change). Engine drops WA to email (Solo Coach
+    //     post-trial has cap=0 → plan_disabled). Failure here doesn't fail
+    //     the cron — conversion already succeeded in 1b.
+    const trialNotificationErrors: Array<{ gym_id: string; error: string }> = []
+    for (const conv of trialConverted ?? []) {
+      try {
+        const { data: owner } = await supabase
+          .from('users')
+          .select('id, name, phone, email')
+          .eq('gym_id', conv.gym_id)
+          .eq('role', 'owner')
+          .order('created_at', { ascending: true })
+          .limit(1).maybeSingle()
+        if (!owner) continue
+
+        await sendNotification({
+          supabase,
+          gymId: conv.gym_id,
+          userId: owner.id,
+          type: 'saas_expiry_alert',
+          triggeredBy: 'cron',
+          recipientName: owner.name,
+          recipientEmail: owner.email,
+          recipientPhone: owner.phone,
+          metadata: {
+            planName: 'Solo Coach',
+            daysLeft: 0,
+            reason: 'trial_converted',
+            billingUrl: `${Deno.env.get('PUBLIC_APP_URL') ?? ''}/owner-dashboard/subscription`,
+            bypassExpiredCheck: true,   // trial→free conversion isn't 'expired' but be defensive
+          },
+        })
+      } catch (err) {
+        trialNotificationErrors.push({
+          gym_id: conv.gym_id,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
 
     // 2. Expire gym members whose expiry_date is in the past
     const { data: members, error: memErr } = await supabase
@@ -98,10 +230,16 @@ Deno.serve(async (req) => {
     }
 
     const summary = {
-      subscriptions_expired: subs?.length ?? 0,
-      members_expired: members?.length ?? 0,
-      abandoned_checkouts_cleaned: abandonedMembers,
-      abandoned_payments_cleaned: abandonedPayments,
+      subscriptions_expired:           subs?.length ?? 0,
+      paid_expiry_notification_failures: paidExpiryNotificationErrors.length,
+      paid_expiry_notification_errors:   paidExpiryNotificationErrors.slice(0, 5),
+      trial_converted_solo_coach:      trialConverted?.length ?? 0,
+      pending_subscriptions_cancelled: pendingCancelled?.length ?? 0,
+      trial_notification_failures:     trialNotificationErrors.length,
+      trial_notification_errors:       trialNotificationErrors.slice(0, 5),
+      members_expired:                 members?.length ?? 0,
+      abandoned_checkouts_cleaned:     abandonedMembers,
+      abandoned_payments_cleaned:      abandonedPayments,
       started_at: startedAt,
       finished_at: new Date().toISOString(),
     }

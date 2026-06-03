@@ -13,12 +13,24 @@ export async function sendPaymentReminder({ paymentId, memberId, planId, dueDate
     body: { paymentId, memberId, planId, dueDate },
   })
   if (error) {
-    let message = error.message
-    try {
-      const body = await error.context?.json?.()
-      if (body?.error) message = body.error
-    } catch {}
-    throw new Error(message)
+    // V3 Task 14: the edge function throws HttpError with a structured body
+    // for plan/quota failures (whatsapp_disabled, whatsapp_quota_exhausted,
+    // solo_coach_one_per_invoice). Surface the full body so PaymentsPage /
+    // MemberDrawer can render the upgrade modal instead of a flat toast.
+    let body = null
+    try { body = await error.context?.json?.() } catch {}
+    const message = body?.message || body?.error || error.message
+    const e = new Error(message)
+    if (body?.error) {
+      e.code          = body.error
+      e.plan          = body.plan
+      e.sub_status    = body.sub_status
+      e.required_plan = body.required_plan
+      e.cap           = body.cap
+      e.used          = body.used
+      e.period_start  = body.period_start
+    }
+    throw e
   }
   if (data?.error) throw new Error(data.error)
   return data

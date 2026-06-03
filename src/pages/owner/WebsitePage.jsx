@@ -209,11 +209,15 @@ const CTA_DEFAULTS = {
 }
 
 function canAccessPage(minPlan, planName) {
-  if (minPlan === 'Starter') return true
-  if (minPlan === 'Pro')      return planName === 'Pro' || planName === 'Enterprise' || planName === 'Premium'
-  // "Premium" minPlan label === Enterprise tier in featureGates.PLAN_TIERS
-  if (minPlan === 'Premium' || minPlan === 'Enterprise') {
-    return planName === 'Enterprise' || planName === 'Premium'
+  // V3 Task 1: plan_name canonicalized to lowercase. Normalize both sides
+  // so legacy mixed-case 'minPlan' configuration (defined in PAGES below)
+  // and lowercase DB values both match correctly.
+  const min  = String(minPlan || '').toLowerCase()
+  const plan = String(planName || '').toLowerCase()
+  if (min === 'starter') return true
+  if (min === 'pro')     return plan === 'pro' || plan === 'premium' || plan === 'enterprise'
+  if (min === 'premium' || min === 'enterprise') {
+    return plan === 'premium' || plan === 'enterprise'
   }
   return false
 }
@@ -1317,6 +1321,15 @@ function GalleryPanel({ content, gymId, planName, onSave, setPreviewData }) {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
 
+  // V3 CMS fix: heading editor for gallery section. Same pattern as
+  // Why Us / Vision / Pricing — three text inputs (label / heading /
+  // subtitle) gated by FeatureGate edit_headings (Pro+). Saved to
+  // gym_content as gallery_label / gallery_heading / gallery_subtitle;
+  // GallerySection reads them with default fallbacks.
+  const [galleryLabel,    setGalleryLabel]    = useState(content?.gallery_label    || '')
+  const [galleryHeading,  setGalleryHeading]  = useState(content?.gallery_heading  || '')
+  const [gallerySubtitle, setGallerySubtitle] = useState(content?.gallery_subtitle || '')
+
   const galleryImgs = useCMSImageList({
     gymId,
     fieldKey: 'gallery_images',
@@ -1327,6 +1340,10 @@ function GalleryPanel({ content, gymId, planName, onSave, setPreviewData }) {
   useEffect(() => {
     setPreviewData?.(p => ({ ...p, gallery_images: galleryImgs.list, _ts: Date.now() }))
   }, [galleryImgs.list]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function updateGalleryLabel(val)    { setGalleryLabel(val);    setPreviewData?.(p => ({ ...p, gallery_label:    val || undefined })) }
+  function updateGalleryHeading(val)  { setGalleryHeading(val);  setPreviewData?.(p => ({ ...p, gallery_heading:  val || undefined })) }
+  function updateGallerySubtitle(val) { setGallerySubtitle(val); setPreviewData?.(p => ({ ...p, gallery_subtitle: val || undefined })) }
 
   // Called by ImageUploader for deletes (via Del button) and URL adds (via Add button)
   function handleListChange(newList) {
@@ -1345,7 +1362,10 @@ function GalleryPanel({ content, gymId, planName, onSave, setPreviewData }) {
     try {
       const finalList = await galleryImgs.commitList()
       const updated = await upsertCmsContent(gymId, {
-        gallery_images: finalList.length ? finalList : null,
+        gallery_images:   finalList.length ? finalList : null,
+        gallery_label:    galleryLabel.trim()    || null,
+        gallery_heading:  galleryHeading.trim()  || null,
+        gallery_subtitle: gallerySubtitle.trim() || null,
       })
       onSave(prev => ({ ...prev, ...updated }))
       setSuccess('Saved!')
@@ -1356,6 +1376,25 @@ function GalleryPanel({ content, gymId, planName, onSave, setPreviewData }) {
   return (
     <form onSubmit={handleSave} className="space-y-5">
       <SectionHeader title="Gallery" description="Photo grid shown on your home page. Leave empty to hide the section." />
+
+      {/* Heading editor — Pro+ only. Starter / Solo Coach get the
+          fallback copy ("Inside Look" / "OUR SPACE" / …) rendered by
+          GallerySection. */}
+      <FeatureGate feature="edit_headings" planName={planName}>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Label" hint='Default: "Inside Look"'>
+              <input type="text" value={galleryLabel} onChange={e => updateGalleryLabel(e.target.value)} placeholder="Inside Look" className={inputCls} />
+            </Field>
+            <Field label="Heading" hint='Default: "OUR SPACE"'>
+              <input type="text" value={galleryHeading} onChange={e => updateGalleryHeading(e.target.value)} placeholder="OUR SPACE" className={inputCls} />
+            </Field>
+          </div>
+          <Field label="Subtitle" hint='Shown right of the heading. Default: "See the facility where champions are made."'>
+            <input type="text" value={gallerySubtitle} onChange={e => updateGallerySubtitle(e.target.value)} placeholder="See the facility where champions are made." className={inputCls} />
+          </Field>
+        </div>
+      </FeatureGate>
 
       <ImageUploader
         gymId={gymId}
@@ -1519,8 +1558,8 @@ function PageHeroForm({ pageKey, content, gymId, planName, onSave, setPreviewDat
         title={`${pageName} Page — Hero`}
         description="The banner at the very top of this page. Leave any field empty to use the default." />
 
-      {/* Background image + text alignment — Enterprise only */}
-      <FeatureGate feature="page_hero_image" planName={planName} hint="Upgrade to Enterprise to add a background image and control text placement on page heroes.">
+      {/* Background image + text alignment — Premium only */}
+      <FeatureGate feature="page_hero_image" planName={planName} hint="Upgrade to Premium to add a background image and control text placement on page heroes.">
         <div className="space-y-4">
           <ImageUploader
             gymId={gymId}
@@ -2991,13 +3030,20 @@ export default function WebsitePage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-gray-900">Website</h1>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                planName === 'Enterprise' ? 'bg-amber-50 text-amber-700' :
-                planName === 'Pro' ? 'bg-indigo-50 text-indigo-700' :
-                'bg-gray-100 text-gray-500'
-              }`}>
-                {planName}
-              </span>
+              {(() => {
+                // V3 Task 1: plan_name canonicalized to lowercase; normalize for matching + display
+                const plan = String(planName || '').toLowerCase()
+                const display =
+                  plan === 'premium' || plan === 'enterprise' ? 'Premium' :
+                  plan === 'pro' ? 'Pro' :
+                  plan === 'starter' ? 'Starter' :
+                  plan === 'free' ? 'Solo Coach' : (planName || '')
+                const cls =
+                  plan === 'premium' || plan === 'enterprise' ? 'bg-amber-50 text-amber-700' :
+                  plan === 'pro' ? 'bg-indigo-50 text-indigo-700' :
+                  'bg-gray-100 text-gray-500'
+                return <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cls}`}>{display}</span>
+              })()}
             </div>
             <p className="text-sm text-gray-500 mt-1">Manage your public gym website content</p>
           </div>

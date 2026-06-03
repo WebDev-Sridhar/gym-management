@@ -19,6 +19,9 @@ import { assignTrainerToMember } from '../../services/trainerService'
 import { supabaseData as supabase } from '../../services/supabaseClient'
 import { markPaymentPaid, recordManualPayment, deletePayment, canDeletePayment } from '../../services/paymentService'
 import { sendPaymentReminder, fetchLastReminders } from '../../services/reminderService'
+import { fetchWhatsappQuota } from '../../services/whatsappQuotaService'
+import { useAuth } from '../../store/AuthContext'
+import UpgradeRequiredModal from './UpgradeRequiredModal'
 import CustomSelect from './CustomSelect'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -114,7 +117,7 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
     <div className="divide-y divide-gray-100">
       <div className="px-5 py-5 space-y-4">
         <SectionLabel>Contact</SectionLabel>
-        <Row Icon={Phone} label="Phone" value={member.phone || '—'} />
+       <Row Icon={Phone} label="Phone" value={member.phone || '—'} />
         <Row Icon={Mail}  label="Email" value={member.email || '—'} />
       </div>
 
@@ -551,6 +554,15 @@ function canCopyPaymentLink(p) {
 
 function PaymentsTab({ member, gymId }) {
   const dialog = useDialog()
+  useAuth()  // touched to keep the hook order stable across renders
+  // V3 Task 14: WhatsApp gating is quota-based. We fetch the gym's
+  // current quota state alongside payments so the Remind button's
+  // tooltip + the channel label reflect reality (e.g. "WhatsApp (12 left)"
+  // vs "Email — WhatsApp quota reached"). Server pre-checks again on POST
+  // so a stale render can't sneak through.
+  const [waQuota, setWaQuota] = useState(null)
+  const whatsappAllowed = !!waQuota?.whatsappEnabled && waQuota.remaining > 0
+  const [upgradeContext, setUpgradeContext] = useState(null)
   const [payments, setPayments]             = useState([])
   const [loading, setLoading]               = useState(true)
   const [markingId, setMarkingId]           = useState(null)
@@ -585,10 +597,12 @@ function PaymentsTab({ member, gymId }) {
         .order('created_at', { ascending: false })
         .limit(10),
       fetchLastReminders(gymId).catch(() => new Map()),
-    ]).then(([res, reminders]) => {
+      fetchWhatsappQuota(gymId).catch(() => null),
+    ]).then(([res, reminders, wa]) => {
       if (cancelled) return
       setPayments(res.data || [])
       setLastReminders(reminders)
+      setWaQuota(wa)
     }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [member.id, gymId])
@@ -611,10 +625,10 @@ function PaymentsTab({ member, gymId }) {
     setReminderToast(null)
     try {
       const res = await sendPaymentReminder({ paymentId })
-      // The edge function returns 200 even when Interakt itself failed —
-      // it logs the attempt and surfaces whatsappSent=false. Treat that as
-      // a failure for the user so they don't think the message went out.
-      if (res?.whatsappSent === false) {
+      // V3 Task 14: send-payment-reminder now pre-checks quota and only
+      // ever dispatches via WhatsApp (Interakt). notificationStatus stays
+      // the source of truth for "did the provider accept it".
+      if (res?.notificationStatus === 'failed') {
         setReminderToast({
           paymentId,
           kind: 'error',
@@ -626,19 +640,32 @@ function PaymentsTab({ member, gymId }) {
           kind: 'success',
           message: 'Reminder sent via WhatsApp',
         })
-        // Refresh the lastReminders cache so the "Last reminder: just now"
-        // line updates and the Remind button flips to its 24h-cooldown state.
+        // Refresh the lastReminders cache + quota so the "Last reminder:
+        // just now" line updates and the remaining-count pill decrements.
         try {
-          const reminders = await fetchLastReminders(gymId)
+          const [reminders, freshQuota] = await Promise.all([
+            fetchLastReminders(gymId),
+            fetchWhatsappQuota(gymId).catch(() => waQuota),
+          ])
           setLastReminders(reminders)
+          setWaQuota(freshQuota)
         } catch { /* non-fatal */ }
       }
     } catch (err) {
-      setReminderToast({
-        paymentId,
-        kind: 'error',
-        message: err.message || 'Failed to send reminder',
-      })
+      // V3 Task 14: structured quota / plan errors open the upgrade modal
+      // instead of a flat toast.
+      if (err.code === 'whatsapp_quota_exhausted' ||
+          err.code === 'whatsapp_disabled' ||
+          err.code === 'solo_coach_one_per_invoice' ||
+          err.code === 'subscription_expired') {
+        setUpgradeContext(err)
+      } else {
+        setReminderToast({
+          paymentId,
+          kind: 'error',
+          message: err.message || 'Failed to send reminder',
+        })
+      }
     } finally {
       setReminderBusy(null)
     }
@@ -710,7 +737,14 @@ function PaymentsTab({ member, gymId }) {
     const isPending = p.status === 'pending' || p.status === 'verification_pending'
     const reminder  = lastReminders.get?.(p.id)
     const sentToday = reminder && (Date.now() - new Date(reminder.last_sent_at)) < 86400000
-    const canRemind = !!member.phone && !sentToday
+    // V3 Task 14: WhatsApp only — phone required. Server returns a
+    // structured error if quota / plan blocks the send, opening the
+    // upgrade modal (handled in handleRemind). We don't disable the
+    // button on quota=0; the modal is more discoverable than a grayed
+    // button + tooltip.
+    const hasContact = !!member.phone
+    const canRemind  = hasContact && !sentToday
+    const missingContactMsg = 'No phone number'
 
     return (
       <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
@@ -768,7 +802,12 @@ function PaymentsTab({ member, gymId }) {
                 </button>
                 <button onClick={() => handleRemind(p.id)}
                   disabled={!canRemind || reminderBusy === p.id}
-                  title={!member.phone ? 'No phone number' : sentToday ? 'Already sent today' : 'Send WhatsApp reminder'}
+                  title={
+                    waQuota?.isExpired ? 'Subscription expired — renew to send reminders'
+                    : !hasContact ? missingContactMsg
+                    : sentToday ? 'Already sent today'
+                    : whatsappAllowed ? `Send WhatsApp reminder · ${waQuota.remaining} left this period`
+                    : 'Send WhatsApp reminder (will check quota)'}
                   className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                   {reminderBusy === p.id ? 'Sending…' : 'Remind'}
                 </button>
@@ -863,6 +902,14 @@ function PaymentsTab({ member, gymId }) {
             ))}
           </div>
         </div>
+      )}
+
+      {upgradeContext && (
+        <UpgradeRequiredModal
+          context={upgradeContext}
+          onClose={() => setUpgradeContext(null)}
+          onUpgrade={() => { setUpgradeContext(null); window.location.assign('/owner-dashboard/subscription') }}
+        />
       )}
     </div>
   )

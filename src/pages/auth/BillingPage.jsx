@@ -1,58 +1,75 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
-import { createSubscriptionOrder, openSubscriptionCheckout } from '../../services/subscriptionService'
+import {
+  createSubscriptionOrder,
+  openSubscriptionCheckout,
+  startTrialSubscription,
+  fetchFounderSlotsUsed,
+} from '../../services/subscriptionService'
 import { nextRouteFor } from '../../lib/onboarding'
+import { planDisplayName } from '../../lib/featureGates'
 import OnboardingProgress from '../../components/ui/OnboardingProgress'
 import OnboardingAccountBar from '../../components/auth/OnboardingAccountBar'
 
+const FOUNDER_TOTAL_SLOTS = 25     // KEEP IN SYNC with create-subscription-order FOUNDER_PRICING_SLOTS
+const FOUNDER_DISCOUNT = 0.5
+
+// V3 Task 1: `key` is the canonical lowercase enum matching DB.
+// V3 Task 8: prices + caps updated per PRICING_REVIEW.md V2 §5/§6/§7/§8.
+// KEEP IN SYNC with:
+//   - src/lib/constants.js PRICING_PLANS (marketing)
+//   - supabase/functions/create-subscription-order/index.ts SAAS_PLANS
 const PLANS = [
   {
+    key: 'starter',
     name: 'Starter',
-    price: 999,
+    price: 799,
     period: '/month',
     durationDays: 30,
-    description: 'Perfect for small gyms just getting started.',
+    description: 'For solo studios and neighborhood gyms.',
     features: [
-      'Up to 100 members',
-      'QR attendance',
-      'Basic analytics',
-      'Payment tracking',
-      'Email support',
+      'Up to 150 active members',
+      '2 trainer accounts',
+      '500 WhatsApp reminders / month',
+      'Razorpay payment collection',
+      'Complete multi-page website',
+      'Email support · 1 business day',
     ],
     highlighted: false,
   },
   {
+    key: 'pro',
     name: 'Pro',
-    price: 2499,
+    price: 1799,
     period: '/month',
     durationDays: 30,
-    description: 'For growing gyms that need full control.',
+    description: 'For growing gyms with trainers and multiple plan tiers.',
     features: [
-      'Up to 500 members',
-      'Everything in Starter',
-      'WhatsApp automation',
-      'Trainer management',
-      'Ghost detection',
-      'Advanced analytics',
-      'Priority support',
+      'Up to 750 active members',
+      '10 trainer accounts',
+      '3,000 WhatsApp reminders / month',
+      'Ghost-detection + cohort retention analytics',
+      'Multi-page website + custom subdomain',
+      'Same-business-day support',
     ],
     highlighted: true,
     badge: 'Most Popular',
   },
   {
-    name: 'Enterprise',
+    key: 'premium',
+    name: 'Premium',
     price: 4999,
     period: '/month',
     durationDays: 30,
-    description: 'For gym chains and premium facilities.',
+    description: 'For multi-branch chains and premium fitness brands.',
     features: [
-      'Unlimited members',
-      'Everything in Pro',
-      'Multi-branch support',
-      'Custom branding',
-      'API access',
-      'Dedicated support',
+      'Unlimited members + trainers',
+      '15,000 WhatsApp / month',
+      'Multi-branch operations + consolidated reporting',
+      'Custom apex domain',
+      'API access for finance/CRM integration',
+      '4-hour SLA · phone + WhatsApp support',
     ],
     highlighted: false,
   },
@@ -67,6 +84,24 @@ export default function BillingPage() {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
   const [paymentSuccess, setPaymentSuccess] = useState(false)
+  // V3 Task 10: separate busy state for the trial CTA so the paid-plan
+  // button doesn't grey out when the trial button is mid-request.
+  const [trialBusy, setTrialBusy] = useState(false)
+  // V3 Task 8 / 11: founder-pricing claim. Slots are tracked server-side;
+  // we read the count on mount so we can hide the checkbox once all 100
+  // are claimed. The server re-validates on createSubscriptionOrder, so
+  // a stale UI can't bypass the cap.
+  const [founderSlotsUsed, setFounderSlotsUsed] = useState(null)
+  const [claimFounder, setClaimFounder] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    fetchFounderSlotsUsed().then(n => { if (!cancelled) setFounderSlotsUsed(n) })
+    return () => { cancelled = true }
+  }, [])
+  const founderSlotsLeft = founderSlotsUsed != null
+    ? Math.max(0, FOUNDER_TOTAL_SLOTS - founderSlotsUsed)
+    : null
+  const founderAvailable = founderSlotsLeft == null || founderSlotsLeft > 0
 
   // Backward compat: handle Razorpay Payment Link callback redirect from the
   // old (legacy) flow. New Checkout flow doesn't redirect — it stays in-page.
@@ -102,9 +137,10 @@ export default function BillingPage() {
       const plan = PLANS[selectedPlan]
 
       const order = await createSubscriptionOrder({
-        planName: plan.name,
+        planName: plan.key,
         price: plan.price,
         durationDays: plan.durationDays,
+        isFounderPricing: claimFounder && founderAvailable,
       })
 
       await openSubscriptionCheckout({
@@ -130,6 +166,14 @@ export default function BillingPage() {
       if (err?.message === 'checkout_dismissed') {
         // User closed the modal — silent, just refresh state in case
         await refreshProfile()
+      } else if (err.code === 'founder_slots_full') {
+        // V3 Task 11: founder slot taken between page load and click.
+        // Show the message, refresh the counter so the checkbox hides,
+        // and let the user retry without the flag.
+        setError(err.message)
+        setClaimFounder(false)
+        const fresh = await fetchFounderSlotsUsed()
+        setFounderSlotsUsed(fresh)
       } else {
         setError(err.message || 'Failed to start payment')
       }
@@ -140,6 +184,30 @@ export default function BillingPage() {
 
   const handleGoToDashboard = () => {
     navigate('/owner-dashboard', { replace: true })
+  }
+
+  // V3 Task 10: uniform 30-day no-card trial. plan_name='free' / status='trial'
+  // server-side; success bumps onboarding_step to 'subscribed' so
+  // ProtectedRoute lets us into the dashboard.
+  const handleStartTrial = async () => {
+    setError('')
+    setTrialBusy(true)
+    try {
+      await startTrialSubscription()
+      await refreshProfile()
+      navigate('/owner-dashboard', { replace: true })
+    } catch (err) {
+      if (err.code === 'subscription_exists') {
+        // Owner already has a sub — refresh state and let nextRouteFor
+        // route them appropriately.
+        await refreshProfile()
+        setError(err.message)
+      } else {
+        setError(err.message || 'Failed to start trial')
+      }
+    } finally {
+      setTrialBusy(false)
+    }
   }
 
   // Payment success screen — show while webhook processes
@@ -191,7 +259,7 @@ export default function BillingPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Plan</span>
-                <span className="text-sm font-semibold text-gray-900">{subscription.plan_name}</span>
+                <span className="text-sm font-semibold text-gray-900">{planDisplayName(subscription.plan_name)}</span>
               </div>
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Amount</span>
@@ -266,7 +334,7 @@ export default function BillingPage() {
         {isExpired && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-8 text-center max-w-lg mx-auto">
             <p className="text-sm text-red-800 font-medium">
-              Your {subscription.plan_name} plan expired on{' '}
+              Your {planDisplayName(subscription.plan_name)} plan expired on{' '}
               {new Date(subscription.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
             </p>
             <p className="text-xs text-red-600 mt-1">
@@ -275,15 +343,40 @@ export default function BillingPage() {
           </div>
         )}
 
-        {/* First-time banner */}
+        {/* V3 Task 10: trial CTA — primary action for first-time signups
+            per Pricing Review §3 ("no-card 30-day trial removes 70% of
+            signup friction"). Hidden on the renewal/expired path since
+            those users already had a trial. */}
         {!isExpired && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8 text-center max-w-lg mx-auto">
-            <p className="text-sm text-amber-800 font-medium">
-              Activate now to start tracking members today
+          <div className="bg-gradient-to-br from-violet-50 to-blue-50 border border-violet-200 rounded-2xl p-6 mb-8 max-w-lg mx-auto">
+            <div className="text-center mb-4">
+              <p className="text-base font-bold text-gray-900">
+                Try Gymmobius free for 30 days
+              </p>
+              <p className="text-xs text-gray-600 mt-1.5">
+                No credit card. Single-page website, member tracking, 50 WhatsApp messages included.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleStartTrial}
+              disabled={trialBusy || processing}
+              className="w-full py-3 bg-gradient-to-r from-violet-600 to-blue-500 text-white font-bold rounded-xl hover:opacity-90 transition-opacity cursor-pointer text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-violet-200"
+            >
+              {trialBusy ? 'Starting trial...' : 'Start 30-day free trial'}
+            </button>
+            <p className="text-center text-[11px] text-gray-500 mt-3">
+              Pick a paid plan anytime during your trial to unlock more.
             </p>
-            <p className="text-xs text-amber-600 mt-1">
-              30-day subscription. Cancel anytime, no commitment.
-            </p>
+          </div>
+        )}
+
+        {/* Section divider */}
+        {!isExpired && (
+          <div className="flex items-center gap-3 max-w-lg mx-auto mb-8">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">or pick a plan</span>
+            <div className="flex-1 h-px bg-gray-200" />
           </div>
         )}
 
@@ -349,8 +442,45 @@ export default function BillingPage() {
           ))}
         </div>
 
+        {/* V3 Task 11: founder pricing claim. Hidden once all slots are
+            taken. Server re-validates on createSubscriptionOrder so a stale
+            UI can't bypass the cap. */}
+        {founderAvailable && (
+          <label className="flex items-start gap-3 max-w-lg mx-auto mb-6 p-4 rounded-xl border border-violet-200 bg-violet-50 cursor-pointer hover:bg-violet-100 transition">
+            <input
+              type="checkbox"
+              checked={claimFounder}
+              onChange={e => setClaimFounder(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+            />
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-semibold text-violet-900">
+                Claim my founder spot — 50% off for 6 months
+              </span>
+              <p className="text-xs text-violet-700 mt-0.5">
+                First {FOUNDER_TOTAL_SLOTS} customers only
+                {founderSlotsLeft != null && (
+                  <> · {founderSlotsLeft} {founderSlotsLeft === 1 ? 'spot' : 'spots'} left</>
+                )}
+                . Locked in for 6 months from signup.
+              </p>
+            </div>
+          </label>
+        )}
+
         {/* CTA */}
         <div className="max-w-lg mx-auto">
+          {claimFounder && founderAvailable && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
+              <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-xs font-semibold text-emerald-800">
+                Founder pricing claimed — 50% off applied for the next 6 months
+              </span>
+            </div>
+          )}
+
           {error && <p className="text-red-500 text-xs mb-3 text-center">{error}</p>}
 
           <button
@@ -359,12 +489,18 @@ export default function BillingPage() {
             disabled={processing}
             className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-blue-500 text-white font-bold rounded-xl hover:opacity-90 transition-opacity cursor-pointer text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-200"
           >
-            {processing
-              ? 'Opening Checkout...'
-              : isExpired
-                ? `Renew with ${PLANS[selectedPlan].name} Plan — ${'\u20B9'}${PLANS[selectedPlan].price.toLocaleString('en-IN')}/month`
-                : `Activate ${PLANS[selectedPlan].name} Plan — ₹${PLANS[selectedPlan].price.toLocaleString('en-IN')}/month`
-            }
+            {(() => {
+              const plan = PLANS[selectedPlan]
+              const effectivePrice = claimFounder && founderAvailable
+                ? Math.round(plan.price * FOUNDER_DISCOUNT)
+                : plan.price
+              if (processing) return 'Opening Checkout...'
+              const verb = isExpired ? 'Renew with' : 'Activate'
+              const priceTxt = `₹${effectivePrice.toLocaleString('en-IN')}/month`
+              return claimFounder && founderAvailable
+                ? `${verb} ${plan.name} — ${priceTxt} (founder pricing)`
+                : `${verb} ${plan.name} Plan — ${priceTxt}`
+            })()}
           </button>
 
           <p className="text-center text-xs text-gray-400 mt-4">

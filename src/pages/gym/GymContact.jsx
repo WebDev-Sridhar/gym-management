@@ -80,10 +80,12 @@ export default function GymContact() {
             <p className="text-xs font-bold tracking-[0.25em] uppercase mb-4 font-sans" style={{ color: 'var(--gym-primary)' }}>
               {content?.contact_page_label || 'Reach Out'}
             </p>
-            <h1 className="font-display text-white tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)' }}>
+            {/* Theme-aware page hero text. */}
+            <h1 className="font-display tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)', color: heroImg ? '#fff' : 'var(--gym-text)' }}>
               {content?.contact_page_title ? content.contact_page_title.toUpperCase() : <>GET IN<br />TOUCH</>}
             </h1>
-            <p className={`text-white/40 mt-6 font-sans leading-relaxed ${heroAlign === 'center' ? 'max-w-md mx-auto' : 'max-w-md'}`}>
+            <p className={`mt-6 font-sans leading-relaxed ${heroAlign === 'center' ? 'max-w-md mx-auto' : 'max-w-md'}`}
+               style={{ color: heroImg ? 'rgba(255,255,255,0.4)' : 'var(--gym-text-muted)' }}>
               {content?.contact_page_desc || "Questions, tour requests, or just want to say hello — we're here."}
             </p>
           </motion.div>

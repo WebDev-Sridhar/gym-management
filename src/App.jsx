@@ -3,51 +3,68 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './store/AuthContext'
 import { ThemeProvider } from './store/ThemeContext'
 import { DialogProvider } from './components/ui/Dialog'
+// Eager: route-guard shells + the marketing landing page. Everything else
+// is lazy-loaded so the initial bundle stays small for mobile users.
 import DashboardLayout from './components/layout/DashboardLayout'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import PublicRoute from './components/layout/PublicRoute'
 import LandingPage from './pages/landing/LandingPage'
-import LoginPage from './pages/auth/LoginPage'
-import SignupPage from './pages/auth/SignupPage'
-import ResetPasswordPage from './pages/auth/ResetPasswordPage'
-import CreateGymPage from './pages/auth/CreateGymPage'
-import OnboardingPage from './pages/auth/OnboardingPage'
-import BillingPage from './pages/auth/BillingPage'
-import AuthCallbackPage from './pages/auth/AuthCallbackPage'
-import OwnerDashboard from './pages/owner/OwnerDashboard'
-import HomePage from './pages/owner/HomePage'
-import PlansPage from './pages/owner/PlansPage'
-import MembersPage from './pages/owner/MembersPage'
-import PaymentsPage from './pages/owner/PaymentsPage'
-import AttendancePage from './pages/owner/AttendancePage'
-import AnalyticsPage from './pages/owner/AnalyticsPage'
-import TrainersPage from './pages/owner/TrainersPage'
-import SettingsPage from './pages/owner/SettingsPage'
-import WebsitePage from './pages/owner/WebsitePage'
-import PaymentSettingsPage from './pages/owner/PaymentSettingsPage'
-import CommunicationPage from './pages/owner/CommunicationPage'
-import MessagesPage from './pages/owner/MessagesPage'
-import ProgramsPage from './pages/owner/ProgramsPage'
-import SubscriptionPage from './pages/owner/SubscriptionPage'
-import SupportPage from './pages/owner/SupportPage'
-import StarterWebsitePage from './pages/owner/StarterWebsitePage'
-import BranchesPage from './pages/owner/BranchesPage'
-import TrainerLayout from './components/layout/TrainerLayout'
-import MemberLayout from './components/layout/MemberLayout'
-import CheckinPage from './pages/checkin/CheckinPage'
-import PayLandingPage from './pages/pay/PayLandingPage'
-import GymLayout from './components/gym/GymLayout'
-import GymHome from './pages/gym/GymHome'
-import GymAbout from './pages/gym/GymAbout'
-import GymPricing from './pages/gym/GymPricing'
-import GymTrainers from './pages/gym/GymTrainers'
-import GymContact from './pages/gym/GymContact'
-import GymLoginPage from './pages/gym/GymLoginPage'
-import GymJoinPage from './pages/gym/GymJoinPage'
 import ScrollToTop from './ScrollToTop'
 import PwaInstallBanner from './components/PwaInstallBanner'
 import { ROUTES } from './lib/constants/routes'
 import { detectHost } from './lib/host'
+
+// Lazy: auth + onboarding pages. Each one is a separate chunk so a user
+// signing up doesn't pay for the dashboard JS up front.
+const LoginPage          = lazy(() => import('./pages/auth/LoginPage'))
+const SignupPage         = lazy(() => import('./pages/auth/SignupPage'))
+const ResetPasswordPage  = lazy(() => import('./pages/auth/ResetPasswordPage'))
+const CreateGymPage      = lazy(() => import('./pages/auth/CreateGymPage'))
+const OnboardingPage     = lazy(() => import('./pages/auth/OnboardingPage'))
+const BillingPage        = lazy(() => import('./pages/auth/BillingPage'))
+const AuthCallbackPage   = lazy(() => import('./pages/auth/AuthCallbackPage'))
+
+// Lazy: owner dashboard pages. Each route is its own chunk; only the page
+// the owner actually navigates to is downloaded.
+const OwnerDashboard       = lazy(() => import('./pages/owner/OwnerDashboard'))
+const HomePage             = lazy(() => import('./pages/owner/HomePage'))
+const PlansPage            = lazy(() => import('./pages/owner/PlansPage'))
+const MembersPage          = lazy(() => import('./pages/owner/MembersPage'))
+const PaymentsPage         = lazy(() => import('./pages/owner/PaymentsPage'))
+const AttendancePage       = lazy(() => import('./pages/owner/AttendancePage'))
+const AnalyticsPage        = lazy(() => import('./pages/owner/AnalyticsPage'))
+const TrainersPage         = lazy(() => import('./pages/owner/TrainersPage'))
+const SettingsPage         = lazy(() => import('./pages/owner/SettingsPage'))
+const WebsitePage          = lazy(() => import('./pages/owner/WebsitePage'))
+const PaymentSettingsPage  = lazy(() => import('./pages/owner/PaymentSettingsPage'))
+const CommunicationPage    = lazy(() => import('./pages/owner/CommunicationPage'))
+const MessagesPage         = lazy(() => import('./pages/owner/MessagesPage'))
+const ProgramsPage         = lazy(() => import('./pages/owner/ProgramsPage'))
+const SubscriptionPage     = lazy(() => import('./pages/owner/SubscriptionPage'))
+const SupportPage          = lazy(() => import('./pages/owner/SupportPage'))
+const StarterWebsitePage   = lazy(() => import('./pages/owner/StarterWebsitePage'))
+const SoloCoachWebsitePage = lazy(() => import('./pages/owner/SoloCoachWebsitePage'))
+const BranchesPage         = lazy(() => import('./pages/owner/BranchesPage'))
+
+// Lazy: trainer + member apps. Their layouts contain keep-alive sub-routers
+// so each split lands as one chunk per app, not per page.
+const TrainerLayout = lazy(() => import('./components/layout/TrainerLayout'))
+const MemberLayout  = lazy(() => import('./components/layout/MemberLayout'))
+
+// Lazy: public utility pages.
+const CheckinPage    = lazy(() => import('./pages/checkin/CheckinPage'))
+const PayLandingPage = lazy(() => import('./pages/pay/PayLandingPage'))
+
+// Lazy: per-gym public site. GymLayout is the shell; each section page
+// is a small chunk.
+const GymLayout    = lazy(() => import('./components/gym/GymLayout'))
+const GymHome      = lazy(() => import('./pages/gym/GymHome'))
+const GymAbout     = lazy(() => import('./pages/gym/GymAbout'))
+const GymPricing   = lazy(() => import('./pages/gym/GymPricing'))
+const GymTrainers  = lazy(() => import('./pages/gym/GymTrainers'))
+const GymContact   = lazy(() => import('./pages/gym/GymContact'))
+const GymLoginPage = lazy(() => import('./pages/gym/GymLoginPage'))
+const GymJoinPage  = lazy(() => import('./pages/gym/GymJoinPage'))
 
 // Detect host kind once at app boot. Hostname can only change with a full
 // page reload, so this is stable for the entire React lifecycle.
@@ -77,10 +94,21 @@ const GymMembershipPage = lazy(() => import('./pages/gym/legal/GymMembershipPage
 const GymWaiverPage = lazy(() => import('./pages/gym/legal/GymWaiverPage'))
 
 
+// V3 CMS rebuild: route the /website page to the CMS that matches the
+// gym's plan. Three variants:
+//   free    → SoloCoachWebsitePage (single-page CMS; subset + contact form)
+//   starter → StarterWebsitePage   (multi-page CMS for a complete site)
+//   pro+    → WebsitePage          (multi-page CMS + advanced controls)
+//
+// Always lowercase the plan_name first — Task 1 canonicalized the DB enum
+// to lowercase, and any strict `=== 'Starter'` match silently fell through
+// to the WebsitePage default for everyone after the migration.
 function WebsitePageRouter() {
   const { subscription } = useAuth()
-  const planName = subscription?.plan_name ?? 'Starter'
-  return planName === 'Starter' ? <StarterWebsitePage /> : <WebsitePage />
+  const plan = String(subscription?.plan_name ?? 'free').toLowerCase()
+  if (plan === 'free')    return <SoloCoachWebsitePage />
+  if (plan === 'starter') return <StarterWebsitePage />
+  return <WebsitePage />
 }
 
 // Gym public-page children — shared between main-domain (/:gymSlug/*) and

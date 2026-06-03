@@ -164,7 +164,9 @@ export default function OwnerDashboard() {
   const [loading, setLoading]           = useState(true)
 
   const expiresAt      = subscription?.expires_at ? new Date(subscription.expires_at) : null
-  const daysLeft       = expiresAt ? Math.ceil((expiresAt - new Date()) / 86400000) : null
+  // Floor matches AuthContext.trialDaysLeft + Topbar + SubscriptionPage so the
+  // sub-expiry day count agrees everywhere it surfaces.
+  const daysLeft       = expiresAt ? Math.max(0, Math.floor((expiresAt - new Date()) / 86400000)) : null
   const isExpiringSoon = daysLeft !== null && daysLeft <= 7
 
   useEffect(() => {

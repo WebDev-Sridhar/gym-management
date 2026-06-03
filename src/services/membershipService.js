@@ -1,5 +1,68 @@
 import { supabaseData as supabase } from './supabaseClient'
 import { applyBranchFilter } from '../lib/branchQuery'
+import { getPlanCap, nextPlanForQuota, planDisplayName } from '../lib/featureGates'
+
+/**
+ * Throws a structured quota error the UI can switch on (err.code === 'quota_exceeded').
+ * Used by createMember + createTrainerInvite to share the same error shape so
+ * UpgradeRequiredModal can render either case from one catch block.
+ */
+function quotaExceededError({ quota, current, cap, planName }) {
+  const labels = { active_members: 'Member', active_trainers: 'Trainer' }
+  const err = new Error(`${labels[quota] ?? 'Quota'} limit reached`)
+  err.code         = 'quota_exceeded'
+  err.quota        = quota
+  err.current      = current
+  err.cap          = cap
+  err.current_plan = planName
+  err.required_plan = nextPlanForQuota(planName)
+  return err
+}
+
+/**
+ * V3 P0: thrown when the gym's subscription is 'expired' — hard stop, no
+ * Solo Coach fallback. Owner must renew before they can create more
+ * members / trainers / payments. UpgradeRequiredModal switches on
+ * `err.code === 'subscription_expired'` to render the Renew flow instead
+ * of the Upgrade flow.
+ */
+function subscriptionExpiredError({ blocked, planName, expiresAt }) {
+  const labels = { active_members: 'member', active_trainers: 'trainer' }
+  const what = labels[blocked] ?? 'this action'
+  const err = new Error(`Subscription expired — renew to add ${what}s`)
+  err.code         = 'subscription_expired'
+  err.blocked      = blocked
+  err.current_plan = planName
+  err.expires_at   = expiresAt
+  return err
+}
+
+/**
+ * Loads the gym's current plan_name + status, including 'expired'. Callers
+ * branch on subStatus === 'expired' to short-circuit with a hard-stop
+ * error before the quota math runs. For 'active' and 'trial' rows the
+ * cap behaviour is unchanged (trial bumps to Starter for members/trainers).
+ *
+ * V3 P0 lifecycle: previously this filtered to ['active','trial'] only,
+ * so expired gyms fell through to the 'free' default — i.e. Solo Coach
+ * caps (25 members, 0 trainers). That's wrong for paid-sub expiry; the
+ * owner should be blocked entirely until they renew.
+ */
+async function loadGymPlan(gymId) {
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('plan_name, status, expires_at')
+    .eq('gym_id', gymId)
+    .in('status', ['active', 'trial', 'expired'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return {
+    planName:  String(sub?.plan_name ?? 'free').toLowerCase(),
+    subStatus: sub?.status ?? null,
+    expiresAt: sub?.expires_at ?? null,
+  }
+}
 
 // ─── Plans ───
 
@@ -80,6 +143,42 @@ export async function fetchMembers(gymId, branchId) {
 export async function createMember({ gymId, branchId, name, phone, email }) {
   const cleanPhone = phone?.trim() || null
   const cleanEmail = email?.trim().toLowerCase() || null
+
+  // V3 Task 6: quota guard. Run BEFORE duplicate check + revival path so a
+  // gym that's already at the cap can't sneak in via reviving a soft-deleted
+  // row. "Active" = deleted_at IS NULL per Pricing Review §6 — payment
+  // status doesn't matter for the count.
+  //
+  // Note: this is the client-app boundary; not the DB boundary. A determined
+  // user with the service key could still bypass. RLS-level enforcement is
+  // tracked as a Phase 5 follow-up (would need a Postgres trigger that joins
+  // subscriptions). For first-10-customers, app-layer guard is sufficient
+  // — the threat model is "stop accidental over-cap", not "stop a hostile
+  // owner manipulating the client".
+  const { planName, subStatus, expiresAt } = await loadGymPlan(gymId)
+  // V3 P0: expired subscription is a hard stop — no Solo Coach fallback.
+  // Owner must renew before any new member adds. Cap-check below is
+  // reached only when status is active/trial.
+  if (subStatus === 'expired') {
+    throw subscriptionExpiredError({ blocked: 'active_members', planName, expiresAt })
+  }
+  const cap = getPlanCap('members', planName, subStatus)
+  if (Number.isFinite(cap)) {
+    const { count, error: countErr } = await supabase
+      .from('members')
+      .select('id', { count: 'exact', head: true })
+      .eq('gym_id', gymId)
+      .is('deleted_at', null)
+    if (countErr) throw countErr
+    if ((count ?? 0) >= cap) {
+      throw quotaExceededError({
+        quota: 'active_members',
+        current: count ?? 0,
+        cap,
+        planName,
+      })
+    }
+  }
 
   // Pre-flight: reject duplicates against ACTIVE (non-deleted) members in
   // this gym. Email is checked first (more uniquely identifying — typos
@@ -526,6 +625,46 @@ export async function fetchTrainerInvites(gymId, branchId) {
 export async function createTrainerInvite({ gymId, branchId, name, phone, email }) {
   const cleanEmail = email?.trim().toLowerCase() || null
   const cleanPhone = phone?.trim() || null
+
+  // V3 Task 7: trainer quota guard. Mirrors Task 6 / createMember. Counts
+  // existing trainer-role users + any UNCLAIMED invites so a gym can't
+  // queue up 20 invites on the free plan and then upgrade-then-downgrade
+  // to stuff them all in. The combined count uses the same definition the
+  // owner sees on the Trainers page.
+  const { planName, subStatus, expiresAt } = await loadGymPlan(gymId)
+  // V3 P0: expired subscription is a hard stop. Without this, the
+  // existing free-fallback path made the modal say "Solo Coach plan
+  // includes 0 trainers" — confusing for an owner who had a paid plan.
+  if (subStatus === 'expired') {
+    throw subscriptionExpiredError({ blocked: 'active_trainers', planName, expiresAt })
+  }
+  const cap = getPlanCap('trainers', planName, subStatus)
+  if (Number.isFinite(cap)) {
+    const [{ count: trainerCount, error: trainerErr }, { count: pendingCount, error: pendingErr }] =
+      await Promise.all([
+        supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .eq('gym_id', gymId)
+          .eq('role', 'trainer'),
+        supabase
+          .from('trainer_invites')
+          .select('id', { count: 'exact', head: true })
+          .eq('gym_id', gymId)
+          .eq('claimed', false),
+      ])
+    if (trainerErr) throw trainerErr
+    if (pendingErr) throw pendingErr
+    const total = (trainerCount ?? 0) + (pendingCount ?? 0)
+    if (total >= cap) {
+      throw quotaExceededError({
+        quota: 'active_trainers',
+        current: total,
+        cap,
+        planName,
+      })
+    }
+  }
 
   // Collision guard: if this email is already an active member of the gym,
   // the auto-link at signup would route them as a member (checked first),

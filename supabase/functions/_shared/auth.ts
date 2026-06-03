@@ -41,7 +41,11 @@ export async function requireOwner(req: Request): Promise<OwnerContext> {
 }
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  // V3 Task 14: optional `body` allows callers to throw a structured
+  // response (e.g. { error: 'whatsapp_quota_exhausted', cap, used, ... })
+  // that the frontend can switch on. When set, errorResponse returns
+  // `body` verbatim instead of the legacy `{ error: message }` envelope.
+  constructor(public status: number, message: string, public body?: Record<string, unknown>) {
     super(message)
   }
 }
@@ -59,7 +63,8 @@ export function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
 
 export function errorResponse(err: unknown): Response {
   if (err instanceof HttpError) {
-    return jsonResponse({ error: err.message }, { status: err.status })
+    // Structured body wins when provided; otherwise legacy envelope.
+    return jsonResponse(err.body ?? { error: err.message }, { status: err.status })
   }
   const message = err instanceof Error ? err.message : 'internal error'
   console.error('edge function error:', err)

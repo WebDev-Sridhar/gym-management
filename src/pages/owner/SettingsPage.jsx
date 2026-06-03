@@ -28,7 +28,9 @@ function fmtDate(iso) {
 }
 function daysUntil(iso) {
   if (!iso) return null
-  return Math.ceil((new Date(iso) - new Date()) / 86400000)
+  // Floor matches AuthContext.trialDaysLeft + Topbar + SubscriptionPage so the
+  // sub-expiry day count agrees everywhere it surfaces.
+  return Math.max(0, Math.floor((new Date(iso) - new Date()) / 86400000))
 }
 function initials(name) {
   if (!name) return '?'
@@ -159,7 +161,7 @@ function SettingsSkeleton() {
 // ── main ──────────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const navigate    = useNavigate()
-  const { user, profile, gymId, gymName, subscription, logout, refreshProfile } = useAuth()
+  const { user, profile, gymId, gymName, subscription, isTrial, isExpired, trialDaysLeft, logout, refreshProfile } = useAuth()
   const { theme, setTheme } = useTheme()
   const { selectedBranchId, isAllBranches, branches, reload: reloadBranches } = useBranch()
 
@@ -400,7 +402,9 @@ export default function SettingsPage() {
   const planName  = subscription?.plan_name || 'Starter'
   const expiresAt = subscription?.expires_at
   const daysLeft  = daysUntil(expiresAt)
-  const isExpired = daysLeft !== null && daysLeft <= 0
+  // Solo Coach (free + active) has a sentinel 2099 expires_at — never show
+  // "Renews 31 Dec 2099" or a days-remaining countdown for it.
+  const isSoloCoach = subscription?.status === 'active' && subscription?.plan_name === 'free'
   const email     = profile?.email || user?.email || '—'
 
   const PLAN_FEATURES = [
@@ -435,7 +439,9 @@ export default function SettingsPage() {
                 <ShieldCheck size={10} /> Owner
               </span>
               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                isExpired ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+                isExpired ? 'bg-red-50 text-red-700'
+                  : isTrial ? 'bg-violet-50 text-violet-700'
+                    : 'bg-emerald-50 text-emerald-700'
               }`}>
                 <Zap size={10} /> {planName} Plan
               </span>
@@ -469,18 +475,25 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2.5 mb-4">
               <span className="text-xl font-bold text-gray-900">{planName}</span>
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                isExpired ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+                isExpired ? 'bg-red-50 text-red-700'
+                  : isTrial ? 'bg-violet-50 text-violet-700'
+                    : 'bg-emerald-50 text-emerald-700'
               }`}>
-                {isExpired ? 'Expired' : 'Active'}
+                {isExpired ? 'Expired' : isTrial ? 'Trial' : 'Active'}
               </span>
             </div>
-            {expiresAt && (
+            {expiresAt && !isSoloCoach && (
               <p className="text-xs text-gray-500 mb-1">
-                {isExpired ? 'Expired' : 'Renews'} {fmtDate(expiresAt)}
+                {isExpired ? 'Expired' : isTrial ? 'Trial ends' : 'Renews'} {fmtDate(expiresAt)}
               </p>
             )}
-            {!isExpired && daysLeft !== null && daysLeft <= 30 && (
-              <p className="text-xs font-medium text-amber-600 mb-1">{daysLeft} days remaining</p>
+            {!isExpired && !isSoloCoach && (isTrial
+              ? trialDaysLeft !== null && (
+                  <p className="text-xs font-medium text-amber-600 mb-1">{trialDaysLeft} days remaining</p>
+                )
+              : daysLeft !== null && daysLeft <= 30 && (
+                  <p className="text-xs font-medium text-amber-600 mb-1">{daysLeft} days remaining</p>
+                )
             )}
 
             <div className="border-t border-gray-50 pt-4 mt-4 space-y-2 mb-5">
@@ -912,10 +925,10 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-700">
-                        Custom domain <span className="text-[10px] font-bold ml-1 px-1.5 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded uppercase tracking-wide">Enterprise</span>
+                        Custom domain <span className="text-[10px] font-bold ml-1 px-1.5 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded uppercase tracking-wide">Premium</span>
                       </p>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        Use <span className="font-mono">yourgym.com</span> on the Enterprise plan.
+                        Use <span className="font-mono">yourgym.com</span> on the Premium plan.
                       </p>
                     </div>
                     <ChevronRight size={13} className="text-gray-300 group-hover:text-violet-500 shrink-0" />

@@ -68,6 +68,10 @@ Deno.serve(async (req) => {
         planName: payment.plan?.name ?? 'Membership',
         amount: Number(payment.amount),
         expiresAt: payment.member?.expiry_date ?? null,
+        // V3 P0 lifecycle: receipts MUST go through even when the gym's
+        // Gymmobius sub is expired. The member just paid money — they need
+        // proof. The engine's expired-skip rule would otherwise swallow this.
+        bypassExpiredCheck: true,
       },
     })
 

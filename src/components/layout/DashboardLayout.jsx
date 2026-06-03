@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import SupportWidget from '../support/SupportWidget'
@@ -8,10 +8,20 @@ import {
   X, Home, LayoutDashboard, CreditCard, Globe,
   Users, UserCheck, QrCode, ClipboardList, BarChart2,
   Megaphone, Settings, UserCircle, Gem, MessageSquare, HelpCircle, FolderKanban,
-  MapPin,
+  MapPin, Sparkles, AlertTriangle,
 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
-import { canAccess } from '../../lib/featureGates'
+import { canAccess, planDisplayName } from '../../lib/featureGates'
+
+// V3 P0 lifecycle: tiny inline formatter for the expired-strip date.
+// Defined here to avoid importing the heavier date util just for one
+// "DD Mon" rendering.
+function fmtExpiredDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+}
 
 const SIDEBAR_BG = 'var(--shell-bg)'
 
@@ -62,7 +72,7 @@ const MOBILE_NAV_SECTIONS = [
 export default function DashboardLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
     const navigate = useNavigate()
-  const { subscription, gymName } = useAuth()
+  const { subscription, gymName, isTrial, trialDaysLeft, isExpired } = useAuth()
 
   const planName = subscription?.plan_name || 'Starter'
 
@@ -72,6 +82,61 @@ export default function DashboardLayout() {
 
         {/* Topbar — always full-width, no layout shift */}
         <Topbar onMenuToggle={() => setMobileNavOpen(v => !v)} />
+
+        {/* V3 Task 10: trial countdown strip. Only renders during an
+            active trial (status='trial'). Copy escalates as days run
+            out — day 7 amber, day 3 red, day 0 "ending today". CTA
+            sends to /subscription where the owner picks a paid plan. */}
+        {isTrial && (
+          <div
+            className={`shrink-0 px-4 sm:px-6 py-2 flex items-center justify-between gap-3 text-xs sm:text-sm border-b ${
+              trialDaysLeft <= 3   ? 'bg-red-50 border-red-200 text-red-800'   :
+              trialDaysLeft <= 7   ? 'bg-amber-50 border-amber-200 text-amber-800' :
+                                     'bg-violet-50 border-violet-200 text-violet-800'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles size={14} className="shrink-0" />
+              <span className="font-medium truncate">
+                {trialDaysLeft === 0
+                  ? 'Trial ends today'
+                  : trialDaysLeft === 1
+                    ? 'Trial ends tomorrow'
+                    : `Trial: ${trialDaysLeft} days left`}
+              </span>
+            </div>
+            <Link
+              to="/owner-dashboard/subscription"
+              className="shrink-0 font-semibold underline underline-offset-2 hover:no-underline"
+            >
+              Pick a plan
+            </Link>
+          </div>
+        )}
+
+        {/* V3 P0 lifecycle: expired-subscription strip. Always red,
+            non-dismissible. Mirrors the trial strip pattern so it sits in
+            the same visual slot. Surfaces the lapsed plan name + expiry
+            date + Renew CTA so the owner can't miss it. Solo Coach
+            (free + active) and trial states are intentionally excluded. */}
+        {isExpired && (
+          <div className="shrink-0 px-4 sm:px-6 py-2 flex items-center justify-between gap-3 text-xs sm:text-sm border-b bg-red-50 border-red-200 text-red-800">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle size={14} className="shrink-0" />
+              <span className="font-medium truncate">
+                Your {planDisplayName(subscription?.plan_name)} subscription expired
+                {subscription?.expires_at ? ` on ${fmtExpiredDate(subscription.expires_at)}` : ''}.
+                New WhatsApp, members, and branches are blocked until you renew.
+              </span>
+            </div>
+            <Link
+              to="/owner-dashboard/subscription"
+              className="shrink-0 font-semibold underline underline-offset-2 hover:no-underline"
+            >
+              Renew
+            </Link>
+          </div>
+        )}
 
         {/* Sidebar + content row below the topbar */}
         <div className="flex flex-1 min-h-0 overflow-hidden">

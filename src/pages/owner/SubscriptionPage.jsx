@@ -1,72 +1,89 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
-import { createSubscriptionOrder, openSubscriptionCheckout } from '../../services/subscriptionService'
+import { createSubscriptionOrder, openSubscriptionCheckout, fetchFounderSlotsUsed } from '../../services/subscriptionService'
+import { fetchWhatsappQuota } from '../../services/whatsappQuotaService'
+import { planDisplayName } from '../../lib/featureGates'
 import { Sk } from '../../components/ui/Skeleton'
+import FounderBadge from '../../components/ui/FounderBadge'
+
+const FOUNDER_TOTAL_SLOTS = 25     // KEEP IN SYNC with create-subscription-order FOUNDER_PRICING_SLOTS
+const FOUNDER_DISCOUNT    = 0.5
 import {
   Zap, Check, Crown, Rocket, Building, AlertTriangle,
-  CheckCircle, RefreshCw, Clock, CreditCard, X, ArrowRight,
+  CheckCircle, RefreshCw, Clock, CreditCard, X, ArrowRight, MessageCircle,
 } from 'lucide-react'
 
+// V3 Task 1: `key` is the canonical lowercase enum that matches the DB
+// CHECK constraint on subscriptions.plan_name. `displayName` is the
+// user-facing string.
+// V3 Task 8: prices + features updated per PRICING_REVIEW.md V2 (₹799 /
+// ₹1,799 / ₹4,999; 150/750/∞ members; 2/10/∞ trainers; 500/3k/15k WhatsApp).
+// KEEP IN SYNC with:
+//   - src/lib/constants.js PRICING_PLANS (marketing)
+//   - src/pages/auth/BillingPage.jsx PLANS (signup)
+//   - supabase/functions/create-subscription-order/index.ts SAAS_PLANS (server)
 const PLANS = [
   {
-    key: 'Starter',
-    price: 999,
+    key: 'starter',
+    displayName: 'Starter',
+    price: 799,
     durationDays: 30,
     icon: Zap,
-    desc: 'Perfect for small gyms just getting started.',
+    desc: 'For solo studios and neighborhood gyms.',
     color: 'indigo',
     features: [
-      'Up to 100 members',
-      'QR code attendance',
-      'Basic analytics',
-      'Payment tracking',
-      'Member management',
-      'Email support',
+      'Up to 150 active members',
+      '2 trainer accounts',
+      '500 WhatsApp reminders / month',
+      'Razorpay payment collection',
+      'Complete multi-page website',
+      'Email support · 1 business day',
     ],
     notIncluded: [
-      'Website builder',
-      'Razorpay integration',
-      'WhatsApp automation',
+      'Multi-page website builder',
+      'Ghost detection',
+      'Advanced analytics',
     ],
   },
   {
-    key: 'Pro',
-    price: 2499,
+    key: 'pro',
+    displayName: 'Pro',
+    price: 1799,
     durationDays: 30,
     icon: Crown,
-    desc: 'For growing gyms that need full control.',
+    desc: 'For growing gyms with trainers and multiple plan tiers.',
     badge: 'Most Popular',
     color: 'violet',
     features: [
-      'Up to 500 members',
-      'Everything in Starter',
-      'Website builder',
-      'Razorpay integration',
-      'WhatsApp automation',
-      'Trainer management',
-      'Advanced analytics',
-      'Priority support',
+      'Up to 750 active members',
+      '10 trainer accounts',
+      '3,000 WhatsApp reminders / month',
+      'Ghost-detection + cohort retention analytics',
+      'Multi-page website + custom subdomain',
+      'SEO meta overrides',
+      'Same-business-day support',
     ],
     notIncluded: [
-      'Multi-branch support',
-      'custom Domain',
+      'Multi-branch operations',
+      'Custom apex domain',
     ],
   },
   {
-    key: 'Enterprise',
+    key: 'premium',
+    displayName: 'Premium',
     price: 4999,
     durationDays: 30,
     icon: Building,
-    desc: 'For gym chains and premium facilities.',
+    desc: 'For multi-branch chains and premium fitness brands.',
     color: 'slate',
     features: [
-      'Unlimited members',
-      'Everything in Pro',
-      'Multi-branch support',
-      'Custom Domain',
-      'Advance SEO',
-      'Dedicated support',
+      'Unlimited active members + trainers',
+      '15,000 WhatsApp / month',
+      'Multi-branch operations + consolidated reporting',
+      'Custom apex domain (yourbrand.com)',
+      'API access for finance/CRM integration',
+      '4-hour SLA · phone + WhatsApp support',
     ],
     notIncluded: [],
   },
@@ -79,7 +96,10 @@ function fmtDate(iso) {
 
 function daysUntil(iso) {
   if (!iso) return null
-  return Math.ceil((new Date(iso) - new Date()) / 86400000)
+  // Floor matches AuthContext.trialDaysLeft so banner + countdown copy never
+  // disagree by one day. Semantically: <24h remaining = 0 days (it's the
+  // last day, not "1 day left").
+  return Math.max(0, Math.floor((new Date(iso) - new Date()) / 86400000))
 }
 
 const PLAN_COLORS = {
@@ -133,6 +153,39 @@ export default function SubscriptionPage() {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  // V3 Task 14: WhatsApp usage shown in the status card so owners can see
+  // how close they are to their monthly cap (and which tier the next
+  // upgrade unlocks).
+  const [waQuota, setWaQuota] = useState(null)
+  useEffect(() => {
+    if (!profile?.gym_id) return
+    let cancelled = false
+    fetchWhatsappQuota(profile.gym_id)
+      .then(q => { if (!cancelled) setWaQuota(q) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [profile?.gym_id, success])
+
+  // V3 Task 11: founder pricing claim — same pattern as BillingPage. The
+  // existing user is on this page either renewing (already paid, no slot
+  // for them) or converting from trial (founder candidate). We show the
+  // checkbox in both cases and let the server enforce — but if they're
+  // already on a paid plan with is_founder_pricing=true, we suppress it.
+  const [founderSlotsUsed, setFounderSlotsUsed] = useState(null)
+  const [claimFounder, setClaimFounder] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    fetchFounderSlotsUsed().then(n => { if (!cancelled) setFounderSlotsUsed(n) })
+    return () => { cancelled = true }
+  }, [success])
+  const founderSlotsLeft = founderSlotsUsed != null
+    ? Math.max(0, FOUNDER_TOTAL_SLOTS - founderSlotsUsed)
+    : null
+  // Hide the checkbox if (a) all slots are taken, or (b) the owner is
+  // already on a founder-pricing subscription (renewing it preserves the
+  // founder rate automatically; no need to re-claim).
+  const founderAvailable = (founderSlotsLeft == null || founderSlotsLeft > 0)
+    && !subscription?.is_founder_pricing
 
   if (loading) return <SubscriptionSkeleton />
 
@@ -142,6 +195,11 @@ export default function SubscriptionPage() {
   const isExpired = !hasActiveSubscription && !!subscription
   const isNew     = !subscription
   const expiringSoon = hasActiveSubscription && daysLeft !== null && daysLeft <= 7
+  // V3 Task 10: distinguish a trial sub from a paid+active sub. Trial reuses
+  // the same status card but the pill says "Trial" and the renewal copy
+  // says "Pick a plan" instead of "Renews on …".
+  const isTrial   = subscription?.status === 'trial'
+  const planLabel = isTrial ? 'Trial — Solo Coach' : planDisplayName(planName)
 
   async function handleSubscribe() {
     setError('')
@@ -152,6 +210,7 @@ export default function SubscriptionPage() {
         planName: plan.key,
         price: plan.price,
         durationDays: plan.durationDays,
+        isFounderPricing: claimFounder && founderAvailable,
       })
       await openSubscriptionCheckout({
         orderId: order.orderId,
@@ -168,7 +227,13 @@ export default function SubscriptionPage() {
       setSuccess(true)
       await refreshProfile()
     } catch (err) {
-      if (err?.message !== 'checkout_dismissed') {
+      if (err?.code === 'founder_slots_full') {
+        // V3 Task 11: slot taken between page load and click.
+        setError(err.message)
+        setClaimFounder(false)
+        const fresh = await fetchFounderSlotsUsed()
+        setFounderSlotsUsed(fresh)
+      } else if (err?.message !== 'checkout_dismissed') {
         setError(err.message || 'Payment failed. Please try again.')
       } else {
         await refreshProfile()
@@ -250,40 +315,96 @@ export default function SubscriptionPage() {
                 }
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-gray-900">{planName} Plan</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-gray-900">
+                    {planLabel}{!isTrial && ' Plan'}
+                  </span>
                   <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                     isExpired    ? 'bg-red-100 text-red-700'     :
+                    isTrial      ? 'bg-violet-100 text-violet-700' :
                     expiringSoon ? 'bg-amber-100 text-amber-700' :
                                    'bg-emerald-100 text-emerald-700'
                   }`}>
-                    {isExpired ? 'Expired' : expiringSoon ? 'Expiring soon' : 'Active'}
+                    {isExpired    ? 'Expired'
+                      : isTrial   ? 'Trial'
+                      : expiringSoon ? 'Expiring soon'
+                      : 'Active'}
                   </span>
+                  {subscription.is_founder_pricing && (
+                    <FounderBadge until={subscription.founder_pricing_until} />
+                  )}
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {isExpired
                     ? `Expired on ${fmtDate(expiresAt)} — select a plan below to restore access`
-                    : `Renews ${fmtDate(expiresAt)}${daysLeft !== null ? ` · ${daysLeft} days remaining` : ''}`
+                    : isTrial
+                      ? `Trial ends ${fmtDate(expiresAt)}${daysLeft !== null ? ` · ${daysLeft} days remaining` : ''} — pick a plan below to continue`
+                      : `Renews ${fmtDate(expiresAt)}${daysLeft !== null ? ` · ${daysLeft} days remaining` : ''}`
                   }
                 </p>
               </div>
             </div>
-            {!isExpired && (
+            {!isExpired && !isTrial && (
               <div className="flex items-center gap-2 shrink-0">
                 <CreditCard size={13} className="text-gray-400" />
                 <span className="text-xs text-gray-500">
                   ₹{Number(subscription.amount || 0).toLocaleString('en-IN')}/month
+                  {subscription.is_founder_pricing && (
+                    <span className="ml-1 text-violet-600 font-medium">· 50% off</span>
+                  )}
                 </span>
               </div>
             )}
+            {isTrial && (
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-gray-500">No card on file</span>
+              </div>
+            )}
           </div>
+
+          {/* V3 Task 14: WhatsApp usage row. Hidden on plans where the cap
+              is 0 (post-trial Solo Coach) — no bar makes sense for "0/0". */}
+          {waQuota && waQuota.cap > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+                  <MessageCircle size={13} className="text-emerald-600" />
+                  WhatsApp messages
+                  <span className="text-[10px] font-normal text-gray-400">
+                    ({waQuota.subStatus === 'trial' ? 'trial total' : 'this month'})
+                  </span>
+                </div>
+                <span className={`text-xs font-semibold ${
+                  waQuota.remaining === 0      ? 'text-red-700' :
+                  waQuota.remaining < waQuota.cap * 0.2 ? 'text-amber-700' :
+                                                'text-gray-700'
+                }`}>
+                  {waQuota.used.toLocaleString('en-IN')} / {waQuota.cap.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    waQuota.remaining === 0      ? 'bg-red-500' :
+                    waQuota.remaining < waQuota.cap * 0.2 ? 'bg-amber-500' :
+                                                  'bg-emerald-500'
+                  }`}
+                  style={{ width: `${Math.min(100, (waQuota.used / waQuota.cap) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Plans grid */}
       <div>
         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-          {isExpired ? 'Select a plan to restore access' : isNew ? 'Choose a plan to activate your dashboard' : 'Change or renew your plan'}
+          {isExpired
+            ? (planName ? `Renew or change your ${planDisplayName(planName)} plan to restore access` : 'Select a plan to restore access')
+            : isTrial ? 'Pick a plan to continue when your trial ends'
+            : isNew ? 'Choose a plan to activate your dashboard'
+            : 'Change or renew your plan'}
         </p>
         <div className="grid md:grid-cols-3 gap-4">
           {PLANS.map((plan, i) => {
@@ -323,7 +444,7 @@ export default function SubscriptionPage() {
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${c.iconBg}`}>
                     <Icon size={15} strokeWidth={2} />
                   </div>
-                  <span className="text-base font-bold text-gray-900">{plan.key}</span>
+                  <span className="text-base font-bold text-gray-900">{plan.displayName}</span>
                 </div>
 
                 <p className="text-xs text-gray-500 mb-3 min-h-[32px]">{plan.desc}</p>
@@ -368,20 +489,61 @@ export default function SubscriptionPage() {
         </div>
       </div>
 
+      {/* V3 Task 11: founder pricing claim. Mirrors BillingPage. Hidden
+          when slots are full or the owner is already on a founder sub. */}
+      {founderAvailable && (
+        <label className="flex items-start gap-3 p-4 rounded-xl border border-violet-200 bg-violet-50 cursor-pointer hover:bg-violet-100 transition">
+          <input
+            type="checkbox"
+            checked={claimFounder}
+            onChange={e => setClaimFounder(e.target.checked)}
+            className="mt-0.5 w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+          />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-semibold text-violet-900">
+              Claim my founder spot — 50% off for 6 months
+            </span>
+            <p className="text-xs text-violet-700 mt-0.5">
+              First {FOUNDER_TOTAL_SLOTS} customers only
+              {founderSlotsLeft != null && (
+                <> · {founderSlotsLeft} {founderSlotsLeft === 1 ? 'spot' : 'spots'} left</>
+              )}
+              . Locked in for 6 months from signup.
+            </p>
+          </div>
+        </label>
+      )}
+
       {/* CTA section */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
+        {claimFounder && founderAvailable && (
+          <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
+            <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+            <span className="text-xs font-semibold text-emerald-800">
+              Founder pricing claimed — 50% off applied for the next 6 months
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <p className="text-sm font-semibold text-gray-900">
               {(() => {
                 const plan = PLANS[selectedPlan]
-                if (hasActiveSubscription && plan.key === planName) return `Renew ${plan.key} Plan`
-                if (hasActiveSubscription) return `Switch to ${plan.key} Plan`
-                return `Activate ${plan.key} Plan`
+                if (hasActiveSubscription && plan.key === planName) return `Renew ${plan.displayName} Plan`
+                if (hasActiveSubscription) return `Switch to ${plan.displayName} Plan`
+                return `Activate ${plan.displayName} Plan`
               })()}
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
-              ₹{PLANS[selectedPlan].price.toLocaleString('en-IN')}/month · Cancel anytime · No hidden fees
+              {(() => {
+                const plan = PLANS[selectedPlan]
+                const effective = claimFounder && founderAvailable
+                  ? Math.round(plan.price * FOUNDER_DISCOUNT)
+                  : plan.price
+                return claimFounder && founderAvailable
+                  ? `₹${effective.toLocaleString('en-IN')}/month (founder) · Cancel anytime`
+                  : `₹${effective.toLocaleString('en-IN')}/month · Cancel anytime · No hidden fees`
+              })()}
             </p>
           </div>
           <button

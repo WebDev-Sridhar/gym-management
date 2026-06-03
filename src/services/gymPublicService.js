@@ -1,6 +1,26 @@
 import { supabaseAnon } from './supabaseClient'
 
 /**
+ * Returns the gym's canonical lowercase plan_name ('free' | 'starter' |
+ * 'pro' | 'premium') via the public.get_gym_active_plan RPC. Falls back
+ * to 'free' (Solo Coach default) on error so the public site always
+ * renders SOMETHING.
+ *
+ * V3 CMS rebuild: used by GymContext to drive single-page-vs-multi-page
+ * rendering for Solo Coach gyms.
+ */
+export async function fetchGymActivePlan(gymId) {
+  if (!gymId) return 'free'
+  try {
+    const { data, error } = await supabaseAnon.rpc('get_gym_active_plan', { p_gym_id: gymId })
+    if (error) return 'free'
+    return typeof data === 'string' ? data.toLowerCase() : 'free'
+  } catch {
+    return 'free'
+  }
+}
+
+/**
  * Fetch gym by slug (public).
  */
 export async function fetchGymBySlug(slug) {

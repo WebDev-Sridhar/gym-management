@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import SectionWrapper from '../layout/SectionWrapper'
 import Button from '../ui/Button'
+import WhatsAppCTA from '../ui/WhatsAppCTA'
 import { fadeUp } from '../../lib/animations'
 import { PRICING_PLANS } from '../../lib/constants'
 
@@ -34,9 +35,11 @@ function PricingCard({ plan }) {
         <p className="text-text-muted text-sm">{plan.description}</p>
       </div>
 
-        <div className="flex items-baseline gap-1 mb-8">
-          <span className="text-text-primary font-extrabold text-4xl tracking-tight">{plan.price}</span>
-          <span className="text-text-muted text-sm">{plan.period}</span>
+        <div className="mb-8">
+          <div className="flex items-baseline gap-1">
+            <span className="text-text-primary font-extrabold text-4xl tracking-tight">{plan.price}</span>
+            <span className="text-text-muted text-sm">{plan.period}</span>
+          </div>
         </div>
 
         <ul className="space-y-3 mb-8 flex-1">
@@ -61,6 +64,14 @@ function PricingCard({ plan }) {
         >
         {plan.cta}
       </Button>
+      {/* V3 Task 8: secondary WhatsApp DM CTA. Renders nothing when
+          VITE_SUPPORT_WHATSAPP is unset. */}
+      <WhatsAppCTA
+        planName={plan.name}
+        variant="link"
+        className="mt-3 self-center"
+        label={`WhatsApp about ${plan.name}`}
+      />
     </motion.div>
   )
 }

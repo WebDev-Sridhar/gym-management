@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { fetchGymBySlug, fetchGymBySubdomain, fetchGymByCustomDomain, resolveSlugRedirect } from '../services/gymPublicService'
+import { fetchGymBySlug, fetchGymBySubdomain, fetchGymByCustomDomain, resolveSlugRedirect, fetchGymActivePlan } from '../services/gymPublicService'
 import { detectHost } from '../lib/host'
 import { useTenantMeta } from '../hooks/useTenantMeta'
 import PwaInstallBanner from '../components/PwaInstallBanner'
@@ -27,6 +27,10 @@ export function GymProvider({ children }) {
   const [gym, setGym] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  // V3 CMS rebuild: canonical lowercase plan ('free' | 'starter' | 'pro' |
+  // 'premium'). Drives single-page-vs-multi-page rendering in GymLayout +
+  // GymSinglePage. Defaults to 'free' so Solo Coach is the safe fallback.
+  const [activePlan, setActivePlan] = useState('free')
 
   // Sync document <head> metadata (title, theme-color, favicon, OG tags) with
   // the resolved tenant. No-ops on the main domain where gym stays null.
@@ -78,6 +82,11 @@ export function GymProvider({ children }) {
         if (cancelled) return
         if (data) {
           setGym(data)
+          // V3 CMS rebuild: fetch the plan in parallel-after style. Failure
+          // falls back to 'free' (Solo Coach) inside fetchGymActivePlan,
+          // so a missed lookup just renders the single-page experience.
+          fetchGymActivePlan(data.id)
+            .then(plan => { if (!cancelled) setActivePlan(plan) })
           return
         }
 
@@ -113,7 +122,7 @@ export function GymProvider({ children }) {
   }, [resolveKey])
 
   return (
-    <GymContext.Provider value={{ gym, loading, error, hostInfo }}>
+    <GymContext.Provider value={{ gym, loading, error, hostInfo, activePlan, isSoloCoach: activePlan === 'free' }}>
       {children}
       {gym && <PwaInstallBanner logo={gym.logo_url} appName={gym.name} />}
     </GymContext.Provider>

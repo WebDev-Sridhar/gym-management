@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import { fetchTrainerInvites, createTrainerInvite, deleteTrainerInvite, sendTrainerInvite } from '../../services/membershipService'
@@ -7,6 +8,7 @@ import { useDialog } from '../../components/ui/Dialog'
 import CustomSelect from '../../components/ui/CustomSelect'
 import { Sk } from '../../components/ui/Skeleton'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
+import UpgradeRequiredModal from '../../components/ui/UpgradeRequiredModal'
 
 function TrainersSkeleton() {
   return (
@@ -47,6 +49,9 @@ export default function TrainersPage() {
   const [showForm, setShowForm]   = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]         = useState('')
+  // V3 Task 7: see MembersPage — same upgrade-modal pattern, same error shape.
+  const [upgradeContext, setUpgradeContext] = useState(null)
+  const navigate = useNavigate()
 
   const [name, setName]   = useState('')
   const [phone, setPhone] = useState('')
@@ -157,7 +162,11 @@ export default function TrainersPage() {
       setSendInviteOnCreate(true)   // reset to default for next add
       setShowForm(false)
     } catch (err) {
-      setError(err.message || 'Failed to add trainer')
+      if (err.code === 'quota_exceeded' || err.code === 'subscription_expired') {
+        setUpgradeContext(err)
+      } else {
+        setError(err.message || 'Failed to add trainer')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -406,6 +415,14 @@ export default function TrainersPage() {
             + Add First Trainer
           </button>
         </div>
+      )}
+
+      {upgradeContext && (
+        <UpgradeRequiredModal
+          context={upgradeContext}
+          onClose={() => setUpgradeContext(null)}
+          onUpgrade={() => { setUpgradeContext(null); navigate('/owner-dashboard/subscription') }}
+        />
       )}
     </div>
   )

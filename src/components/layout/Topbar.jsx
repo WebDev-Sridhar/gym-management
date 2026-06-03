@@ -30,9 +30,12 @@ function timeAgo(iso) {
 }
 
 function statusConfig(status) {
-  if (status === 'active')  return { label: 'Active',  Icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50',  border: 'border-green-200' }
-  if (status === 'pending') return { label: 'Pending', Icon: Clock,        color: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200' }
-  return                           { label: 'Inactive',Icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50',    border: 'border-red-200' }
+  if (status === 'active')    return { label: 'Active',    Icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50',  border: 'border-green-200' }
+  if (status === 'trial')     return { label: 'Trial',     Icon: Clock,        color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200' }
+  if (status === 'pending')   return { label: 'Pending',   Icon: Clock,        color: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200' }
+  if (status === 'expired')   return { label: 'Expired',   Icon: AlertCircle,  color: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-200' }
+  if (status === 'cancelled') return { label: 'Cancelled', Icon: AlertCircle,  color: 'text-gray-600',   bg: 'bg-gray-50',   border: 'border-gray-200' }
+  return                             { label: 'Inactive',  Icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50',    border: 'border-red-200' }
 }
 
 export default function Topbar({ onMenuToggle }) {
@@ -231,7 +234,9 @@ export default function Topbar({ onMenuToggle }) {
               const sc  = statusConfig(sub?.status || 'inactive')
               const { Icon: StatusIcon } = sc
               const expiresAt = sub?.expires_at ? new Date(sub.expires_at) : null
-              const daysLeft  = expiresAt ? Math.ceil((expiresAt - new Date()) / 86400000) : null
+              // Floor matches AuthContext.trialDaysLeft + SubscriptionPage so
+              // the trial/expiry day count agrees across banner, dropdown, page.
+              const daysLeft  = expiresAt ? Math.max(0, Math.floor((expiresAt - new Date()) / 86400000)) : null
 
               return (
                 <div data-profile-dropdown style={{
@@ -292,11 +297,16 @@ export default function Topbar({ onMenuToggle }) {
                           {sc.label}
                         </span>
                       </div>
-                      {daysLeft !== null && (
+                      {/* Solo Coach (free + active) has a 2099 sentinel
+                          expires_at — suppress the silly "Expires in 26000
+                          days" line for that case. */}
+                      {daysLeft !== null && !(sub?.status === 'active' && sub?.plan_name === 'free') && (
                         <p style={{ fontSize: 11, color: daysLeft <= 7 ? '#d97706' : '#9ca3af', margin: 0 }}>
-                          {daysLeft > 0
-                            ? `Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
-                            : 'Subscription expired'}
+                          {sub?.status === 'expired' || daysLeft <= 0
+                            ? 'Subscription expired'
+                            : sub?.status === 'trial'
+                              ? `Trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
+                              : `Renews in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`}
                         </p>
                       )}
                     </div>

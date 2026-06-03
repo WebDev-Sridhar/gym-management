@@ -153,44 +153,138 @@ export function welcomeEmail(args: {
   return { subject: `Welcome to ${gymName}`, html: gymShell(args.gym, body) }
 }
 
-export function dailySummaryEmail(args: {
+// V3 weekly rewrite (2026-06-02): Sunday-evening owner digest. Replaces the
+// thin "today only" daily that didn't carry decision-grade info. Shows
+// week-over-week revenue trend + action lists (overdue pending payments,
+// at-risk ghost cohort, members expiring next week).
+export function weeklySummaryEmail(args: {
   ownerName: string
   gym: GymCtx
-  pendingCount: number
-  pendingAmount: number
+  periodStart?: string
+  periodEnd?: string
+  newMembersCount: number
   expiringCount: number
-  revenueToday: number
+  expiringList?: Array<{ name: string; expiryDate: string }>
+  revenueThisWeek: number
+  revenueLastWeek: number
+  revenueDelta?: number | null    // % change vs last week; null when last week was 0
+  pendingOldList?: Array<{ name: string; amount: number; ageDays: number }>
+  pendingOldTotal?: number
+  newGhostsCount: number
+  newGhostsList?: Array<{ name: string; lastCheckin: string }>
+  whatsappUsed?: number | null
+  whatsappCap?: number | null
 }): { subject: string; html: string } {
   const gymName = safe(args.gym.name, 'Your gym')
-  const date = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  const brand   = args.gym.theme_color || '#8B5CF6'
+  const weekRange = args.periodStart && args.periodEnd
+    ? `${formatShortDate(args.periodStart)} – ${formatShortDate(args.periodEnd)}`
+    : 'this week'
+
+  const deltaPill = (() => {
+    if (args.revenueDelta === null || args.revenueDelta === undefined) {
+      return `<span style="color:#6b7280;font-size:12px;">first week tracked</span>`
+    }
+    const isUp = args.revenueDelta >= 0
+    const bg   = isUp ? '#d1fae5' : '#fee2e2'
+    const fg   = isUp ? '#065f46' : '#991b1b'
+    const arrow = isUp ? '▲' : '▼'
+    return `<span style="background:${bg};color:${fg};font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;">${arrow} ${Math.abs(args.revenueDelta)}% vs last week</span>`
+  })()
+
+  const expiringSection = (args.expiringList && args.expiringList.length > 0) ? `
+    <div style="margin-top:18px;">
+      <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;">Expiring next 7 days (${args.expiringCount})</div>
+      <table role="presentation" width="100%" style="background:#fef3c7;border-radius:10px;padding:12px;">
+        ${args.expiringList.slice(0, 5).map(m => `
+          <tr>
+            <td style="font-size:13px;color:#78350f;padding:3px 0;">${safe(m.name)}</td>
+            <td align="right" style="font-size:12px;color:#92400e;font-weight:600;">${formatShortDate(m.expiryDate)}</td>
+          </tr>
+        `).join('')}
+        ${args.expiringList.length > 5 ? `<tr><td colspan="2" style="font-size:11px;color:#92400e;padding-top:6px;font-style:italic;">+ ${args.expiringList.length - 5} more</td></tr>` : ''}
+      </table>
+    </div>
+  ` : ''
+
+  const pendingSection = (args.pendingOldList && args.pendingOldList.length > 0) ? `
+    <div style="margin-top:18px;">
+      <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;">⚠ Pending ≥ 7 days — needs a call</div>
+      <table role="presentation" width="100%" style="background:#fee2e2;border-radius:10px;padding:12px;">
+        ${args.pendingOldList.map(p => `
+          <tr>
+            <td style="font-size:13px;color:#7f1d1d;padding:3px 0;">${safe(p.name)} <span style="color:#991b1b;font-size:11px;">· ${p.ageDays}d old</span></td>
+            <td align="right" style="font-size:12px;color:#991b1b;font-weight:600;">₹${Number(p.amount).toLocaleString('en-IN')}</td>
+          </tr>
+        `).join('')}
+        ${args.pendingOldTotal && args.pendingOldList.length > 1 ? `
+          <tr><td colspan="2" style="border-top:1px solid #fecaca;padding-top:6px;font-size:12px;color:#7f1d1d;font-weight:700;">
+            Total: ₹${Number(args.pendingOldTotal).toLocaleString('en-IN')}
+          </td></tr>
+        ` : ''}
+      </table>
+    </div>
+  ` : ''
+
+  const ghostSection = (args.newGhostsList && args.newGhostsList.length > 0) ? `
+    <div style="margin-top:18px;">
+      <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;">At risk — newly inactive this week (${args.newGhostsCount})</div>
+      <table role="presentation" width="100%" style="background:#f3f4f6;border-radius:10px;padding:12px;">
+        ${args.newGhostsList.slice(0, 5).map(g => `
+          <tr>
+            <td style="font-size:13px;color:#374151;padding:3px 0;">${safe(g.name)}</td>
+            <td align="right" style="font-size:12px;color:#6b7280;">last seen ${formatShortDate(g.lastCheckin)}</td>
+          </tr>
+        `).join('')}
+      </table>
+    </div>
+  ` : ''
+
+  const quotaSection = (args.whatsappCap && args.whatsappCap > 0) ? `
+    <div style="margin-top:18px;font-size:12px;color:#6b7280;text-align:center;padding-top:14px;border-top:1px solid #f0f0f0;">
+      WhatsApp this period: <b style="color:#374151;">${args.whatsappUsed ?? 0} / ${args.whatsappCap}</b>
+      ${(args.whatsappUsed ?? 0) / args.whatsappCap >= 0.8 ? `<span style="color:#92400e;font-weight:600;"> · approaching cap</span>` : ''}
+    </div>
+  ` : ''
 
   const body = `
-    <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:6px;">Daily summary — ${date}</div>
-    <div style="color:#6b7280;margin-bottom:22px;">Good morning ${safe(args.ownerName)}, here's what's happening at <b>${gymName}</b>.</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:22px;">
+    <div style="font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Weekly recap · ${weekRange}</div>
+    <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:6px;">Hi ${safe(args.ownerName)},</div>
+    <div style="color:#6b7280;margin-bottom:22px;">Here's how <b>${gymName}</b> did this week.</div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:18px;">
       <tr>
-        <td width="33%" style="background:#fef3c7;padding:14px;border-radius:10px;text-align:center;">
-          <div style="font-size:12px;color:#78350f;text-transform:uppercase;letter-spacing:0.5px;">Pending</div>
-          <div style="font-size:22px;font-weight:700;color:#92400e;margin-top:4px;">${args.pendingCount}</div>
-          <div style="font-size:12px;color:#92400e;">₹${Number(args.pendingAmount).toLocaleString('en-IN')}</div>
+        <td width="48%" style="background:#f9fafb;padding:16px;border-radius:10px;">
+          <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Revenue this week</div>
+          <div style="font-size:24px;font-weight:700;color:${brand};margin-top:4px;">₹${Number(args.revenueThisWeek).toLocaleString('en-IN')}</div>
+          <div style="margin-top:6px;">${deltaPill}</div>
         </td>
-        <td width="6"></td>
-        <td width="33%" style="background:#fee2e2;padding:14px;border-radius:10px;text-align:center;">
-          <div style="font-size:12px;color:#7f1d1d;text-transform:uppercase;letter-spacing:0.5px;">Expiring</div>
-          <div style="font-size:22px;font-weight:700;color:#991b1b;margin-top:4px;">${args.expiringCount}</div>
-          <div style="font-size:12px;color:#991b1b;">in 3 days</div>
-        </td>
-        <td width="6"></td>
-        <td width="33%" style="background:#d1fae5;padding:14px;border-radius:10px;text-align:center;">
-          <div style="font-size:12px;color:#064e3b;text-transform:uppercase;letter-spacing:0.5px;">Revenue</div>
-          <div style="font-size:22px;font-weight:700;color:#065f46;margin-top:4px;">₹${Number(args.revenueToday).toLocaleString('en-IN')}</div>
-          <div style="font-size:12px;color:#065f46;">today</div>
+        <td width="4%"></td>
+        <td width="48%" style="background:#f9fafb;padding:16px;border-radius:10px;">
+          <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">New joins</div>
+          <div style="font-size:24px;font-weight:700;color:#0f172a;margin-top:4px;">${args.newMembersCount}</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:6px;">${args.newMembersCount === 1 ? 'member' : 'members'} this week</div>
         </td>
       </tr>
     </table>
-    <div style="color:#6b7280;font-size:13px;">Open the Gymmobius dashboard for full details.</div>
+
+    ${pendingSection}
+    ${expiringSection}
+    ${ghostSection}
+    ${quotaSection}
+
+    <div style="color:#6b7280;font-size:13px;margin-top:22px;">Open the Gymmobius dashboard for the full picture.</div>
   `
-  return { subject: `📊 ${gymName} — daily summary`, html: gymShell(args.gym, body) }
+  return { subject: `📊 ${gymName} — weekly recap (${weekRange})`, html: gymShell(args.gym, body) }
+}
+
+// Helper for the weekly email date formatting. Defined here (not exported)
+// because it's only useful inside the template.
+function formatShortDate(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
 // Payment reminder. Was previously an inline <p>...</p> in notifications.ts

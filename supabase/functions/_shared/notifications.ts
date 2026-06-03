@@ -6,10 +6,11 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sendInteraktTemplate, normalizeIndianPhone } from './interakt.ts'
 import { sendEmail } from './resend.ts'
+import { getWhatsappQuotaState } from './whatsappQuota.ts'
 import {
   paymentConfirmationEmail,
   welcomeEmail,
-  dailySummaryEmail,
+  weeklySummaryEmail,
   saasPaymentReceiptEmail,
   memberInviteEmail,
   trainerInviteEmail,
@@ -34,7 +35,7 @@ export type NotificationType =
   | 'saas_expiry_alert'        // SaaS subscription expiring soon (owner-facing); distinct from
                                //   member-facing `expiry_alert` because subject/copy/template
                                //   differs (gym subscription vs gym membership).
-  | 'daily_summary'
+  | 'weekly_summary'
   | 'payment_confirmation'     // Member-facing — paid their gym
   | 'saas_payment_receipt'     // Owner-facing — paid for their Gymmobius subscription
   | 'welcome'                  // Member-facing — fires AFTER first successful payment ("active")
@@ -49,7 +50,7 @@ const CHANNEL_MAP: Record<NotificationType, Channel[]> = {
   payment_reminder:     ['whatsapp'],
   expiry_alert:         ['whatsapp'],
   saas_expiry_alert:    ['whatsapp'],
-  daily_summary:        ['whatsapp'],
+  weekly_summary:        ['whatsapp', 'email'],  // V3 weekly: both channels by default; caller passes preferredChannels to honor owner's pick
   payment_confirmation: ['email'],          // email is primary here
   saas_payment_receipt: ['email'],          // SaaS receipt is email-first; owners want a permanent record
   welcome:              ['whatsapp'],
@@ -65,7 +66,11 @@ function templateName(type: NotificationType): string {
     case 'payment_reminder':     return fromEnv('INTERAKT_TEMPLATE_PAYMENT_LINK',  'payment_reminder_link')
     case 'expiry_alert':         return fromEnv('INTERAKT_TEMPLATE_EXPIRY',        'membership_expiry_reminder')
     case 'saas_expiry_alert':    return fromEnv('INTERAKT_TEMPLATE_SAAS_EXPIRY',   'saas_expiry_reminder')
-    case 'daily_summary':        return fromEnv('INTERAKT_TEMPLATE_DAILY_SUMMARY', 'daily_summary')
+    // Interakt template fallback intentionally kept as 'daily_summary' —
+    // that's the existing approved template ID. Once you've registered a
+    // dedicated weekly template in Interakt, set INTERAKT_TEMPLATE_DAILY_SUMMARY
+    // (env var name unchanged for ops continuity) to its name.
+    case 'weekly_summary':        return fromEnv('INTERAKT_TEMPLATE_DAILY_SUMMARY', 'daily_summary')
     case 'payment_confirmation': return fromEnv('INTERAKT_TEMPLATE_PAYMENT_CONFIRM','payment_confirmation')
     case 'saas_payment_receipt': return fromEnv('INTERAKT_TEMPLATE_SAAS_RECEIPT',  'saas_payment_receipt')
     case 'welcome':              return fromEnv('INTERAKT_TEMPLATE_WELCOME',       'member_welcome')
@@ -83,7 +88,7 @@ export interface SendNotificationParams {
   userId?: string                 // owner / trainer auth uid
   memberId?: string               // for member-facing notifications
   triggeredBy?: 'manual' | 'cron' | 'system' | 'webhook'
-  // Optional explicit recipient overrides — used by daily_summary (owner phone/email)
+  // Optional explicit recipient overrides — used by weekly_summary (owner phone/email)
   recipientPhone?: string | null
   recipientEmail?: string | null
   recipientName?: string | null
@@ -95,6 +100,14 @@ interface ChannelResult {
   error?: string
 }
 
+// V3 Task 14 — reasons the engine drops the WhatsApp channel before dispatch.
+// Surfaced to callers via SendNotificationResult so manual paths can render
+// an upgrade modal and cron paths can log the fallback.
+//   - plan_disabled       → Solo Coach post-trial (cap = 0)
+//   - plan_excludes_type  → Solo Coach trial trying non-payment_reminder type
+//   - quota_exhausted     → used >= cap for the current billing period
+export type WhatsappBlockedReason = 'plan_disabled' | 'plan_excludes_type' | 'quota_exhausted'
+
 export interface SendNotificationResult {
   notificationId: string
   // 'skipped' = recipient opted out (M1 suppression); engine never tried
@@ -102,6 +115,9 @@ export interface SendNotificationResult {
   //            rejected) so dashboard alerting can ignore it.
   status: 'sent' | 'partial' | 'failed' | 'skipped'
   channelResults: Record<Channel, ChannelResult | undefined>
+  // V3 Task 14: when set, the engine intentionally suppressed WhatsApp.
+  // Callers may surface this (e.g. PaymentsPage upgrade modal) or log it.
+  whatsappBlockedReason?: WhatsappBlockedReason
 }
 
 /**
@@ -118,15 +134,57 @@ export async function sendNotification(p: SendNotificationParams): Promise<SendN
   //    the unmonitored noreply@gymmobius.com mailbox).
   const { data: gym } = await supabase
     .from('gyms')
-    .select('id, name, email, theme_color, whatsapp_enabled, email_enabled, daily_summary_enabled')
+    .select('id, name, email, theme_color, whatsapp_enabled, email_enabled, weekly_summary_enabled')
     .eq('id', gymId)
     .single()
 
   if (!gym) throw new Error(`gym ${gymId} not found`)
 
   // Daily summary respects its own toggle — short-circuit if disabled
-  if (type === 'daily_summary' && gym.daily_summary_enabled === false) {
+  if (type === 'weekly_summary' && gym.weekly_summary_enabled === false) {
     return { notificationId: '', status: 'sent', channelResults: {} as Record<Channel, ChannelResult | undefined> }
+  }
+
+  // V3 P0 lifecycle: when the gym's subscription is 'expired', hard-stop
+  // notifications. NO WhatsApp, NO email fallback, NO crons reach members.
+  // Two exceptions bypass via metadata.bypassExpiredCheck = true:
+  //   • saas_expiry_alert sent by expire-stale-records itself ("your
+  //     subscription expired, renew now") — chicken-and-egg
+  //   • saas_payment_receipt for the renewal payment that re-activates them
+  // Skipped rows are audited in `notifications` so the owner can see in
+  // their activity log that crons were intentionally suppressed.
+  const bypassExpiredCheck = metadata?.bypassExpiredCheck === true
+  if (!bypassExpiredCheck) {
+    const { data: gymSub } = await supabase
+      .from('subscriptions')
+      .select('status')
+      .eq('gym_id', gymId)
+      .in('status', ['active', 'trial', 'expired'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (gymSub?.status === 'expired') {
+      const { data: skipped } = await supabase
+        .from('notifications')
+        .insert({
+          gym_id: gymId,
+          user_id: userId ?? null,
+          member_id: memberId ?? null,
+          type,
+          channels: [],
+          status: 'skipped',
+          metadata: { ...metadata, suppressed_reason: 'subscription_expired' },
+          triggered_by: triggeredBy,
+          sent_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+      return {
+        notificationId: skipped?.id ?? '',
+        status: 'skipped',
+        channelResults: {} as Record<Channel, ChannelResult | undefined>,
+      }
+    }
   }
 
   // 2. Resolve recipient + check suppression in ONE round-trip.
@@ -190,11 +248,49 @@ export async function sendNotification(p: SendNotificationParams): Promise<SendN
   }
 
   // 3. Compute channels = (mapped channels for this type) ∩ (enabled gym channels)
-  const primary = CHANNEL_MAP[type]
+  //    + WhatsApp quota enforcement (V3 Task 14).
+  //
+  // The quota check runs ONLY when the type's primary set includes whatsapp
+  // and the gym hasn't disabled WhatsApp at the org level. We skip the DB
+  // round-trip for email-primary types (payment_confirmation, member_invite,
+  // trainer_invite, saas_payment_receipt) — they never hit WhatsApp anyway.
+  //
+  // Caller override (V3 weekly-summary): when metadata.preferredChannels is
+  // set, intersect with the type's default. Lets the owner pick channels
+  // per-notification-type without rewriting CHANNEL_MAP per-call. Used by
+  // the weekly summary cron — owner picks WhatsApp / Email / Both in the
+  // Communication page, edge function passes the array through.
+  const preferred = Array.isArray(metadata?.preferredChannels)
+    ? (metadata.preferredChannels as string[]).filter(c => c === 'whatsapp' || c === 'email') as Channel[]
+    : null
+  const primary = preferred && preferred.length > 0
+    ? CHANNEL_MAP[type].filter(c => preferred.includes(c))
+    : CHANNEL_MAP[type]
+  let whatsappBlockedReason: WhatsappBlockedReason | undefined
+  if (primary.includes('whatsapp') && gym.whatsapp_enabled !== false) {
+    const quota = await getWhatsappQuotaState(supabase, gymId)
+    if (!quota.whatsappEnabled) {
+      // Solo Coach post-trial: WhatsApp is a trial benefit only.
+      whatsappBlockedReason = 'plan_disabled'
+    } else if (quota.planName === 'free' && type !== 'payment_reminder') {
+      // Solo Coach trial: 50 lifetime, payment_reminder only — no automation.
+      whatsappBlockedReason = 'plan_excludes_type'
+    } else if (quota.remaining <= 0) {
+      whatsappBlockedReason = 'quota_exhausted'
+    }
+  }
+
   const channels: Channel[] = primary.filter((c) =>
-    (c === 'whatsapp' && gym.whatsapp_enabled !== false) ||
+    (c === 'whatsapp' && gym.whatsapp_enabled !== false && !whatsappBlockedReason) ||
     (c === 'email'    && gym.email_enabled    !== false)
   )
+
+  // Stamp the block reason into metadata for the audit row so the activity
+  // log can show "Sent via email — WhatsApp quota reached" without joining
+  // back to the subscription table at read time.
+  const effectiveMetadata = whatsappBlockedReason
+    ? { ...metadata, whatsapp_blocked_reason: whatsappBlockedReason }
+    : metadata
 
   // 4. Insert pending notification row up front so we have an id to update
   const { data: row, error: insErr } = await supabase
@@ -206,7 +302,7 @@ export async function sendNotification(p: SendNotificationParams): Promise<SendN
       type,
       channels: channels.length ? channels : primary,    // record what we attempted (or wanted to)
       status: 'pending',
-      metadata,
+      metadata: effectiveMetadata,
       triggered_by: triggeredBy,
     })
     .select('id')
@@ -251,7 +347,7 @@ export async function sendNotification(p: SendNotificationParams): Promise<SendN
     sent_at: new Date().toISOString(),
   }).eq('id', notificationId)
 
-  return { notificationId, status, channelResults: results }
+  return { notificationId, status, channelResults: results, whatsappBlockedReason }
 }
 
 // ─── Channel implementations ────────────────────────────────────────────────
@@ -356,16 +452,31 @@ async function sendEmailChannel(args: {
           portalUrl:    typeof args.metadata.portalUrl === 'string' ? args.metadata.portalUrl : undefined,
         })
         break
-      case 'daily_summary':
-        tpl = dailySummaryEmail({
+      case 'weekly_summary': {
+        // V3 weekly: forwards the new aggregation shape from the
+        // weekly-summary cron. All optional fields default to safe values
+        // so manual / test sends with sparse metadata still render.
+        const m = args.metadata as Record<string, unknown>
+        tpl = weeklySummaryEmail({
           ownerName: args.name ?? 'there',
           gym: args.gym,
-          pendingCount:  Number(args.metadata.pendingCount  ?? 0),
-          pendingAmount: Number(args.metadata.pendingAmount ?? 0),
-          expiringCount: Number(args.metadata.expiringCount ?? 0),
-          revenueToday:  Number(args.metadata.revenueToday  ?? 0),
+          periodStart:      typeof m.periodStart === 'string' ? m.periodStart : undefined,
+          periodEnd:        typeof m.periodEnd   === 'string' ? m.periodEnd   : undefined,
+          newMembersCount:  Number(m.newMembersCount ?? 0),
+          expiringCount:    Number(m.expiringCount   ?? 0),
+          expiringList:     Array.isArray(m.expiringList)   ? m.expiringList   as Array<{ name: string; expiryDate: string }> : [],
+          revenueThisWeek:  Number(m.revenueThisWeek ?? 0),
+          revenueLastWeek:  Number(m.revenueLastWeek ?? 0),
+          revenueDelta:     typeof m.revenueDelta === 'number' ? m.revenueDelta : null,
+          pendingOldList:   Array.isArray(m.pendingOldList) ? m.pendingOldList as Array<{ name: string; amount: number; ageDays: number }> : [],
+          pendingOldTotal:  Number(m.pendingOldTotal ?? 0),
+          newGhostsCount:   Number(m.newGhostsCount  ?? 0),
+          newGhostsList:    Array.isArray(m.newGhostsList)  ? m.newGhostsList  as Array<{ name: string; lastCheckin: string }> : [],
+          whatsappUsed:     typeof m.whatsappUsed === 'number' ? m.whatsappUsed : null,
+          whatsappCap:      typeof m.whatsappCap  === 'number' ? m.whatsappCap  : null,
         })
         break
+      }
       // Owner-facing SaaS subscription expiry. Distinct from `expiry_alert`
       // (member membership expiry) — different subject, billing URL instead
       // of a per-payment link, renders in saasShell (Gymmobius brand + logo).
@@ -444,7 +555,7 @@ function computeBodyValues(
         String(m.billingUrl ?? ''),                                      // {{4}} billing URL
       ]
     }
-    case 'daily_summary':
+    case 'weekly_summary':
       return [
         name,                                                            // {{1}} owner name
         `${m.pendingCount ?? 0} (₹${Number(m.pendingAmount ?? 0).toLocaleString('en-IN')})`,  // {{2}} pending

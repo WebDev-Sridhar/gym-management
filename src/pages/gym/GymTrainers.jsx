@@ -55,10 +55,12 @@ export default function GymTrainers() {
               <p className="text-xs font-bold tracking-[0.25em] uppercase mb-4 font-sans" style={{ color: 'var(--gym-primary)' }}>
                 {content?.trainers_page_label || 'Expert Coaches'}
               </p>
-              <h1 className="font-display text-white tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)' }}>
+              {/* Theme-aware page hero text. */}
+              <h1 className="font-display tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)', color: heroImg ? '#fff' : 'var(--gym-text)' }}>
                 {content?.trainers_page_title ? content.trainers_page_title.toUpperCase() : <>MEET THE<br />COACHES</>}
               </h1>
-              <p className={`text-white/40 mt-6 font-sans leading-relaxed ${heroAlign === 'center' ? 'max-w-md mx-auto' : 'max-w-md'}`}>
+              <p className={`mt-6 font-sans leading-relaxed ${heroAlign === 'center' ? 'max-w-md mx-auto' : 'max-w-md'}`}
+                 style={{ color: heroImg ? 'rgba(255,255,255,0.4)' : 'var(--gym-text-muted)' }}>
                 {content?.trainers_page_desc || defaults.trainers.subtitle}
               </p>
             </motion.div>

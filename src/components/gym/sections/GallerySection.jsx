@@ -6,6 +6,14 @@ export default function GallerySection({ defaults, content }) {
     ? content.gallery_images.map((src, i) => ({ id: i, src, alt: '' }))
     : defaults.gallery
 
+  // V3 CMS fix: heading fields are owner-editable (Pro+ via edit_headings).
+  // Fall back to canonical defaults so Starter / Solo Coach gyms still get
+  // sensible copy without having to set these. KEEP IN SYNC with the
+  // placeholders shown in the WebsitePage + StarterWebsitePage GalleryPanel.
+  const label    = content?.gallery_label    || 'Inside Look'
+  const heading  = (content?.gallery_heading || 'OUR SPACE').toUpperCase()
+  const subtitle = content?.gallery_subtitle || 'See the facility where champions are made.'
+
   return (
     <motion.section
       variants={staggerContainer}
@@ -15,16 +23,17 @@ export default function GallerySection({ defaults, content }) {
       style={{ background: 'var(--gym-surface)', borderTop: '1px solid var(--gym-border)' }}
     >
       <div className="max-w-6xl mx-auto px-6" style={{ paddingBlock: "var(--gym-section-py)" }}>
-        {/* Header */}
+        {/* Header — theme-aware text vars (was hardcoded white before,
+            invisible on light-mode surface). */}
         <motion.div variants={fadeUp} className="mb-12 flex items-end justify-between flex-wrap gap-4">
           <div>
             <p className="text-xs font-bold tracking-[0.25em] uppercase mb-3 font-sans" style={{ color: 'var(--gym-primary)' }}>
-              Inside Look
+              {label}
             </p>
-            <h2 className="font-display text-white tracking-wide" style={{ fontSize: 'var(--gym-h2-size)' }}>OUR SPACE</h2>
+            <h2 className="font-display tracking-wide" style={{ fontSize: 'var(--gym-h2-size)', color: 'var(--gym-text)' }}>{heading}</h2>
           </div>
-          <p className="text-white/40 text-sm font-sans max-w-xs leading-relaxed">
-            See the facility where champions are made.
+          <p className="text-sm font-sans max-w-xs leading-relaxed" style={{ color: 'var(--gym-text-muted)' }}>
+            {subtitle}
           </p>
         </motion.div>
 

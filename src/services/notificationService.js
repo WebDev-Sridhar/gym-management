@@ -6,7 +6,7 @@ import { applyBranchFilter } from '../lib/branchQuery'
 export async function fetchGymCommSettings(gymId) {
   const { data, error } = await supabase
     .from('gyms')
-    .select('whatsapp_enabled, email_enabled, daily_summary_enabled')
+    .select('whatsapp_enabled, email_enabled, weekly_summary_enabled, summary_channels')
     .eq('id', gymId)
     .single()
   if (error) throw error
@@ -14,15 +14,22 @@ export async function fetchGymCommSettings(gymId) {
 }
 
 export async function updateGymCommSettings(gymId, prefs) {
+  // V3 weekly: summary_channels is a text[] (subset of {whatsapp, email},
+  // ≥ 1 element — DB CHECK enforces both). UI guarantees ≥ 1 by disabling
+  // the last toggle when only one is selected.
+  const update = {
+    whatsapp_enabled:      !!prefs.whatsapp_enabled,
+    email_enabled:         !!prefs.email_enabled,
+    weekly_summary_enabled: !!prefs.weekly_summary_enabled,
+  }
+  if (Array.isArray(prefs.summary_channels) && prefs.summary_channels.length > 0) {
+    update.summary_channels = prefs.summary_channels.filter(c => c === 'whatsapp' || c === 'email')
+  }
   const { data, error } = await supabase
     .from('gyms')
-    .update({
-      whatsapp_enabled:      !!prefs.whatsapp_enabled,
-      email_enabled:         !!prefs.email_enabled,
-      daily_summary_enabled: !!prefs.daily_summary_enabled,
-    })
+    .update(update)
     .eq('id', gymId)
-    .select('whatsapp_enabled, email_enabled, daily_summary_enabled')
+    .select('whatsapp_enabled, email_enabled, weekly_summary_enabled, summary_channels')
     .single()
   if (error) throw error
   return data

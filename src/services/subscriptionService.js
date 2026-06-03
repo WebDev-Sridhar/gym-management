@@ -8,11 +8,74 @@ import { supabaseData as supabase } from './supabaseClient'
  * The plan's price is enforced server-side from the SAAS_PLANS allow-list —
  * frontend cannot tamper with the amount.
  */
-export async function createSubscriptionOrder({ planName, price, durationDays }) {
+export async function createSubscriptionOrder({ planName, price, durationDays, isFounderPricing }) {
   const { data, error } = await supabase.functions.invoke('create-subscription-order', {
-    body: { planName, price, durationDays },
+    body: { planName, price, durationDays, isFounderPricing },
   })
-  if (error) throw error
+  if (error) {
+    // V3 Task 11: surface the structured founder-slots-full error so the
+    // UI can render "Founder slots filled — standard pricing applies"
+    // and retry without the flag.
+    let body = null
+    try { body = await error.context?.json?.() } catch {}
+    const message = body?.message || body?.error || error.message
+    const e = new Error(message)
+    if (body?.error) {
+      e.code        = body.error
+      e.slots_total = body.slots_total
+      e.slots_used  = body.slots_used
+    }
+    throw e
+  }
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
+/**
+ * V3 Task 11 / Task 8: how many of the 100 founder-pricing slots have
+ * been claimed. Calls the public.founder_slots_used() RPC (SECURITY
+ * DEFINER) so anon visitors on the marketing pricing page can read the
+ * aggregate without RLS access to subscriptions.
+ *
+ * Returns null if the RPC errors — caller should fall back to hiding
+ * the counter rather than showing "?/100".
+ */
+export async function fetchFounderSlotsUsed() {
+  const { data, error } = await supabase.rpc('founder_slots_used')
+  if (error) return null
+  return typeof data === 'number' ? data : 0
+}
+
+/**
+ * V3 Task 10: starts the no-card 30-day uniform trial. Creates a
+ * subscription with plan_name='free', status='trial'. After 30 days the
+ * gym either pays (status → 'active', plan_name → chosen paid tier) or
+ * lapses to Solo Coach (WhatsApp disabled per featureGates.getWhatsappCap).
+ *
+ * Returns the inserted subscription row plus trialDays / trialEndsAt for
+ * the success screen.
+ *
+ * Throws an Error with `.code === 'subscription_exists'` (status 409) when
+ * the gym already has a trial / pending / active subscription — caller can
+ * branch on that to show "you already have a trial" copy.
+ */
+export async function startTrialSubscription() {
+  const { data, error } = await supabase.functions.invoke('start-trial-subscription', {
+    body: {},
+  })
+  if (error) {
+    let body = null
+    try { body = await error.context?.json?.() } catch {}
+    const message = body?.message || body?.error || error.message
+    const e = new Error(message)
+    if (body?.error) {
+      e.code             = body.error
+      e.existing_status  = body.existing_status
+      e.existing_plan    = body.existing_plan
+      e.existing_expires = body.existing_expires
+    }
+    throw e
+  }
   if (data?.error) throw new Error(data.error)
   return data
 }
@@ -93,15 +156,17 @@ export async function openSubscriptionCheckout({ orderId, amount, currency = 'IN
 }
 
 /**
- * Fetch the active subscription for a gym.
- * Reuses the same query pattern as userService.fetchSubscription.
+ * Fetch the current subscription for a gym (active, trial, or pending).
+ * Reuses the same query pattern as userService.fetchSubscription, but
+ * also includes 'pending' so the post-Razorpay-checkout success screen
+ * can render the row before the webhook flips it to 'active'.
  */
 export async function fetchSubscription(gymId) {
   const { data, error } = await supabase
     .from('subscriptions')
     .select('*')
     .eq('gym_id', gymId)
-    .in('status', ['active', 'pending'])
+    .in('status', ['active', 'trial', 'pending', 'expired'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()

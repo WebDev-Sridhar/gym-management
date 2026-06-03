@@ -46,7 +46,7 @@ function CommunicationSkeleton() {
 const TYPE_LABEL = {
   payment_reminder:     'Payment reminder',
   expiry_alert:         'Expiry alert',
-  daily_summary:        'Daily summary',
+  weekly_summary:       'Weekly summary',
   payment_confirmation: 'Payment confirmation',
   welcome:              'Welcome / test',
 }
@@ -194,7 +194,7 @@ export default function CommunicationPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-gray-900">WhatsApp messages</p>
-              <p className="text-xs text-gray-500 mt-0.5">Payment reminders, expiry alerts, daily summary, win-back nudges</p>
+              <p className="text-xs text-gray-500 mt-0.5">Payment reminders, expiry alerts, weekly summary, win-back nudges</p>
             </div>
             <Toggle value={prefs.whatsapp_enabled} onChange={(v) => setPrefs({ ...prefs, whatsapp_enabled: v })} />
           </div>
@@ -205,12 +205,57 @@ export default function CommunicationPage() {
             </div>
             <Toggle value={prefs.email_enabled} onChange={(v) => setPrefs({ ...prefs, email_enabled: v })} />
           </div>
-          <div className="flex items-center justify-between gap-4 pt-4 border-t border-gray-100">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Daily summary</p>
-              <p className="text-xs text-gray-500 mt-0.5">8 AM digest with pending payments and expiring members</p>
+          {/* V3 weekly rewrite: master on/off + single-channel picker.
+              The DB column is still text[] (summary_channels), but the UI
+              only writes single-element arrays. The engine reads the
+              array — when it's ['whatsapp'], the existing email-fallback
+              path fires automatically if Interakt errors. When it's
+              ['email'], email only (no fallback — that IS the choice). */}
+          <div className="pt-4 border-t border-gray-100 space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Weekly summary</p>
+                <p className="text-xs text-gray-500 mt-0.5">Sunday 6 PM recap — revenue, new joins, expiring & at-risk members</p>
+              </div>
+              <Toggle value={prefs.weekly_summary_enabled} onChange={(v) => setPrefs({ ...prefs, weekly_summary_enabled: v })} />
             </div>
-            <Toggle value={prefs.daily_summary_enabled} onChange={(v) => setPrefs({ ...prefs, daily_summary_enabled: v })} />
+
+            {/* Channel picker — segmented control, single selection.
+                Legacy rows that had both channels resolve to 'whatsapp'
+                (it was the primary; email was the fallback in disguise). */}
+            {prefs.weekly_summary_enabled && (() => {
+              const arr = Array.isArray(prefs.summary_channels) ? prefs.summary_channels : []
+              const selected = arr.includes('email') && !arr.includes('whatsapp') ? 'email' : 'whatsapp'
+              const pick = (channel) => setPrefs({ ...prefs, summary_channels: [channel] })
+
+              const Btn = ({ value, label, sub }) => {
+                const active = selected === value
+                return (
+                  <button
+                    type="button"
+                    onClick={() => pick(value)}
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-left transition-all border ${
+                      active
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">{label}</span>
+                    <span className={`block text-[11px] mt-0.5 ${active ? 'text-indigo-100' : 'text-gray-400'}`}>{sub}</span>
+                  </button>
+                )
+              }
+
+              return (
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">Send via</p>
+                  <div className="flex gap-2">
+                    <Btn value="whatsapp" label="WhatsApp" sub="Falls back to email if WhatsApp fails" />
+                    <Btn value="email"    label="Email"    sub="Email only — no fallback" />
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </div>
 

@@ -146,10 +146,10 @@ export default function BranchesPage() {
         <div className="w-14 h-14 rounded-xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
           <Building2 size={24} className="text-indigo-600" strokeWidth={1.8} />
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-1">Multi-branch is an Enterprise feature</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-1">Multi-branch is a Premium feature</h2>
         <p className="text-sm text-gray-500">
           Run multiple locations under one account — manage members, payments, and analytics per branch.
-          Upgrade to Enterprise to unlock branch management.
+          Upgrade to Premium to unlock branch management.
         </p>
       </div>
     )

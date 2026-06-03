@@ -26,6 +26,27 @@ import {
  */
 
 export const BANNERS = [
+  // ── Subscription expired ─────────────────────────────────────────────
+  // V3 P0 lifecycle: highest priority (200), non-dismissible. Pairs with
+  // the red strip in DashboardLayout — strip is the always-visible
+  // reminder, this card carries the explanatory copy + CTA on every
+  // page the predicate matches.
+  {
+    id: 'subscription_expired',
+    pages: ['dashboard', 'members', 'payments', 'plans', 'analytics', 'website', 'trainers', 'communication'],
+    priority: 200,
+    variant: 'warning',
+    backgroundType: 'soft',
+    icon: AlertTriangle,
+    label: 'Action required',
+    title: 'Your Gymmobius subscription has expired',
+    description: 'Renew now to unlock WhatsApp dispatch, new member additions, and new branches. Existing data is preserved — nothing was deleted.',
+    ctaLabel: 'Renew subscription',
+    ctaPath:  '/owner-dashboard/subscription',
+    dismissible: false,
+    visible: ({ subscription }) => subscription?.status === 'expired',
+  },
+
   // ── Payment setup ────────────────────────────────────────────────────
   {
     id: 'setup_payments',
@@ -95,8 +116,10 @@ export const BANNERS = [
     // No publish flag in DB yet — treat "website never opened" as not live.
     // Owner gets the banner until they dismiss it (1-time guidance).
     visible: ({ gym, subscription }) => {
-      const plan = subscription?.plan_name
-      const proPlus = plan === 'Pro' || plan === 'Enterprise'
+      // V3 Task 1: plan_name is canonical lowercase from DB; accept legacy
+      // mixed-case in case any old client cached state references it.
+      const plan = (subscription?.plan_name || '').toLowerCase()
+      const proPlus = plan === 'pro' || plan === 'premium'
       // Only relevant to Pro+ — Starter doesn't have a full builder.
       if (!proPlus) return false
       // Soft heuristic: if no hero customisations, treat as un-published
@@ -135,7 +158,11 @@ export const BANNERS = [
     ctaLabel: 'Upgrade to Pro',
     ctaPath:  '/owner-dashboard/subscription',
     dismissible: true,
-    visible: ({ subscription }) => (subscription?.plan_name || 'Starter') === 'Starter',
+    visible: ({ subscription }) => {
+      // V3 Task 1: plan_name canonicalized to lowercase
+      const plan = (subscription?.plan_name || 'starter').toLowerCase()
+      return plan === 'starter' || plan === 'free'
+    },
   },
 
   // ── Analytics education (informational) ──────────────────────────────

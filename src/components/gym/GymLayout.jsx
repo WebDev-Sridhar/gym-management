@@ -1,11 +1,23 @@
 import { useEffect } from 'react'
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, Link, Navigate, useLocation } from 'react-router-dom'
 import { GymProvider, useGym } from '../../store/GymContext'
 import GymNavbar from './GymNavbar'
+import GymSinglePage from '../../pages/gym/GymSinglePage'
 import { getFullThemeCSSVars, getFontStack } from '../../lib/gymTheme'
 import { SocialIcon } from '../../lib/socialPlatforms.jsx'
 import { useDocumentHead } from '../../hooks/useDocumentHead'
 import { getPublicBasePath } from '../../lib/host'
+
+// V3 CMS rebuild: Solo Coach (free plan) has a single-page site. Multi-
+// page paths that exist for paid plans (/about, /pricing, etc.) get
+// redirected to the matching anchor on the homepage. Legal pages, login,
+// and join stay routed normally because they're standalone surfaces.
+const SOLO_PATH_TO_HASH = {
+  about:    '#about',
+  pricing:  '#plans',
+  trainers: '#about',  // Solo Coach = one person; "trainers" makes no sense, send to About
+  contact:  '#contact',
+}
 
 export default function GymLayout() {
   return (
@@ -16,7 +28,8 @@ export default function GymLayout() {
 }
 
 function GymLayoutInner() {
-  const { gym, loading, error } = useGym()
+  const { gym, loading, error, isSoloCoach } = useGym()
+  const location = useLocation()
 
   // Per-gym browser tab + social-share metadata. Auto-restores SaaS defaults
   // when the user navigates away from the gym public site.
@@ -85,6 +98,28 @@ function GymLayoutInner() {
   // Host-aware base path: prefix slug on main domain, empty on subdomain / custom domain
   const base = getPublicBasePath(typeof window !== 'undefined' ? window.location.hostname : '', gym.slug)
 
+  // V3 CMS rebuild: Solo Coach redirect for multi-page paths. Path segment
+  // immediately after `base` is what we key on (e.g. /iron-paradise/pricing
+  // → 'pricing' → '#plans'). Legal/login/join paths are skipped.
+  if (isSoloCoach) {
+    const rest = location.pathname.startsWith(base)
+      ? location.pathname.slice(base.length).replace(/^\/+|\/+$/g, '')
+      : location.pathname.replace(/^\/+|\/+$/g, '')
+    const hash = SOLO_PATH_TO_HASH[rest]
+    if (hash) {
+      return <Navigate to={`${base || '/'}${hash}`} replace />
+    }
+  }
+
+  // Whether to render GymSinglePage instead of the route Outlet. True
+  // when isSoloCoach AND we're at the gym root (or just `/` on a tenant
+  // host). False on legal/login/join — those still use Outlet.
+  const isAtGymRoot =
+    location.pathname === base ||
+    location.pathname === `${base}/` ||
+    location.pathname === '/'
+  const renderSinglePage = isSoloCoach && isAtGymRoot
+
   return (
     <div
       data-gym-theme={gym.theme_mode || 'dark'}
@@ -93,7 +128,7 @@ function GymLayoutInner() {
     >
       <GymNavbar />
       <main>
-        <Outlet />
+        {renderSinglePage ? <GymSinglePage /> : <Outlet />}
       </main>
 
       {/* Theme-aware footer */}
@@ -140,27 +175,49 @@ function GymLayoutInner() {
               )}
             </div>
 
-            {/* Navigate */}
+            {/* Navigate — anchor hrefs on Solo Coach (single-page site);
+                multi-page route paths for paid plans. */}
             <div className="md:col-span-2">
               <h4 className="text-xs tracking-[0.2em] uppercase mb-5 font-sans font-bold" style={{ color: 'var(--gym-text-muted)' }}>Navigate</h4>
               <ul className="space-y-3">
-                {[
-                  { to: base || '/', label: 'Home' },
-                  { to: `${base}/about`, label: 'About' },
-                  { to: `${base}/pricing`, label: 'Pricing' },
-                  { to: `${base}/trainers`, label: 'Trainers' },
-                  { to: `${base}/contact`, label: 'Contact' },
-                ].map(link => (
+                {(isSoloCoach
+                  ? [
+                      { to: `${base || '/'}#hero`,     label: 'Home',     anchor: true },
+                      { to: `${base || '/'}#about`,    label: 'About',    anchor: true },
+                      { to: `${base || '/'}#programs`, label: 'Programs', anchor: true },
+                      { to: `${base || '/'}#plans`,    label: 'Plans',    anchor: true },
+                      { to: `${base || '/'}#contact`,  label: 'Contact',  anchor: true },
+                    ]
+                  : [
+                      { to: base || '/',         label: 'Home' },
+                      { to: `${base}/about`,     label: 'About' },
+                      { to: `${base}/pricing`,   label: 'Pricing' },
+                      { to: `${base}/trainers`,  label: 'Trainers' },
+                      { to: `${base}/contact`,   label: 'Contact' },
+                    ]
+                ).map(link => (
                   <li key={link.to}>
-                    <Link
-                      to={link.to}
-                      className="text-sm transition-colors duration-200"
-                      style={{ color: 'var(--gym-text-secondary)' }}
-                      onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
-                      onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
-                    >
-                      {link.label}
-                    </Link>
+                    {link.anchor ? (
+                      <a
+                        href={link.to}
+                        className="text-sm transition-colors duration-200"
+                        style={{ color: 'var(--gym-text-secondary)' }}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={link.to}
+                        className="text-sm transition-colors duration-200"
+                        style={{ color: 'var(--gym-text-secondary)' }}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--gym-text)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--gym-text-secondary)'}
+                      >
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

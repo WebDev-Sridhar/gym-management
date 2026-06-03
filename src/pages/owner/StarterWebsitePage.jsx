@@ -1062,7 +1062,7 @@ function GalleryPanel({ content, gymId, onSave }) {
         isPending={galleryImgs.isPending}
         pendingUrls={galleryImgs.pendingUrls}
         selectMode={false}
-        planName="Starter"
+        planName={panelPlanName}
         label="Gallery Images"
         hint="Landscape or square photos work best. Uploaded as WebP for fast loading."
       />
@@ -1329,7 +1329,8 @@ function ContactPanel({ gym, gymId, onSave }) {
 
 // ─── Sidebar sections ───────────────────────────────────────────────────────────
 
-const SECTIONS = [
+// V3 CMS rebuild: full section list — the Starter variant shows everything.
+const STARTER_SECTIONS = [
   { id: 'theme',    label: 'Theme',             desc: 'Colors & branding' },
   { id: 'hero',     label: 'Hero Banner',       desc: 'Full-page landing section' },
   { id: 'about',    label: 'About Section',    desc: 'Story, stats & values' },
@@ -1344,9 +1345,31 @@ const SECTIONS = [
   { id: 'contact',  label: 'Contact Info',     desc: 'Phone, email & address' },
 ]
 
+// V3 CMS rebuild: Solo Coach single-page variant. Subset focused on what
+// actually appears on a one-page scrolling site. Skips: why_us (overlaps
+// About), vision (too much text for a single page), faq (rarely useful at
+// this tier), coaches (Solo Coach = one person; About covers it),
+// gallery (optional polish, omitted for focus).
+const SOLO_SECTIONS = [
+  { id: 'theme',    label: 'Theme',          desc: 'Colors & branding' },
+  { id: 'hero',     label: 'Hero Banner',    desc: 'Top section of your page' },
+  { id: 'about',    label: 'About',          desc: 'Your story' },
+  { id: 'programs', label: 'Programs',       desc: 'What you offer' },
+  { id: 'plans',    label: 'Plans & Pricing', desc: 'Membership plans' },
+  { id: 'reviews',  label: 'Reviews',        desc: 'Member feedback' },
+  { id: 'contact',  label: 'Contact Info',   desc: 'Phone, email & address' },
+]
+
+// Kept for backwards compat — older references to SECTIONS still resolve
+// to the full Starter list. New callers should pass variant explicitly.
+const SECTIONS = STARTER_SECTIONS
+
 // ─── Main component ─────────────────────────────────────────────────────────────
 
-export default function StarterWebsitePage() {
+// V3 CMS rebuild: SoloCoachWebsitePage is a thin wrapper that passes
+// variant='solo' to render the single-page subset. Routing in App.jsx
+// (WebsitePageRouter) picks between the variants based on plan_name.
+export default function StarterWebsitePage({ variant = 'starter' } = {}) {
   const { gymId } = useAuth()
   const [gym, setGym] = useState(null)
   const [content, setContent] = useState(null)
@@ -1357,7 +1380,14 @@ export default function StarterWebsitePage() {
   const [activeSection, setActiveSection] = useState('theme')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
-  const activeSectionDef = SECTIONS.find(s => s.id === activeSection)
+  // Section list + planName labels switch on variant. planName is passed
+  // down to child panels — they use it to gate Premium-only features
+  // (e.g. advanced image controls). Solo Coach gets 'free' so child
+  // gates align with featureGates.normalizePlan('free') → 'basic'.
+  const sections = variant === 'solo' ? SOLO_SECTIONS : STARTER_SECTIONS
+  const panelPlanName = variant === 'solo' ? 'free' : 'Starter'
+
+  const activeSectionDef = sections.find(s => s.id === activeSection)
 
   function selectSection(id) {
     setActiveSection(id)
@@ -1409,7 +1439,9 @@ export default function StarterWebsitePage() {
         )}
       </div>
 
-      {/* Pro upgrade banner */}
+      {/* Upgrade banner — copy differs by variant. Solo Coach is nudged
+          one step up (to Starter, which unlocks the full multi-page
+          public site). Starter is nudged to Pro (advanced CMS controls). */}
       <div className="flex items-center gap-3 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl">
         <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
           <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1417,10 +1449,21 @@ export default function StarterWebsitePage() {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-indigo-900">Upgrade to Pro for the full CMS</p>
-          <p className="hidden sm:block text-xs text-indigo-600 mt-0.5">Live preview, section heading editor, Design controls, page-level CTAs and more.</p>
+          {variant === 'solo' ? (
+            <>
+              <p className="text-sm font-semibold text-indigo-900">Upgrade to Starter for a multi-page website</p>
+              <p className="hidden sm:block text-xs text-indigo-600 mt-0.5">Dedicated About, Pricing, Trainers, and Contact pages — plus 500 WhatsApp/month and 150-member capacity.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-indigo-900">Upgrade to Pro for the full CMS</p>
+              <p className="hidden sm:block text-xs text-indigo-600 mt-0.5">Live preview, section heading editor, Design controls, page-level CTAs and more.</p>
+            </>
+          )}
         </div>
-        <span className="text-xs font-bold px-2.5 py-1 bg-indigo-600 text-white rounded-full shrink-0">Pro</span>
+        <span className="text-xs font-bold px-2.5 py-1 bg-indigo-600 text-white rounded-full shrink-0">
+          {variant === 'solo' ? 'Starter' : 'Pro'}
+        </span>
       </div>
 
       {/* Mobile section picker — sits above content, hidden on desktop */}
@@ -1435,7 +1478,7 @@ export default function StarterWebsitePage() {
         {mobileNavOpen && (
           <div className="mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-10 relative p-2">
             <ul className="space-y-0.5">
-              {SECTIONS.map(sec => (
+              {sections.map(sec => (
                 <li key={sec.id}>
                   <button type="button" onClick={() => selectSection(sec.id)}
                     className={`w-full text-left px-3 py-2.5 rounded-xl transition-all cursor-pointer ${activeSection === sec.id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'}`}>
@@ -1455,7 +1498,7 @@ export default function StarterWebsitePage() {
         {/* Sidebar — desktop only */}
         <nav className="cms-sidebar hidden lg:flex flex-col w-44 shrink-0 sticky top-6 overflow-y-auto overscroll-contain" style={{ height: 'calc(100vh - 8.5rem)' }}>
           <ul className="space-y-0.5">
-            {SECTIONS.map(sec => (
+            {sections.map(sec => (
               <li key={sec.id}>
                 <button
                   type="button"
@@ -1480,16 +1523,16 @@ export default function StarterWebsitePage() {
             <ThemePanel gym={gym} gymId={gymId} onSave={setGym} />
           )}
           {activeSection === 'hero' && (
-            <HeroForm content={content} gym={gym} gymId={gymId} planName="Starter" onSave={handleContentSave} onSaveGym={setGym} />
+            <HeroForm content={content} gym={gym} gymId={gymId} planName={panelPlanName} onSave={handleContentSave} onSaveGym={setGym} />
           )}
           {activeSection === 'about' && (
-            <AboutPanel content={content} gymId={gymId} onSave={handleContentSave} planName="Starter" />
+            <AboutPanel content={content} gymId={gymId} onSave={handleContentSave} planName={panelPlanName} />
           )}
           {activeSection === 'programs' && (
-            <ProgramsPanel content={content} gymId={gymId} onSave={handleContentSave} planName="Starter" />
+            <ProgramsPanel content={content} gymId={gymId} onSave={handleContentSave} planName={panelPlanName} />
           )}
           {activeSection === 'reviews' && (
-            <ReviewsPanel testimonials={testimonials} gymId={gymId} onUpdate={setTestimonials} planName="Starter" />
+            <ReviewsPanel testimonials={testimonials} gymId={gymId} onUpdate={setTestimonials} planName={panelPlanName} />
           )}
           {activeSection === 'why_us' && (
             <WhyUsPanel content={content} gymId={gymId} onSave={handleContentSave} />
@@ -1498,13 +1541,13 @@ export default function StarterWebsitePage() {
             <VisionPanel content={content} gymId={gymId} onSave={handleContentSave} />
           )}
           {activeSection === 'plans' && (
-            <PlansPanel plans={plans} content={content} gymId={gymId} onUpdate={setPlans} onSaveCms={handleContentSave} planName="Starter" />
+            <PlansPanel plans={plans} content={content} gymId={gymId} onUpdate={setPlans} onSaveCms={handleContentSave} planName={panelPlanName} />
           )}
           {activeSection === 'faq' && (
             <FAQPanel content={content} gymId={gymId} onSave={handleContentSave} />
           )}
           {activeSection === 'coaches' && (
-            <CoachesPanel trainers={trainers} gymId={gymId} onUpdate={setTrainers} planName="Starter" />
+            <CoachesPanel trainers={trainers} gymId={gymId} onUpdate={setTrainers} planName={panelPlanName} />
           )}
           {activeSection === 'gallery' && (
             <GalleryPanel content={content} gymId={gymId} onSave={handleContentSave} />

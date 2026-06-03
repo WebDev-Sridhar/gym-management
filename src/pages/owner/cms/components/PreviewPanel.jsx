@@ -113,11 +113,15 @@ function PageHeroPreview({ previewData, pageKey }) {
         <p className="font-sans font-bold uppercase mb-4" style={{ fontSize: '0.75rem', letterSpacing: '0.25em', color: 'var(--gym-primary)' }}>
           {label}
         </p>
-        <h1 className="font-display tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)', color: '#fff' }}>
+        {/* Page hero text color: white when there's a photo backdrop
+            (always-dark overlay), theme-aware otherwise. Without this,
+            light-mode owners with no hero image saw invisible white text
+            on the light surface backdrop. */}
+        <h1 className="font-display tracking-wide leading-none" style={{ fontSize: 'var(--gym-h1-size)', color: heroImg ? '#fff' : 'var(--gym-text)' }}>
           {title}
         </h1>
         {desc && (
-          <p className="mt-6 max-w-md font-sans leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)', marginInline: isCentered ? 'auto' : undefined }}>
+          <p className="mt-6 max-w-md font-sans leading-relaxed" style={{ color: heroImg ? 'rgba(255,255,255,0.5)' : 'var(--gym-text-muted)', marginInline: isCentered ? 'auto' : undefined }}>
             {desc}
           </p>
         )}

@@ -32,7 +32,7 @@ const MEMBER_REMIND_DAYS = [3, 1, 0]      // before/on expiry
 const SAAS_REMIND_DAYS   = [7, 3, 1, 0]
 
 Deno.serve(async (req) => {
-  // Audit C7 — validate CRON_SECRET (not service-role key). See daily-summary
+  // Audit C7 — validate CRON_SECRET (not service-role key). See weekly-summary
   // for the full rationale.
   const auth = req.headers.get('Authorization') ?? ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
@@ -93,7 +93,13 @@ Deno.serve(async (req) => {
 async function processMemberReminders(supabase: SupabaseClient) {
   const today = new Date()
   const todayStr = today.toISOString().slice(0, 10)
-  const stats = { found: 0, sent: 0, skipped: 0, failed: 0 }
+  const stats = {
+    found: 0, sent: 0, skipped: 0, failed: 0,
+    // V3 Task 14: emailFallback = engine downgraded the dispatch from WA→email
+    // (quota_exhausted, plan_disabled, etc.). Different from `failed` —
+    // member was still reached, just via a different channel.
+    emailFallback: 0,
+  }
 
   // Build expiry dates we care about: today + 3, today + 1, today
   const targets: string[] = []
@@ -113,8 +119,28 @@ async function processMemberReminders(supabase: SupabaseClient) {
   if (error) throw error
   stats.found = members?.length ?? 0
 
+  // V3 Task 14: gym → plan mapping for the Solo Coach "1 reminder per
+  // invoice, ever" rule (rest of the WhatsApp gating moved into the engine).
+  // Paid plans keep the per-day dedup; only 'free' tightens to lifetime.
+  const gymIds = Array.from(new Set((members ?? []).map(m => m.gym_id)))
+  const planByGym = new Map<string, string>()
+  if (gymIds.length > 0) {
+    const { data: subs } = await supabase
+      .from('subscriptions')
+      .select('gym_id, plan_name')
+      .in('gym_id', gymIds)
+      .in('status', ['active', 'trial'])
+      .order('created_at', { ascending: false })
+    for (const s of subs ?? []) {
+      if (!planByGym.has(s.gym_id)) planByGym.set(s.gym_id, s.plan_name)
+    }
+  }
+
   for (const m of members ?? []) {
     if (!m.phone || !m.plan) { stats.skipped++; continue }
+
+    const gymPlan = String(planByGym.get(m.gym_id) ?? 'free').toLowerCase()
+    const isSoloCoach = gymPlan === 'free'
 
     // Dedup: did we already send a reminder for this member today?
     const { data: existingPayment } = await supabase
@@ -129,17 +155,28 @@ async function processMemberReminders(supabase: SupabaseClient) {
       .maybeSingle()
 
     if (existingPayment) {
-      const { data: lastReminder } = await supabase
+      // Solo Coach (free): one reminder per invoice EVER. Paid plans dedup
+      // per-day. The lifetime check is a superset of the per-day check, so
+      // Solo Coach uses the same payment_reminders read but drops the date
+      // filter. Reason: post-trial Solo Coach uses email-only reminders,
+      // and we don't want a daily email bombarding their members.
+      const reminderQ = supabase
         .from('payment_reminders')
         .select('id, sent_at')
         .eq('payment_id', existingPayment.id)
-        .gte('sent_at', `${todayStr}T00:00:00Z`)
-        .maybeSingle()
+        .neq('status', 'failed')      // don't count failed-then-retry as "already reminded"
+      if (!isSoloCoach) reminderQ.gte('sent_at', `${todayStr}T00:00:00Z`)
+      const { data: lastReminder } = await reminderQ.limit(1).maybeSingle()
       if (lastReminder) { stats.skipped++; continue }
     }
 
     try {
-      await sendMemberReminder(supabase, m, existingPayment?.id ?? null)
+      const result = await sendMemberReminder(supabase, m, existingPayment?.id ?? null)
+      if (result?.whatsappBlockedReason) {
+        stats.emailFallback++
+        // Surface in logs so cron_runs detail page can render an aggregate.
+        console.log(`member ${m.id}: WhatsApp suppressed (${result.whatsappBlockedReason}) — email used`)
+      }
       stats.sent++
     } catch (err) {
       console.error(`member ${m.id} reminder failed:`, err)
@@ -154,7 +191,7 @@ async function sendMemberReminder(
   supabase: SupabaseClient,
   member: any,                                        // eslint-disable-line @typescript-eslint/no-explicit-any
   existingPaymentId: string | null,
-) {
+): Promise<{ whatsappBlockedReason?: string } | void> {
   const { data: gym } = await supabase
     .from('gyms')
     .select('id, name, payment_mode, upi_id, razorpay_enabled')
@@ -298,6 +335,10 @@ async function sendMemberReminder(
       branch_id: member.branch_id ?? null,
       payment_id: paymentId!,
       member_id: member.id,
+      // V3 Task 14: engine decides the channel based on quota. We claim
+      // with WhatsApp + interakt as the optimistic default; the post-
+      // dispatch update below corrects to email/resend if the engine
+      // fell back due to quota_exhausted / plan_disabled.
       channel: 'whatsapp',
       provider: 'interakt',
       template_name: 'pending',  // overwritten post-dispatch
@@ -342,25 +383,35 @@ async function sendMemberReminder(
     sendErr = err instanceof Error ? err.message : String(err)
   }
 
+  // V3 Task 14: the engine decides whether WhatsApp ran or was dropped to
+  // email by quota / plan. Audit the channel the engine actually used.
   const wa = notifResult?.channelResults.whatsapp
-  const whatsappSent = wa?.status === 'sent'
-  const whatsappError = wa?.error ?? sendErr ?? null
+  const em = notifResult?.channelResults.email
+  const usedWhatsapp = wa?.status === 'sent'
+  const usedEmail    = em?.status === 'sent'
+  const primaryResult = usedWhatsapp ? wa : em
+  const primarySent   = !!primaryResult && primaryResult.status === 'sent'
+  const primaryError  = primaryResult?.error ?? sendErr ?? null
 
-  // Fill in the result on the row we CLAIMED above.
+  // Reflect the actual dispatched channel in the audit row. If the engine
+  // suppressed WhatsApp the claim row gets corrected to email/resend.
   await supabase.from('payment_reminders').update({
     template_name: templateName,
-    status: whatsappSent ? 'sent' : 'failed',
-    provider_message_id: wa?.id ?? null,
+    channel:  usedWhatsapp ? 'whatsapp' : usedEmail ? 'email' : 'whatsapp',
+    provider: usedWhatsapp ? 'interakt' : usedEmail ? 'resend' : 'interakt',
+    status: primarySent ? 'sent' : 'failed',
+    provider_message_id: primaryResult?.id ?? null,
     link_sent: payLink,
-    error: whatsappError,
+    error: primaryError,
   }).eq('id', reminderRowId)
 
   // Only throw if BOTH primary AND email fallback failed. A successful
   // email fallback keeps the cron counter as "sent" — the member was
   // actually reached, just via a different channel.
   if (notifResult?.status === 'failed') {
-    throw new Error(whatsappError ?? 'notification dispatch failed')
+    throw new Error(primaryError ?? 'notification dispatch failed')
   }
+  return { whatsappBlockedReason: notifResult?.whatsappBlockedReason }
 }
 
 // ─── SaaS subscription reminders (gym owner notifications) ────────────────

@@ -19,6 +19,28 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { sendNotification } from '../_shared/notifications.ts'
 
+// V3 cadence fix (2026-06-02): a ghost stays a ghost every day after the
+// 5-day inactivity threshold. The RPC returns them daily, which previously
+// fanned out a fresh ghost_reminder every day to the same member.
+//
+// Escalating-then-stop cadence per owner decision: nudge at days 5, 14, 30
+// (relative to last_checkin) then go silent. After 30 days a member is
+// effectively churned — continuing to email them trains the gym's address
+// into spam folders. Owners run manual win-back campaigns past that point.
+//
+// Streak tracking: "how many reminders in this absence streak" = count of
+// ghost_reminder rows in the notifications table since the member's
+// last_checkin. A check-in resets the streak (next absence starts over
+// at #1).
+//
+// Configurable for ops tuning without a redeploy (e.g. set to
+// "5,14,30,60" if you want a longer tail).
+const GHOST_REMINDER_DAYS = (Deno.env.get('GHOST_REMINDER_DAYS') ?? '5,14,30')
+  .split(',')
+  .map(s => Number(s.trim()))
+  .filter(n => Number.isFinite(n) && n > 0)
+  .sort((a, b) => a - b)
+
 interface GhostRow {
   member_name: string
   gym_name:    string
@@ -28,7 +50,7 @@ interface GhostRow {
 }
 
 Deno.serve(async (req: Request) => {
-  // Audit C7 — validate CRON_SECRET (not service-role key). See daily-summary
+  // Audit C7 — validate CRON_SECRET (not service-role key). See weekly-summary
   // for the full rationale.
   const cronSecret = Deno.env.get('CRON_SECRET')
   if (!cronSecret) {
@@ -59,17 +81,26 @@ Deno.serve(async (req: Request) => {
     let sent = 0
     let failed = 0
     let skipped = 0
+    // V3 Task 14: emailFallback = engine downgraded WA→email (quota /
+    // plan_disabled). Different from `failed`. Audited per-call for
+    // observability without an extra plan lookup here — the engine knows.
+    let emailFallback = 0
+    // V3 cadence fix: how many members were eligible (RPC returned them)
+    // but already nudged enough times this absence streak — held off so
+    // we don't churn the email list.
+    let cadenceSkipped = 0
 
     for (const g of ghosts ?? []) {
       if (!g.phone) { skipped++; continue }
 
-      // The RPC doesn't return member_id / gym_id (we'd need to alter it).
-      // Match by phone for now — phones are gym-unique per the members
-      // create-guard, so this resolves a single member reliably. Daily
-      // cron + bounded ghost count means the extra round-trip is fine.
+      // The RPC doesn't return member_id / gym_id in the TS type (it does
+      // in the SQL — todo cleanup). Resolve by phone — phones are gym-
+      // unique per the members create-guard. last_checkin is also fetched
+      // so we can count ghost_reminder rows within the current absence
+      // streak (resets when the member returns).
       const { data: member } = await supabase
         .from('members')
-        .select('id, gym_id, email')
+        .select('id, gym_id, email, last_checkin')
         .eq('phone', g.phone)
         .ilike('name', g.member_name)         // belt + suspenders: name+phone == almost certainly unique
         .is('deleted_at', null)
@@ -85,6 +116,40 @@ Deno.serve(async (req: Request) => {
         continue
       }
 
+      // V3 cadence fix: escalating-then-stop schedule. Count ghost_reminder
+      // notifications since the member's last_checkin (= "during this
+      // absence streak"). Decide whether to send based on:
+      //   sentCount === 0 AND days_absent >= schedule[0]  → send #1
+      //   sentCount === 1 AND days_absent >= schedule[1]  → send #2
+      //   sentCount === N AND days_absent >= schedule[N]  → send #(N+1)
+      //   sentCount >= schedule.length                    → skip (max reached)
+      //
+      // Why "since last_checkin": if a ghost returns and goes inactive
+      // again 5 days later, they're a fresh streak — counter should reset
+      // automatically by virtue of the time window cutting off prior
+      // reminders.
+      //
+      // Failed rows are intentionally counted: if Interakt + Resend both
+      // errored, we should NOT push the next reminder one day early
+      // hoping it works. Manual replay path (Phase 5) handles retries.
+      const sinceStreakStart = member.last_checkin ?? '1970-01-01T00:00:00Z'
+      const { count: sentCount } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('member_id', member.id)
+        .eq('type', 'ghost_reminder')
+        .gte('created_at', sinceStreakStart)
+
+      const reminderIndex   = sentCount ?? 0
+      const reachedMax      = reminderIndex >= GHOST_REMINDER_DAYS.length
+      const dueThreshold    = reachedMax ? null : GHOST_REMINDER_DAYS[reminderIndex]
+      const notYetDue       = dueThreshold !== null && g.days_absent < dueThreshold
+      if (reachedMax || notYetDue) {
+        cadenceSkipped++
+        continue
+      }
+      const reminderNumber = reminderIndex + 1  // 1-indexed for templates / logs
+
       try {
         const result = await sendNotification({
           supabase,
@@ -93,14 +158,28 @@ Deno.serve(async (req: Request) => {
           memberId: member.id,
           triggeredBy: 'cron',
           metadata: {
-            daysInactive: g.days_absent,
-            planName:     g.plan_name ?? 'Membership',
+            daysInactive:   g.days_absent,
+            planName:       g.plan_name ?? 'Membership',
+            // V3 cadence fix: 1-indexed position in the escalating
+            // schedule (1 = first nudge, 2 = follow-up, 3 = final).
+            // Surfaced to the email template so future copy can escalate
+            // tone (warm → firmer → "checking in one last time").
+            reminderNumber,
+            reminderTotal:  GHOST_REMINDER_DAYS.length,
             // No portalUrl yet — would require resolving the gym's slug
             // here. Email template renders fine without it (button just
             // omitted). Follow-up: pass portalUrl once we add the gym
             // slug to the RPC return.
           },
         })
+
+        // V3 Task 14: Solo Coach trial doesn't permit ghost_reminder via
+        // WhatsApp (payment_reminder only), and any plan can hit quota.
+        // Engine handles both — log the reason for observability.
+        if (result.whatsappBlockedReason) {
+          emailFallback++
+          console.log(`ghost ${member.id}: WhatsApp suppressed (${result.whatsappBlockedReason}) — email used`)
+        }
 
         if (result.status === 'failed') failed++
         else                            sent++
@@ -112,7 +191,8 @@ Deno.serve(async (req: Request) => {
 
     const summary = {
       job_name: 'ghost-detection',
-      total, sent, failed, skipped,
+      total, sent, failed, skipped, emailFallback, cadenceSkipped,
+      schedule_days: GHOST_REMINDER_DAYS,
       started_at:  startedAt,
       finished_at: new Date().toISOString(),
     }

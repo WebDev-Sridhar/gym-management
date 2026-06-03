@@ -5,7 +5,7 @@ import { useGym } from '../../store/GymContext'
 import { getPublicBasePath } from '../../lib/host'
 
 export default function GymNavbar() {
-  const { gym } = useGym()
+  const { gym, isSoloCoach } = useGym()
   const location = useLocation()
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -29,13 +29,30 @@ export default function GymNavbar() {
   // even before the user scrolls. Home page still starts transparent (over dark photo hero).
   const isLightScrolled = !isDark && (scrolled || !isHomePage)
 
-  const links = [
-    { to: base, label: 'Home', end: true },
-    { to: `${base}/about`, label: 'About' },
-    { to: `${base}/pricing`, label: 'Pricing' },
-    { to: `${base}/trainers`, label: 'Trainers' },
-    { to: `${base}/contact`, label: 'Contact' },
-  ]
+  // V3 CMS rebuild: Solo Coach uses anchor links (#about / #plans /
+  // #contact) on a single scrolling page. `anchor: true` switches the
+  // renderer from <NavLink> (route navigation) to plain <a href=…>
+  // (browser scroll) below. The hash list mirrors the section IDs in
+  // GymSinglePage.jsx.
+  const links = isSoloCoach
+    ? [
+        { to: `${base || '/'}#hero`,     label: 'Home',     anchor: true, end: true },
+        { to: `${base || '/'}#about`,    label: 'About',    anchor: true },
+        { to: `${base || '/'}#programs`, label: 'Programs', anchor: true },
+        { to: `${base || '/'}#plans`,    label: 'Plans',    anchor: true },
+        { to: `${base || '/'}#contact`,  label: 'Contact',  anchor: true },
+      ]
+    : [
+        { to: base, label: 'Home', end: true },
+        { to: `${base}/about`, label: 'About' },
+        { to: `${base}/pricing`, label: 'Pricing' },
+        { to: `${base}/trainers`, label: 'Trainers' },
+        { to: `${base}/contact`, label: 'Contact' },
+      ]
+
+  // "Join Now" CTA target: paid plans go to /pricing page; Solo Coach
+  // scrolls to the inline #plans anchor on the same page.
+  const joinHref = isSoloCoach ? `${base || '/'}#plans` : `${base}/pricing`
 
   // Show solid/frosted bg when: scrolled (any mode) OR light mode on non-home page
   const showSolidBg = scrolled || isLightScrolled
@@ -85,20 +102,33 @@ export default function GymNavbar() {
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-1">
             {links.map(link => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                end={link.end}
-                className="px-4 py-2 text-sm font-sans transition-all duration-200 rounded-lg"
-                style={({ isActive }) => ({
-                  color: isActive ? textColor : textMutedColor,
-                  background: isActive ? activeBg : 'transparent',
-                })}
-                onMouseEnter={e => { if (!e.currentTarget.dataset.active) e.currentTarget.style.background = hoverBg }}
-                onMouseLeave={e => { if (!e.currentTarget.dataset.active) e.currentTarget.style.background = 'transparent' }}
-              >
-                {link.label}
-              </NavLink>
+              link.anchor ? (
+                <a
+                  key={link.to}
+                  href={link.to}
+                  className="px-4 py-2 text-sm font-sans transition-all duration-200 rounded-lg"
+                  style={{ color: textMutedColor }}
+                  onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textColor }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent';  e.currentTarget.style.color = textMutedColor }}
+                >
+                  {link.label}
+                </a>
+              ) : (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  end={link.end}
+                  className="px-4 py-2 text-sm font-sans transition-all duration-200 rounded-lg"
+                  style={({ isActive }) => ({
+                    color: isActive ? textColor : textMutedColor,
+                    background: isActive ? activeBg : 'transparent',
+                  })}
+                  onMouseEnter={e => { if (!e.currentTarget.dataset.active) e.currentTarget.style.background = hoverBg }}
+                  onMouseLeave={e => { if (!e.currentTarget.dataset.active) e.currentTarget.style.background = 'transparent' }}
+                >
+                  {link.label}
+                </NavLink>
+              )
             ))}
           </div>
 
@@ -111,13 +141,23 @@ export default function GymNavbar() {
             >
               Member Login
             </Link>
-            <Link
-              to={`${base}/pricing`}
-              className="hidden md:inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:opacity-90 hover:-translate-y-0.5"
-              style={{ background: 'var(--gym-gradient)', borderRadius: 'var(--gym-card-radius)' }}
-            >
-              Join Now
-            </Link>
+            {isSoloCoach ? (
+              <a
+                href={joinHref}
+                className="hidden md:inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:opacity-90 hover:-translate-y-0.5"
+                style={{ background: 'var(--gym-gradient)', borderRadius: 'var(--gym-card-radius)' }}
+              >
+                Join Now
+              </a>
+            ) : (
+              <Link
+                to={joinHref}
+                className="hidden md:inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:opacity-90 hover:-translate-y-0.5"
+                style={{ background: 'var(--gym-gradient)', borderRadius: 'var(--gym-card-radius)' }}
+              >
+                Join Now
+              </Link>
+            )}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden p-2 transition-colors cursor-pointer"
@@ -159,36 +199,53 @@ export default function GymNavbar() {
           >
             <div className="py-3 flex flex-col gap-1">
               {links.map(link => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  end={link.end}
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3.5 text-sm font-sans rounded-xl transition-colors"
-                  style={({ isActive }) => ({
-                    color: isActive
-                      ? isDark ? 'white' : 'var(--gym-text)'
-                      : isDark ? 'rgba(255,255,255,0.5)' : 'var(--gym-text-secondary)',
-                    background: isActive
-                      ? isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'
-                      : 'transparent',
-                    border: isActive
-                      ? `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`
-                      : '1px solid transparent',
-                  })}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <span
-                        className="w-1 h-5 rounded-full shrink-0 transition-all"
-                        style={{
-                          background: isActive ? 'var(--gym-gradient)' : 'transparent',
-                        }}
-                      />
-                      <span>{link.label}</span>
-                    </>
-                  )}
-                </NavLink>
+                link.anchor ? (
+                  <a
+                    key={link.to}
+                    href={link.to}
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3.5 text-sm font-sans rounded-xl transition-colors"
+                    style={{
+                      color: isDark ? 'rgba(255,255,255,0.5)' : 'var(--gym-text-secondary)',
+                      background: 'transparent',
+                      border: '1px solid transparent',
+                    }}
+                  >
+                    <span className="w-1 h-5 rounded-full shrink-0" style={{ background: 'transparent' }} />
+                    <span>{link.label}</span>
+                  </a>
+                ) : (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    end={link.end}
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3.5 text-sm font-sans rounded-xl transition-colors"
+                    style={({ isActive }) => ({
+                      color: isActive
+                        ? isDark ? 'white' : 'var(--gym-text)'
+                        : isDark ? 'rgba(255,255,255,0.5)' : 'var(--gym-text-secondary)',
+                      background: isActive
+                        ? isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'
+                        : 'transparent',
+                      border: isActive
+                        ? `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`
+                        : '1px solid transparent',
+                    })}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <span
+                          className="w-1 h-5 rounded-full shrink-0 transition-all"
+                          style={{
+                            background: isActive ? 'var(--gym-gradient)' : 'transparent',
+                          }}
+                        />
+                        <span>{link.label}</span>
+                      </>
+                    )}
+                  </NavLink>
+                )
               ))}
               <div className="pt-2 mt-1 border-t flex flex-col gap-2" style={{ borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}>
                 <Link
@@ -202,14 +259,25 @@ export default function GymNavbar() {
                 >
                   Member Login
                 </Link>
-                <Link
-                  to={`${base}/pricing`}
-                  onClick={() => setMobileOpen(false)}
-                  className="block text-center px-4 py-3.5 text-sm font-semibold text-white rounded-xl"
-                  style={{ background: 'var(--gym-gradient)' }}
-                >
-                  Join Now
-                </Link>
+                {isSoloCoach ? (
+                  <a
+                    href={joinHref}
+                    onClick={() => setMobileOpen(false)}
+                    className="block text-center px-4 py-3.5 text-sm font-semibold text-white rounded-xl"
+                    style={{ background: 'var(--gym-gradient)' }}
+                  >
+                    Join Now
+                  </a>
+                ) : (
+                  <Link
+                    to={joinHref}
+                    onClick={() => setMobileOpen(false)}
+                    className="block text-center px-4 py-3.5 text-sm font-semibold text-white rounded-xl"
+                    style={{ background: 'var(--gym-gradient)' }}
+                  >
+                    Join Now
+                  </Link>
+                )}
               </div>
             </div>
           </motion.div>
