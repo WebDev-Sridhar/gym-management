@@ -280,9 +280,10 @@ export default function GymJoinPage() {
                   when the gym added you by phone only (no email). */}
               <div>
                 <label style={labelStyle}>
-                  Phone <span style={{ textTransform: 'none', opacity: 0.6, fontWeight: 500 }}>(optional)</span>
+                  Phone 
                 </label>
                 <input type="tel" value={phone}
+                  required
                   onChange={e => setPhone(e.target.value.replace(/[^\d+\s-]/g, ''))}
                   placeholder="10-digit mobile" maxLength={15} style={inputStyle}
                   onFocus={e => { e.target.style.borderColor = 'var(--gym-primary)' }}

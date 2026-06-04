@@ -94,7 +94,13 @@ export default function CheckinPage() {
   if (!isAuthenticated) {
     const returnUrl = encodeURIComponent(`/checkin?gymId=${gymId}`)
     const loginUrl  = gym.slug ? `/${gym.slug}/login?return=${returnUrl}` : '/login'
-    const joinUrl   = gym.slug ? `/${gym.slug}/join?return=${returnUrl}`  : '/signup'
+    // Self-registration request — prospect fills the form, gym owner reviews
+    // + approves in the dashboard, then the existing member-invite email is
+    // sent (which routes them to /:slug/join to actually set their password).
+    // We deliberately don't link /:slug/join from the QR scan: that path
+    // assumes you're ALREADY a member (added by owner), and a true prospect
+    // clicking it would create an orphan auth.users row with no member match.
+    const registerUrl = gym.slug ? `/${gym.slug}/register` : '/signup'
     const brand     = gym.theme_color || '#8B5CF6'
 
     return (
@@ -133,11 +139,11 @@ export default function CheckinPage() {
               Sign In
             </Link>
             <Link
-              to={joinUrl}
+              to={registerUrl}
               className="block text-center text-sm font-medium mt-3 hover:opacity-80 transition-opacity"
               style={{ color: brand }}
             >
-              New here? Create an account
+              New here? Request to join
             </Link>
           </div>
 
