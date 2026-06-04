@@ -341,7 +341,7 @@ export default function GymJoinPage() {
         </p>
 
         <p className="text-center mt-4">
-          <Link to={base} className="text-xs hover:opacity-80 transition-opacity"
+          <Link to={basePath || '/'} className="text-xs hover:opacity-80 transition-opacity"
             style={{ color: 'var(--gym-text-muted)' }}>
             ← Back to {gym.name}
           </Link>
