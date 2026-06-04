@@ -48,6 +48,7 @@ import {
 } from '../../services/gymCmsService'
 import { canAccess } from '../../lib/featureGates'
 import { useCMSImage, useCMSImageList } from '../../hooks/useCMSImage'
+import UnsavedUploadsBadge from './cms/components/UnsavedUploadsBadge'
 import { deleteFile } from '../../services/storageService'
 import { sweepStaleDraftEntries } from '../../lib/cmsDraft'
 import { SocialIcon, SOCIAL_PLATFORMS } from '../../lib/socialPlatforms.jsx'
@@ -867,9 +868,10 @@ function SeoPanel({ gym, gymId, planName, onSave }) {
               />
             </Field>
 
-            <div className="pt-2 flex items-center gap-3">
+            <div className="pt-2 flex items-center gap-3 flex-wrap">
               <SaveBtn saving={saving} />
               <SuccessMsg msg={success} />
+              <UnsavedUploadsBadge pending={ogImg.isPending} hide={saving || !!success} />
             </div>
           </div>
 
@@ -1412,9 +1414,10 @@ function GalleryPanel({ content, gymId, planName, onSave, setPreviewData }) {
         hint="Landscape or square photos work best. Uploaded as WebP for fast loading."
       />
       {galleryImgs.error && <p className="text-xs text-red-500">{galleryImgs.error}</p>}
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex items-center gap-3 pt-1 flex-wrap">
         <SaveBtn saving={saving} />
         <SuccessMsg msg={success} />
+        <UnsavedUploadsBadge pending={galleryImgs.isPending} hide={saving || !!success} />
       </div>
     </form>
   )
@@ -1625,9 +1628,10 @@ function PageHeroForm({ pageKey, content, gymId, planName, onSave, setPreviewDat
       <Field label="Description" hint="Subtitle shown below the title.">
         <textarea value={desc} onChange={e => updateDesc(e.target.value)} rows={3} placeholder={defs.desc} className={inputCls + ' resize-none'} />
       </Field>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <SaveBtn saving={saving} />
         <SuccessMsg msg={success} />
+        <UnsavedUploadsBadge pending={img.isPending} hide={saving || !!success} />
       </div>
     </form>
   )
@@ -2192,12 +2196,13 @@ function ProgramInlineForm({ mode, data, gymId, planName, imageCount, onSave, on
         hint="Background photo for the card."
       />
       {img.error && <p className="text-xs text-red-500">{img.error}</p>}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-1 flex-wrap">
         <button type="button" onClick={handleCancel}
           className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
           Cancel
         </button>
         <SaveBtn saving={saving || img.uploading} onClick={handleSave} label={img.uploading ? 'Uploading…' : 'Save'} type="button" />
+        <UnsavedUploadsBadge pending={img.isPending} hide={saving || img.uploading} />
       </div>
     </div>
   )

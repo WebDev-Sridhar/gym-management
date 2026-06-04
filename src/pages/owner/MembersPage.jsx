@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import UpgradeRequiredModal from '../../components/ui/UpgradeRequiredModal'
-import { fetchMembers, createMember, assignPlan, fetchPlans, sendMemberInvite } from '../../services/membershipService'
+import { fetchMembers, createMember, assignPlan, fetchPlans, sendMemberInvite, computeDefaultExpiry } from '../../services/membershipService'
+import { fetchPendingRegistrations, approveRegistration, rejectRegistration } from '../../services/memberRegistrationService'
 import { recordManualPayment } from '../../services/paymentService'
 import { fetchTrainers } from '../../services/trainerService'
 import { AnimatePresence } from 'framer-motion'
@@ -11,6 +12,7 @@ import CustomSelect from '../../components/ui/CustomSelect'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 import MemberDrawer from '../../components/ui/MemberDrawer'
 import Pagination from '../../components/ui/Pagination'
+import { useDialog } from '../../components/ui/Dialog'
 import { Sk } from '../../components/ui/Skeleton'
 
 function MembersSkeleton() {
@@ -43,8 +45,9 @@ function MembersSkeleton() {
 }
 
 export default function MembersPage() {
-  const { gymId } = useAuth()
+  const { gymId, gymSlug } = useAuth()
   const { selectedBranchId, branches, isAllBranches } = useBranch()
+  const dialog = useDialog()
   const [members, setMembers] = useState([])
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
@@ -56,6 +59,16 @@ export default function MembersPage() {
   const [drawerMember, setDrawerMember] = useState(null)
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 10
+  // Self-registration queue: owner sees pending submissions from /:slug/register
+  // and approves/rejects them. Loaded alongside members; refreshed after each
+  // action so the badge count + list stay in sync.
+  const [pendingRegs, setPendingRegs]   = useState([])
+  const [processingId, setProcessingId] = useState(null)   // id being approved/rejected
+  // Per-row "send invite on approve" toggle. Default true (matches the
+  // Add Member form default). Owner unchecks for phone-only walk-ins or
+  // anyone who already has an account at another gym and doesn't need
+  // a fresh invite email. Map keyed by registration id; absent = true.
+  const [pendingInviteOpts, setPendingInviteOpts] = useState({})
 
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
@@ -64,6 +77,13 @@ export default function MembersPage() {
   const [newBranchId, setNewBranchId] = useState('')
   // Plan-payment state (only meaningful when newPlanId is set)
   const [alreadyPaid, setAlreadyPaid] = useState(false)
+  // Override for the new expiry date. Owner answers "when does the current
+  // period end?" — for fresh sign-ups that's today+duration (the default),
+  // for migrated members it's whenever their existing cycle is set to end
+  // (e.g. their next-due-on-the-12th renewal). Initialized empty; the
+  // useEffect below recomputes the default whenever the plan changes so the
+  // input always has a sensible pre-fill.
+  const [newExpiryDate, setNewExpiryDate] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
   // Audit C5 — fire `member_invite` notification on create if checked.
   // Default true: the most common case is owner-adds-member-then-wants-them-
@@ -86,6 +106,15 @@ export default function MembersPage() {
     else if (branches.length > 0) setNewBranchId(branches.find(b => b.is_main)?.id || branches[0].id)
   }, [showAddForm, isAllBranches, selectedBranchId, branches, newBranchId])
 
+  // Whenever the selected plan changes, reset the "Next renewal due" field
+  // to that plan's natural default (today + duration). Owner can then
+  // override it to match a migrated member's actual cycle end date.
+  useEffect(() => {
+    const plan = plans.find(p => p.id === newPlanId)
+    if (!plan) { setNewExpiryDate(''); return }
+    setNewExpiryDate(computeDefaultExpiry(null, plan.duration_days))
+  }, [newPlanId, plans])
+
   useEffect(() => {
     if (!gymId) { setLoading(false); return }
 
@@ -96,9 +125,11 @@ export default function MembersPage() {
       fetchMembers(gymId, selectedBranchId),
       fetchPlans(gymId),
       fetchTrainers(gymId, selectedBranchId),
+      fetchPendingRegistrations(gymId).catch(() => []),
     ])
-      .then(([m, p, t]) => {
+      .then(([m, p, t, pr]) => {
         if (cancelled) return
+        setPendingRegs(pr || [])
         setMembers(m)
         setPlans(p)
         setTrainers(t)
@@ -135,7 +166,12 @@ export default function MembersPage() {
       if (newPlanId) {
         const plan = plans.find((p) => p.id === newPlanId)
         if (plan) {
-          member = await assignPlan({ memberId: member.id, planId: plan.id, durationDays: plan.duration_days })
+          // Only override when owner picked a date different from the default
+          // (today + duration). Same-as-default → null → service uses the
+          // standard stacking logic, same behavior as before this feature.
+          const defaultExpiry = computeDefaultExpiry(null, plan.duration_days)
+          const expiryDate = newExpiryDate && newExpiryDate !== defaultExpiry ? newExpiryDate : null
+          member = await assignPlan({ memberId: member.id, planId: plan.id, durationDays: plan.duration_days, expiryDate })
           // Record the corresponding payment so the plan price flows into
           // revenue analytics. Non-fatal — if this errors we still ship the
           // member; the owner can re-record from PaymentsPage later.
@@ -171,6 +207,7 @@ export default function MembersPage() {
       setMembers((prev) => [member, ...prev])
       setNewName(''); setNewPhone(''); setNewEmail(''); setNewPlanId('')
       setAlreadyPaid(false); setPaymentMethod('cash')
+      setNewExpiryDate('')   // useEffect resets to default when plan picked next time
       setSendInviteOnCreate(true)   // reset to default for next add
       setShowAddForm(false)
     } catch (err) {
@@ -198,6 +235,52 @@ export default function MembersPage() {
   function daysLeft(expiryDate) {
     if (!expiryDate) return null
     return Math.ceil((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
+  }
+
+  // ─── Pending-registration handlers ──────────────────────────────────────
+  // Identity-only approve: creates the member with the registration's
+  // name/phone/email, defaults to the registration's branch. Owner can
+  // later add a plan + expiry from the member drawer's change-plan flow.
+  // Quota / expired-sub blocks bubble up via createMember and land in the
+  // upgrade modal — same surface as the regular Add Member path.
+  async function handleApprovePending(reg) {
+    setProcessingId(reg.id)
+    try {
+      // Default to true unless owner explicitly unchecked for this row.
+      const sendInvite = pendingInviteOpts[reg.id] !== false
+      const newMember = await approveRegistration(reg.id, {
+        gymId,
+        branchId: reg.branch_id ?? null,
+        sendInvite,
+      })
+      // Optimistic UI: drop the row from the pending list + prepend the new
+      // member so they appear immediately at the top.
+      setPendingRegs(prev => prev.filter(r => r.id !== reg.id))
+      setMembers(prev => [newMember, ...prev])
+    } catch (err) {
+      if (err.code === 'quota_exceeded' || err.code === 'subscription_expired') {
+        setUpgradeContext({ code: err.code, details: err.details })
+      } else {
+        // Inline error on this card would be nicer; for v1 use the existing
+        // error state at the top of the page.
+        setError(err.message || 'Failed to approve registration')
+      }
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  async function handleRejectPending(reg) {
+    if (!await dialog.confirm(`Reject the registration from ${reg.name}?`)) return
+    setProcessingId(reg.id)
+    try {
+      await rejectRegistration(reg.id)
+      setPendingRegs(prev => prev.filter(r => r.id !== reg.id))
+    } catch (err) {
+      setError(err.message || 'Failed to reject registration')
+    } finally {
+      setProcessingId(null)
+    }
   }
 
   // "New" badge — true when the member was created within the last 24 hours.
@@ -237,7 +320,25 @@ export default function MembersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Members</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{members.length} total member{members.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {members.length} total member{members.length !== 1 ? 's' : ''}
+            {gymSlug && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = `${window.location.origin}/${gymSlug}/register`
+                    navigator.clipboard?.writeText(url)
+                  }}
+                  className="text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                  title="Copy registration link to clipboard"
+                >
+                  copy registration link
+                </button>
+              </>
+            )}
+          </p>
         </div>
         <button
           onClick={() => { setShowAddForm(!showAddForm); setError(''); setNewPlanId(''); setAlreadyPaid(false); setPaymentMethod('cash') }}
@@ -246,6 +347,88 @@ export default function MembersPage() {
           {showAddForm ? 'Close' : '+ Add Member'}
         </button>
       </div>
+
+      {/* Pending self-registrations. Shown above the main list so the
+          owner sees them prominently when they land on the page. Hidden
+          entirely when the queue is empty so it doesn't add chrome to
+          gyms that haven't shared their registration link yet. */}
+      {pendingRegs.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <h2 className="text-base font-semibold text-amber-700">
+              {pendingRegs.length} pending self-registration{pendingRegs.length !== 1 ? 's' : ''}
+            </h2>
+            {gymSlug && (
+              <div className="text-xs text-amber-700 flex items-center gap-2">
+                <span>Share:</span>
+                <code className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-800 select-all">{window.location.origin}/{gymSlug}/register</code>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/${gymSlug}/register`)}
+                  className="text-amber-700 hover:text-amber-900 underline cursor-pointer"
+                  title="Copy to clipboard"
+                >
+                  Copy
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            {pendingRegs.map(reg => (
+              <div key={reg.id} className="bg-white border border-amber-200 rounded-lg p-3 flex flex-wrap items-start justify-between gap-3">
+                <div className="flex-1 min-w-[200px]">
+                  <p className="text-sm font-semibold text-gray-900">{reg.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {reg.phone} · {reg.email}
+                    {reg.branch && (
+                      <> · <span className="text-gray-600">{reg.branch.name}{reg.branch.city ? ` (${reg.branch.city})` : ''}</span></>
+                    )}
+                  </p>
+                  {reg.notes && (
+                    <p className="text-xs text-gray-600 mt-1.5 italic">"{reg.notes}"</p>
+                  )}
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Submitted {new Date(reg.submitted_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleApprovePending(reg)}
+                      disabled={processingId === reg.id}
+                      className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {processingId === reg.id ? '...' : 'Approve'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRejectPending(reg)}
+                      disabled={processingId === reg.id}
+                      className="px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 bg-white rounded-lg hover:text-red-600 hover:border-red-200 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                  <label className="flex items-center gap-1.5 text-[12px] text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={pendingInviteOpts[reg.id] !== false}
+                      onChange={e => setPendingInviteOpts(prev => ({ ...prev, [reg.id]: e.target.checked }))}
+                      disabled={processingId === reg.id}
+                      className="w-3 h-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    Send invite email
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-amber-700 leading-snug">
+            Approving creates the member with their phone/email. The invite email (if checked) lets them set a password and access their member dashboard. Assign their plan + renewal date from the member drawer.
+          </p>
+        </div>
+      )}
 
       {/* Add member form */}
       {showAddForm && (
@@ -302,6 +485,36 @@ export default function MembersPage() {
                 Ticked = paid payment (counts as revenue immediately). */}
             {newPlanId && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                {/* Next renewal due. Defaults to today + plan duration
+                    (fresh sign-up). For migrated members whose current cycle
+                    ends sooner (e.g. their always-on-the-12th payment is due
+                    in 8 days), owner picks that date here so reminders fire
+                    on the correct schedule (7/3/1/0 days before expiry).
+                    Capped at the default so the owner can't accidentally
+                    extend expiry by a full month. */}
+                {(() => {
+                  const plan = plans.find(p => p.id === newPlanId)
+                  const days = plan?.duration_days
+                  const defaultExpiry = days ? computeDefaultExpiry(null, days) : ''
+                  const isDefault = newExpiryDate === defaultExpiry
+                  return (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-1.5">Next renewal due</label>
+                      <input
+                        type="date"
+                        value={newExpiryDate}
+                        max={defaultExpiry}
+                        onChange={(e) => setNewExpiryDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        {isDefault
+                          ? `Default for a ${days}-day plan starting today. Reminders fire 3, 1, 0 days before expiry.`
+                          : `Member expires ${newExpiryDate}. They'll get renewal reminders 3, 1, 0 days before. On payment, the next cycle adds ${days} days.`}
+                      </p>
+                    </div>
+                  )
+                })()}
                 <label className="flex items-start gap-3 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -367,7 +580,7 @@ export default function MembersPage() {
             </button>
             <button
               type="button"
-              onClick={() => {setShowAddForm(false); setError(''); setNewName(''); setNewPhone(''); setNewEmail(''); setNewPlanId(''); setNewBranchId(''); setAlreadyPaid(false); setSendInviteOnCreate(false)}}   
+              onClick={() => {setShowAddForm(false); setError(''); setNewName(''); setNewPhone(''); setNewEmail(''); setNewPlanId(''); setNewBranchId(''); setAlreadyPaid(false); setNewExpiryDate(''); setSendInviteOnCreate(false)}}
               className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
             >
               Cancel

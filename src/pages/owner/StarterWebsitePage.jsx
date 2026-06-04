@@ -223,6 +223,7 @@ import { SocialIcon, SOCIAL_PLATFORMS } from '../../lib/socialPlatforms.jsx'
 import LocationPicker from '../../components/LocationPicker'
 import HeroForm from './cms/sections/HeroForm'
 import { useCMSImage, useCMSImageList } from '../../hooks/useCMSImage'
+import UnsavedUploadsBadge from './cms/components/UnsavedUploadsBadge'
 import { deleteFile } from '../../services/storageService'
 import { sweepStaleDraftEntries } from '../../lib/cmsDraft'
 import { useDialog } from '../../components/ui/Dialog'
@@ -508,9 +509,10 @@ function StarterProgramInlineForm({ mode, data, gymId, planName, imageCount, onS
       <Field label="Description"><textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Short description of this program…" className={inputCls + ' resize-none'} /></Field>
       <ImageUploader gymId={gymId} section="programs" currentUrl={img.url} onChange={img.handleUrl} onFileSelected={img.handleFile} isPending={img.isPending} planName={planName} usageCount={imageCount} label="Program Image" hint="Landscape image works best." />
       {img.error && <p className="text-xs text-red-500">{img.error}</p>}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-1 flex-wrap">
         <button type="button" onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">Cancel</button>
         <SaveBtn saving={saving || img.uploading} onClick={handleSave} label={img.uploading ? 'Uploading…' : 'Save'} />
+        <UnsavedUploadsBadge pending={img.isPending} hide={saving || img.uploading} />
       </div>
     </div>
   )
@@ -1067,9 +1069,10 @@ function GalleryPanel({ content, gymId, onSave }) {
         hint="Landscape or square photos work best. Uploaded as WebP for fast loading."
       />
       {galleryImgs.error && <p className="text-xs text-red-500">{galleryImgs.error}</p>}
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex items-center gap-3 pt-1 flex-wrap">
         <SaveBtn saving={saving} />
         <SuccessMsg msg={success} />
+        <UnsavedUploadsBadge pending={galleryImgs.isPending} hide={saving || !!success} />
       </div>
     </form>
   )
@@ -1107,9 +1110,10 @@ function StarterCoachInlineForm({ mode, data, gymId, planName, imageCount, onSav
       <ImageUploader gymId={gymId} section="trainers" currentUrl={img.url} onChange={img.handleUrl} onFileSelected={img.handleFile} isPending={img.isPending} planName={planName} usageCount={imageCount} label="Coach Photo" hint="Square or portrait photo works best." />
       {img.error && <p className="text-xs text-red-500">{img.error}</p>}
       <Field label="Bio" hint="Short bio — 1–2 sentences."><textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} placeholder="Ravi has 10 years of experience in strength training…" className={inputCls + ' resize-none'} /></Field>
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-1 flex-wrap">
         <button type="button" onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">Cancel</button>
         <SaveBtn saving={saving || img.uploading} onClick={handleSave} label={img.uploading ? 'Uploading…' : 'Save'} />
+        <UnsavedUploadsBadge pending={img.isPending} hide={saving || img.uploading} />
       </div>
     </div>
   )

@@ -4,6 +4,7 @@ import { updateGymDetails } from '../../../../services/membershipService'
 import { canAccess } from '../../../../lib/featureGates'
 import { useCMSImageList } from '../../../../hooks/useCMSImage'
 import ImageUploader from '../components/ImageUploader'
+import UnsavedUploadsBadge from '../components/UnsavedUploadsBadge'
 import { useDialog } from '../../../../components/ui/Dialog'
 
 const inputCls =
@@ -261,9 +262,10 @@ export default function HeroForm({ content, gym, gymId, planName, onSave, onSave
       />
       {heroImgs.error && <p className="text-xs text-red-500">{heroImgs.error}</p>}
 
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex items-center gap-3 pt-1 flex-wrap">
         <SaveBtn saving={saving} />
         <SuccessMsg msg={success} />
+        <UnsavedUploadsBadge pending={heroImgs.isPending} hide={saving || !!success} />
       </div>
     </form>
   )

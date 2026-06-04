@@ -48,7 +48,7 @@ export async function updateGymCommSettings(gymId, prefs) {
 // same filter.
 const SAAS_NOTIFICATION_TYPES = ['saas_payment_receipt', 'saas_expiry_alert']
 
-export async function fetchNotifications(gymId, { type = null, status = null, limit = 50, branchId = null } = {}) {
+export async function fetchNotifications(gymId, { type = null, status = null, limit = 50, branchId = null, excludeStatus = null } = {}) {
   let q = supabase
     .from('notifications')
     .select('id, type, channels, status, metadata, channel_results, triggered_by, created_at, sent_at, member:members(id, name, phone, email)')
@@ -57,8 +57,9 @@ export async function fetchNotifications(gymId, { type = null, status = null, li
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (type)   q = q.eq('type', type)
-  if (status) q = q.eq('status', status)
+  if (type)          q = q.eq('type', type)
+  if (status)        q = q.eq('status', status)
+  if (excludeStatus) q = q.neq('status', excludeStatus)
   q = applyBranchFilter(q, branchId)
 
   const { data, error } = await q

@@ -13,6 +13,7 @@ import {
   weeklySummaryEmail,
   saasPaymentReceiptEmail,
   memberInviteEmail,
+  memberRegistrationRequestEmail,
   trainerInviteEmail,
   ghostReminderEmail,
   paymentReminderEmail,
@@ -42,6 +43,7 @@ export type NotificationType =
   | 'member_invite'            // Member-facing — fires BEFORE signup ("you've been added; click to set up")
   | 'trainer_invite'           // Trainer-facing — fires after createTrainerInvite ("you've been invited; claim")
   | 'ghost_reminder'           // Member-facing — ghost-detection cron: "we miss you, N days since last check-in"
+  | 'member_registration_request' // Owner-facing — new self-registration awaiting approval in dashboard
 
 export type Channel = 'whatsapp' | 'email'
 
@@ -57,6 +59,7 @@ const CHANNEL_MAP: Record<NotificationType, Channel[]> = {
   member_invite:        ['email'],          // email-first; doesn't need a pre-approved WA template to start working
   trainer_invite:       ['email'],          // same — trainer needs the link, email is universally reachable
   ghost_reminder:       ['whatsapp'],       // WhatsApp-first (warmer for a "we miss you" nudge); falls back to email
+  member_registration_request: ['email'],   // Email-only: owner gets the details + dashboard link to approve; no WA template needed v1
 }
 
 // WhatsApp template per type — read from env so they can be changed without redeploy.
@@ -77,6 +80,10 @@ function templateName(type: NotificationType): string {
     case 'member_invite':        return fromEnv('INTERAKT_TEMPLATE_MEMBER_INVITE', 'member_invite')
     case 'trainer_invite':       return fromEnv('INTERAKT_TEMPLATE_TRAINER_INVITE','trainer_invite')
     case 'ghost_reminder':       return fromEnv('INTERAKT_TEMPLATE_GHOST_REMINDER','ghost_member_recall')
+    // Owner-facing, email-only — but the switch must be exhaustive per
+    // TypeScript. WhatsApp dispatch is gated by CHANNEL_MAP above so this
+    // template name is never actually requested.
+    case 'member_registration_request': return ''
   }
 }
 
@@ -292,6 +299,43 @@ export async function sendNotification(p: SendNotificationParams): Promise<SendN
     ? { ...metadata, whatsapp_blocked_reason: whatsappBlockedReason }
     : metadata
 
+  // 3b. No deliverable channel → skipped, NOT failed. Owner deliberately
+  // turned both toggles off (or WhatsApp was blocked by plan/quota AND email
+  // was off). Recording these as 'failed' makes the activity log misleading
+  // — nothing actually tried + failed; we had nothing to send through.
+  // Distinct suppression reasons so the UI can show "WhatsApp + Email
+  // disabled" vs. "WhatsApp blocked, Email disabled" vs. "channel disabled".
+  if (channels.length === 0) {
+    const waOff    = gym.whatsapp_enabled === false
+    const emailOff = gym.email_enabled    === false
+    const suppressedReason =
+      waOff && emailOff                          ? 'channels_disabled'         :
+      whatsappBlockedReason && emailOff          ? 'whatsapp_blocked_email_off':
+      whatsappBlockedReason && !primary.includes('email') ? `whatsapp_${whatsappBlockedReason}` :
+                                                   'no_deliverable_channel'
+    const { data: skipped } = await supabase
+      .from('notifications')
+      .insert({
+        gym_id:    gymId,
+        user_id:   userId ?? null,
+        member_id: memberId ?? null,
+        type,
+        channels:  [],
+        status:    'skipped',
+        metadata:  { ...effectiveMetadata, suppressed_reason: suppressedReason },
+        triggered_by: triggeredBy,
+        sent_at:   new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+    return {
+      notificationId: skipped?.id ?? '',
+      status: 'skipped',
+      channelResults: {} as Record<Channel, ChannelResult | undefined>,
+      whatsappBlockedReason,
+    }
+  }
+
   // 4. Insert pending notification row up front so we have an id to update
   const { data: row, error: insErr } = await supabase
     .from('notifications')
@@ -435,6 +479,16 @@ async function sendEmailChannel(args: {
           memberName: args.name ?? 'Member',
           gym: args.gym,
           portalUrl: String(args.metadata.portalUrl ?? ''),
+        })
+        break
+      case 'member_registration_request':
+        tpl = memberRegistrationRequestEmail({
+          ownerName:    args.name ?? undefined,
+          memberName:   String(args.metadata.memberName ?? 'Unknown'),
+          memberPhone:  String(args.metadata.memberPhone ?? '—'),
+          memberEmail:  String(args.metadata.memberEmail ?? '—'),
+          gym:          args.gym,
+          dashboardUrl: String(args.metadata.dashboardUrl ?? ''),
         })
         break
       case 'trainer_invite':

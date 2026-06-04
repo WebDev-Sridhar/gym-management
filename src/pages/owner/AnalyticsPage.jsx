@@ -851,7 +851,15 @@ export default function AnalyticsPage() {
             gymId={gymId}
             defaultTab="Info"
             onClose={() => setDrawerMember(null)}
-            onUpdated={updated => setDrawerMember(updated)}
+            onUpdated={updated => {
+              // Keep drawer in sync while it's open
+              setDrawerMember(updated)
+              // A plan change / payment from inside the drawer can shift
+              // revenue + cohort + at-risk aggregates. Bump refreshKey to
+              // re-run all 5 analytics fetches so the dashboard reflects
+              // the change without a full page reload.
+              setRefreshKey(k => k + 1)
+            }}
             onDeleted={() => setDrawerMember(null)}
           />
         )}

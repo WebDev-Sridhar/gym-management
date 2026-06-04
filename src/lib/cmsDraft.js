@@ -44,3 +44,21 @@ export async function sweepStaleDraftEntries(gymId) {
   await Promise.allSettled(deletes)
   if (staleKeys.length) clearDraftFields(gymId, staleKeys)
 }
+
+// Called from AuthContext.logout — discards ALL drafts (regardless of age)
+// and deletes their pending temp files so a re-login doesn't resurrect the
+// editor with stale uploads pointing at orphaned storage files. The daily
+// cleanup-temp-images cron is the safety net if any of these storage
+// deletes fail (e.g. network drop during signout).
+export async function discardAllDrafts(gymId) {
+  if (!gymId) return
+  const { deleteFile } = await import('../services/storageService')
+  const draft = getDraft(gymId)
+  const deletes = []
+  for (const entry of Object.values(draft)) {
+    if (entry?.tempPath) deletes.push(deleteFile(entry.url))
+    if (entry?.tempPaths) Object.keys(entry.tempPaths).forEach(u => deletes.push(deleteFile(u)))
+  }
+  await Promise.allSettled(deletes)
+  clearAllDraft(gymId)
+}

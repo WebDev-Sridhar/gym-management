@@ -81,6 +81,10 @@ Deno.serve(async (req: Request) => {
     let sent = 0
     let failed = 0
     let skipped = 0
+    // Engine returned status='skipped' (e.g. owner disabled both channels,
+    // member unsubscribed, sub expired). Tracked separately from `sent` so
+    // the cron summary doesn't inflate the "delivered" number.
+    let suppressed = 0
     // V3 Task 14: emailFallback = engine downgraded WA→email (quota /
     // plan_disabled). Different from `failed`. Audited per-call for
     // observability without an extra plan lookup here — the engine knows.
@@ -181,8 +185,9 @@ Deno.serve(async (req: Request) => {
           console.log(`ghost ${member.id}: WhatsApp suppressed (${result.whatsappBlockedReason}) — email used`)
         }
 
-        if (result.status === 'failed') failed++
-        else                            sent++
+        if      (result.status === 'failed')  failed++
+        else if (result.status === 'skipped') suppressed++
+        else                                   sent++
       } catch (sendErr) {
         console.error('ghost-detection: send failed for member', member.id, sendErr)
         failed++
@@ -191,7 +196,7 @@ Deno.serve(async (req: Request) => {
 
     const summary = {
       job_name: 'ghost-detection',
-      total, sent, failed, skipped, emailFallback, cadenceSkipped,
+      total, sent, failed, skipped, suppressed, emailFallback, cadenceSkipped,
       schedule_days: GHOST_REMINDER_DAYS,
       started_at:  startedAt,
       finished_at: new Date().toISOString(),

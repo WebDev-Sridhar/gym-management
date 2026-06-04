@@ -314,6 +314,11 @@ export async function updateMemberBranch({ memberId, branchId }) {
  * Compute the new join_date + expiry_date for a member when a plan is
  * assigned or renewed. Uses anchor-with-grace:
  *
+ *   - expiryOverride present → expiry_date = expiryOverride directly.
+ *     Owner says "this member's current period ends on Jun 12" → store
+ *     that; reminders fire on schedule before Jun 12; on renewal day the
+ *     stacking logic below kicks in and computes the next expiry from
+ *     this value. Bypasses all the auto-anchor logic.
  *   - No prior plan → anchor = today (fresh sign-up).
  *   - Active renewal (currentExpiry in the future) → anchor = currentExpiry
  *     so renewals stack on top of unused days. A 30-day plan with 10 days
@@ -326,9 +331,15 @@ export async function updateMemberBranch({ memberId, branchId }) {
  *
  * join_date is preserved when set; only assigned for first-time members.
  */
-export function computeRenewalDates({ currentExpiry, planDuration, existingJoinDate }) {
+export function computeRenewalDates({ currentExpiry, planDuration, existingJoinDate, expiryOverride = null }) {
   const now = new Date()
   const todayStr = now.toISOString().slice(0, 10)
+  if (expiryOverride) {
+    return {
+      expiry_date: expiryOverride,
+      join_date:   existingJoinDate || todayStr,
+    }
+  }
   let anchor
   if (!currentExpiry) {
     anchor = now
@@ -341,11 +352,23 @@ export function computeRenewalDates({ currentExpiry, planDuration, existingJoinD
   const newExpiry = new Date(anchor.getTime() + planDuration * 86_400_000)
   return {
     expiry_date: newExpiry.toISOString().slice(0, 10),
-    join_date: existingJoinDate || todayStr,
+    join_date:   existingJoinDate || todayStr,
   }
 }
 
-export async function assignPlan({ memberId, planId, durationDays }) {
+// Pure helper for the UI: what expiry_date would assignPlan produce if the
+// owner doesn't touch the override field? Mirrors computeRenewalDates without
+// the expiryOverride branch. Used to:
+//   1. Pre-fill the "Next renewal due" input with a sensible default
+//   2. Detect whether the owner actually changed it (don't pass override
+//      when input still matches default — preserves existing stacking)
+//   3. Cap the date picker via `max=` so accidentally jumping a month forward
+//      becomes structurally impossible
+export function computeDefaultExpiry(currentExpiry, planDuration) {
+  return computeRenewalDates({ currentExpiry, planDuration }).expiry_date
+}
+
+export async function assignPlan({ memberId, planId, durationDays, expiryDate = null }) {
   // Fetch existing dates so renewals stack from currentExpiry instead of
   // resetting to today — otherwise a member with 20 unused days who renews
   // loses those 20 days. join_date is preserved across renewals so it keeps
@@ -357,6 +380,7 @@ export async function assignPlan({ memberId, planId, durationDays }) {
     currentExpiry:    m?.expiry_date ?? null,
     planDuration:     durationDays,
     existingJoinDate: m?.join_date   ?? null,
+    expiryOverride:   expiryDate,
   })
 
   const { data, error } = await supabase

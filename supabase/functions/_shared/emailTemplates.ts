@@ -425,6 +425,33 @@ export function findMyGymEmail(args: {
 // ("your membership is active"); this one fires BEFORE that — "your gym
 // added you; click to set up your account". Branded with the gym's
 // theme_color so members recognise the sender.
+// Owner-facing — fires when a prospective member submits the public
+// self-registration form (/:slug/register). Contains the member's details
+// + a one-click link to the dashboard pending-approvals section.
+export function memberRegistrationRequestEmail(args: {
+  ownerName?: string
+  memberName: string
+  memberPhone: string
+  memberEmail: string
+  gym: GymCtx
+  dashboardUrl: string
+}): { subject: string; html: string } {
+  const brand = args.gym.theme_color || '#8B5CF6'
+  const gymName = safe(args.gym.name, 'your gym')
+  const body = `
+    <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:6px;">New member registration request</div>
+    <div style="color:#6b7280;margin-bottom:22px;">Hi ${safe(args.ownerName, 'there')} — someone just filled out the registration form for ${gymName}. Review their details and approve, edit, or reject from the dashboard.</div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:22px;">
+      <div style="font-size:14px;color:#0f172a;margin-bottom:6px;"><strong>${safe(args.memberName)}</strong></div>
+      <div style="font-size:13px;color:#6b7280;">Phone: ${safe(args.memberPhone)}</div>
+      <div style="font-size:13px;color:#6b7280;">Email: ${safe(args.memberEmail)}</div>
+    </div>
+    ${btn(args.dashboardUrl, 'Review in dashboard', brand)}
+    <div style="color:#9ca3af;font-size:12px;margin-top:22px;">No member account or auth login is created until you approve.</div>
+  `
+  return { subject: `New registration request — ${gymName}`, html: gymShell(args.gym, body) }
+}
+
 export function memberInviteEmail(args: {
   memberName: string
   gym: GymCtx

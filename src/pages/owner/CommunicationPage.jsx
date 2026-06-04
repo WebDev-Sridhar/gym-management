@@ -51,13 +51,32 @@ const TYPE_LABEL = {
   welcome:              'Welcome / test',
 }
 
-function StatusBadge({ status }) {
+// Human-readable copy for the engine's suppressed_reason metadata. Surfaced
+// as a tooltip on Skipped status badges so the owner understands *why* the
+// engine didn't dispatch (vs. "Failed" which implies a delivery error).
+const SUPPRESS_REASON_LABEL = {
+  subscription_expired:         'Subscription expired — renew to resume',
+  member_unsubscribed:          'Member opted out',
+  channels_disabled:            'Both WhatsApp + Email channels are off',
+  whatsapp_blocked_email_off:   'WhatsApp blocked by plan/quota and Email is off',
+  no_deliverable_channel:       'No deliverable channel available',
+  whatsapp_plan_disabled:       'WhatsApp not available on this plan',
+  whatsapp_plan_excludes_type:  'This notification type is not enabled for the plan',
+  whatsapp_quota_exhausted:     'WhatsApp monthly quota exhausted',
+}
+
+function StatusBadge({ status, suppressedReason }) {
   const cls =
     status === 'sent'    ? 'bg-green-50 text-green-700' :
     status === 'partial' ? 'bg-amber-50 text-amber-700' :
     status === 'failed'  ? 'bg-red-50  text-red-700'   :
+    status === 'skipped' ? 'bg-blue-50 text-blue-700'  :
                            'bg-gray-100 text-gray-500'
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+  const tooltip = status === 'skipped' && suppressedReason
+    ? (SUPPRESS_REASON_LABEL[suppressedReason] || suppressedReason)
+    : undefined
+  return <span title={tooltip}
+    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls} ${tooltip ? 'cursor-help' : ''}`}>
     {status[0].toUpperCase() + status.slice(1)}
   </span>
 }
@@ -122,7 +141,10 @@ export default function CommunicationPage() {
     setLoading(true)
     Promise.all([
       fetchGymCommSettings(gymId),
-      fetchNotifications(gymId, { limit: 50, branchId: selectedBranchId }),
+      // Default: hide 'skipped' rows. They're recorded for audit (e.g. "we
+      // tried but channels were off") but cluttering the activity log with
+      // them is more noise than signal — owner can opt-in via the filter.
+      fetchNotifications(gymId, { limit: 50, branchId: selectedBranchId, excludeStatus: 'skipped' }),
     ])
       .then(([p, n]) => { if (!cancelled) { setPrefs(p); setNotifs(n) } })
       .catch((err) => console.error('Failed to load comm settings:', err))
@@ -139,6 +161,10 @@ export default function CommunicationPage() {
       const n = await fetchNotifications(gymId, {
         type: filterType || null,
         status: filterStatus || null,
+        // When no explicit status filter, exclude 'skipped' rows from the
+        // default list. When the owner picks 'Skipped' from the dropdown,
+        // status='skipped' is set and this exclude is a no-op.
+        excludeStatus: filterStatus ? null : 'skipped',
         limit: 50,
         branchId: selectedBranchId,
       })
@@ -329,6 +355,7 @@ export default function CommunicationPage() {
                 { value: 'sent',    label: 'Sent' },
                 { value: 'partial', label: 'Partial' },
                 { value: 'failed',  label: 'Failed' },
+                { value: 'skipped', label: 'Skipped' },
               ]}
             />
           </div>
@@ -360,7 +387,7 @@ export default function CommunicationPage() {
                       {n.member?.phone && <p className="text-xs text-gray-400">{n.member.phone}</p>}
                     </td>
                     <td className="px-5 py-3 text-xs text-gray-500">{(n.channels || []).join(' + ')}</td>
-                    <td className="px-5 py-3"><StatusBadge status={n.status} /></td>
+                    <td className="px-5 py-3"><StatusBadge status={n.status} suppressedReason={n.metadata?.suppressed_reason} /></td>
                     <td className="px-5 py-3 text-right text-xs text-gray-400">{formatRelative(n.sent_at || n.created_at)}</td>
                   </tr>
                 ))}

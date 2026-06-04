@@ -10,6 +10,7 @@ import {
 import {
   updateMember, deleteMember,
   assignPlan as assignMembershipPlan,
+  computeDefaultExpiry,
 } from '../../services/membershipService'
 import {
   fetchWorkoutTemplates, fetchDietTemplates,
@@ -206,6 +207,12 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
   // Plan-payment state — only meaningful while changingPlan is open
   const [alreadyPaid, setAlreadyPaid]       = useState(false)
   const [paymentMethod, setPaymentMethod]   = useState('cash')
+  // Override for the new expiry date. Default = what computeRenewalDates
+  // would produce naturally (stacks on existing expiry for active members,
+  // today + duration for new/inactive). Owner picks a sooner date when
+  // migrating someone whose actual cycle ends before our auto-default.
+  // Empty until selPlanId is set; the useEffect below pre-fills.
+  const [expiryDate, setExpiryDate] = useState('')
   const [assignType, setAssignType]     = useState(null)   // 'workout' | 'diet' | null
   const [needsConfirm, setNeedsConfirm] = useState(false)  // duplicate-plan warning visible
   const [templates, setTemplates]       = useState([])
@@ -219,12 +226,32 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
       .finally(() => setLoadingPlans(false))
   }, [member.id])
 
+  // Whenever the selected plan changes (or we enter change-plan mode), reset
+  // the expiry override to the natural default — what computeRenewalDates
+  // would produce without an override. For an active renewing member this
+  // stacks on existing expiry; for new/inactive it's today+duration.
+  useEffect(() => {
+    if (!changingPlan) { setExpiryDate(''); return }
+    const plan = plans?.find(p => p.id === selPlanId)
+    if (!plan) { setExpiryDate(''); return }
+    setExpiryDate(computeDefaultExpiry(member.expiry_date ?? null, plan.duration_days))
+  }, [changingPlan, selPlanId, plans, member.expiry_date])
+
   async function handleSavePlan() {
     const plan = plans?.find(p => p.id === selPlanId)
     if (!plan) return
     setSavingPlan(true)
     try {
-      await assignMembershipPlan({ memberId: member.id, planId: plan.id, durationDays: plan.duration_days })
+      // Only pass expiryDate when owner picked something different from the
+      // natural default. Same-as-default → null → service runs its normal
+      // stacking logic, identical to pre-feature behavior for active members.
+      const defaultExpiry = computeDefaultExpiry(member.expiry_date ?? null, plan.duration_days)
+      const expiryOverride = expiryDate && expiryDate !== defaultExpiry ? expiryDate : null
+      // assignMembershipPlan returns the freshly-updated member row with the
+      // new expiry_date / status / plan join. Capture it so the drawer's
+      // local state + parent list both pick up the new expiry — otherwise
+      // the Info tab keeps rendering the stale value until full refresh.
+      const updated = await assignMembershipPlan({ memberId: member.id, planId: plan.id, durationDays: plan.duration_days, expiryDate: expiryOverride })
       // Every Save records a payment — including re-save of the same plan,
       // so an owner who deleted a pending row can re-record by re-saving.
       // recordManualPayment expires existing pendings first, so back-to-back
@@ -243,10 +270,16 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
       } catch (payErr) {
         console.error('recordManualPayment failed:', payErr)
       }
-      onMemberUpdate({ ...member, plan_id: plan.id, plan })
+      // Merge order matters: parent's `member` first preserves joined fields
+      // not in assignPlan's select (e.g. branch); `updated` overlays the
+      // refreshed table columns; `plan` ensures the joined plan object is
+      // present (it's already in `updated` but defensive against future
+      // changes to the select).
+      onMemberUpdate({ ...member, ...updated, plan })
       setChangingPlan(false)
       setAlreadyPaid(false)
       setPaymentMethod('cash')
+      setExpiryDate('')
     } catch (err) { dialog.alert(err.message || 'Failed') }
     finally { setSavingPlan(false) }
   }
@@ -327,6 +360,35 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
                 }))}
               />
 
+              {/* Next renewal due — defaults to what the service would
+                  compute naturally (stacks for active members, today+dur
+                  for new). Owner overrides for migrated members whose
+                  actual expiry is sooner. Capped at the default so an
+                  accidental month-jump can't extend expiry by a cycle. */}
+              {selPlanId && (() => {
+                const plan = plans?.find(p => p.id === selPlanId)
+                const days = plan?.duration_days
+                const defaultExpiry = days ? computeDefaultExpiry(member.expiry_date ?? null, days) : ''
+                const isDefault = expiryDate === defaultExpiry
+                return (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1">
+                    <label className="block text-xs font-semibold text-gray-900">Next renewal due</label>
+                    <input
+                      type="date"
+                      value={expiryDate}
+                      max={defaultExpiry}
+                      onChange={e => setExpiryDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-md text-xs text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <p className="text-[11px] text-gray-500 leading-snug">
+                      {isDefault
+                        ? `Default ${days}d cycle. Reminders fire 3, 1, 0 days before.`
+                        : `Expires ${expiryDate}. Reminders fire 3, 1, 0 days before. Next renewal adds ${days}d.`}
+                    </p>
+                  </div>
+                )
+              })()}
+
               {/* Payment row — shown for any save with a plan selected,
                   including re-saving the same plan (so an owner who deleted
                   a pending row can re-record by re-saving). */}
@@ -370,7 +432,7 @@ function PlansTab({ member, gymId, plans, onMemberUpdate }) {
                   className="flex-1 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 cursor-pointer disabled:opacity-50">
                   {savingPlan ? 'Saving…' : 'Save'}
                 </button>
-                <button onClick={() => { setChangingPlan(false); setAlreadyPaid(false); setPaymentMethod('cash') }}
+                <button onClick={() => { setChangingPlan(false); setAlreadyPaid(false); setPaymentMethod('cash'); setExpiryDate('') }}
                   className="flex-1 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 cursor-pointer">
                   Cancel
                 </button>

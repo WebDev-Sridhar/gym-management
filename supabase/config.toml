@@ -1,0 +1,62 @@
+# Supabase project config. Per-function `verify_jwt` declarations below are
+# the source of truth on `supabase functions deploy` — without these entries
+# the CLI defaults each function to verify_jwt=true on deploy, which would
+# break cron-triggered, webhook-triggered, and public-checkout functions.
+#
+# Add a new function here BEFORE deploying it if it must skip JWT verification.
+# All omitted functions default to verify_jwt=true (the safe default for
+# user-triggered endpoints).
+
+project_id = "gymmobius"
+
+
+# ─── Cron-triggered functions ────────────────────────────────────────────────
+# Authenticated by CRON_SECRET passed in the Authorization header from pg_cron.
+# Must NOT require a user JWT — there's no logged-in user.
+
+[functions.ghost-detection]
+verify_jwt = false
+
+[functions.expire-stale-records]
+verify_jwt = false
+
+[functions.weekly-summary]
+verify_jwt = false
+
+[functions.daily-expiry-reminders]
+verify_jwt = false
+
+[functions.cleanup-temp-images]
+verify_jwt = false
+
+
+# ─── Webhook (server-to-server) ──────────────────────────────────────────────
+# Razorpay POSTs payment events directly — no user JWT. Authenticated via the
+# x-razorpay-signature header (HMAC of body + RAZORPAY_WEBHOOK_SECRET).
+
+[functions.razorpay-webhook]
+verify_jwt = false
+
+
+# ─── Public-facing endpoints ─────────────────────────────────────────────────
+# Called from each gym's public website / payment links without an
+# authenticated session. Authorization is enforced inside the function via
+# per-gym tokens, phone OTP, or signed payloads.
+
+[functions.find-my-gym]
+verify_jwt = false
+
+[functions.create-public-order]
+verify_jwt = false
+
+[functions.verify-public-payment]
+verify_jwt = false
+
+[functions.get-payment-by-token]
+verify_jwt = false
+
+[functions.confirm-upi-payment]
+verify_jwt = false
+
+[functions.submit-member-registration]
+verify_jwt = false

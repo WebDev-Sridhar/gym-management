@@ -63,8 +63,9 @@ const GymAbout     = lazy(() => import('./pages/gym/GymAbout'))
 const GymPricing   = lazy(() => import('./pages/gym/GymPricing'))
 const GymTrainers  = lazy(() => import('./pages/gym/GymTrainers'))
 const GymContact   = lazy(() => import('./pages/gym/GymContact'))
-const GymLoginPage = lazy(() => import('./pages/gym/GymLoginPage'))
-const GymJoinPage  = lazy(() => import('./pages/gym/GymJoinPage'))
+const GymLoginPage    = lazy(() => import('./pages/gym/GymLoginPage'))
+const GymJoinPage     = lazy(() => import('./pages/gym/GymJoinPage'))
+const GymRegisterPage = lazy(() => import('./pages/gym/GymRegisterPage'))
 
 // Detect host kind once at app boot. Hostname can only change with a full
 // page reload, so this is stable for the entire React lifecycle.
@@ -123,6 +124,7 @@ const gymChildRoutes = (
     <Route path="contact" element={<GymContact />} />
     <Route path="login" element={<GymLoginPage />} />
     <Route path="join" element={<GymJoinPage />} />
+    <Route path="register" element={<GymRegisterPage />} />
     <Route path="privacy" element={<GymPrivacyPage />} />
     <Route path="terms" element={<GymTermsPage />} />
     <Route path="refund" element={<GymRefundPage />} />

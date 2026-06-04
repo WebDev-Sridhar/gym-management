@@ -589,7 +589,16 @@ export default function PaymentsPage() {
             trainers={[]}
             defaultTab="Payments"
             onClose={() => setDrawerMember(null)}
-            onUpdated={updated => setDrawerMember(updated)}
+            onUpdated={updated => {
+              // Keep drawer in sync while it's open
+              setDrawerMember(updated)
+              // Update the local members cache so anything keyed off members
+              // (status pills, expiry hints) reflects immediately on close
+              setMembers(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m))
+              // A plan change inside the drawer creates a payment row via
+              // recordManualPayment — refetch so the new row shows up.
+              fetchPayments(gymId, selectedBranchId).then(setPayments).catch(() => {})
+            }}
             onDeleted={() => setDrawerMember(null)}
           />
         )}

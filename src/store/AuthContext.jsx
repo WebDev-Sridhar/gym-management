@@ -3,6 +3,7 @@ import { supabase, setAccessToken } from '../services/supabaseClient'
 import { fetchUserProfile, fetchSubscription } from '../services/userService'
 import { signOut as authSignOut } from '../services/authService'
 import { setSentryUser } from '../lib/sentry'
+import { discardAllDrafts } from '../lib/cmsDraft'
 
 const AuthContext = createContext(null)
 
@@ -234,6 +235,14 @@ export function AuthProvider({ children }) {
   async function logout() {
     // Clear cached token immediately so data client stops working
     setAccessToken(null)
+    // Drop CMS drafts + their pending temp uploads BEFORE auth state clears,
+    // so re-login on the same browser doesn't resurrect a stale editor with
+    // images pointing at orphaned storage files. Best-effort: failures are
+    // caught by the daily cleanup-temp-images cron.
+    const gymIdForCleanup = profile?.gym_id
+    if (gymIdForCleanup) {
+      try { await discardAllDrafts(gymIdForCleanup) } catch { /* silent */ }
+    }
     // Drop the gym-slug breadcrumb (only used by the neuter-redirect path)
     if (typeof window !== 'undefined') {
       try { localStorage.removeItem('gym:lastSlug') } catch { /* ignore */ }

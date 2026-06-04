@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { upsertCmsContent } from '../../../../services/gymCmsService'
 import { useCMSImageList } from '../../../../hooks/useCMSImage'
 import ImageUploader from '../components/ImageUploader'
+import UnsavedUploadsBadge from '../components/UnsavedUploadsBadge'
 import FeatureGate from '../components/FeatureGate'
 import { useDialog } from '../../../../components/ui/Dialog'
 
@@ -226,9 +227,10 @@ export default function AboutForm({ content, gymId, planName, onSave, setPreview
         {aboutImgs.error && <p className="mt-1.5 text-xs text-red-500">{aboutImgs.error}</p>}
       </div>
 
-      <div className="flex items-center gap-3 pt-4">
+      <div className="flex items-center gap-3 pt-4 flex-wrap">
         <SaveBtn saving={saving} onClick={save} />
         <SuccessMsg msg={success} />
+        <UnsavedUploadsBadge pending={aboutImgs.isPending} hide={saving || !!success} />
       </div>
     </div>
   )

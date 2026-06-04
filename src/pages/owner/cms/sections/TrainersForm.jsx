@@ -5,6 +5,7 @@ import {
 import { deleteFile } from '../../../../services/storageService'
 import { useCMSImage } from '../../../../hooks/useCMSImage'
 import ImageUploader from '../components/ImageUploader'
+import UnsavedUploadsBadge from '../components/UnsavedUploadsBadge'
 import FeatureGate from '../components/FeatureGate'
 import { useDialog } from '../../../../components/ui/Dialog'
 import FormModal from '../../../../components/ui/FormModal'
@@ -109,7 +110,7 @@ function TrainerInlineForm({ data, gymId, planName, imageCount, onSave, onCancel
           placeholder="Ravi has 10 years of experience in strength training…" className={inputCls + ' resize-none'} />
       </Field>
 
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-1 flex-wrap">
         <button type="button" onClick={handleCancel}
           className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
           Cancel
@@ -119,6 +120,7 @@ function TrainerInlineForm({ data, gymId, planName, imageCount, onSave, onCancel
           {(saving || img.uploading) && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />}
           {saving ? 'Saving…' : img.uploading ? 'Uploading…' : 'Save'}
         </button>
+        <UnsavedUploadsBadge pending={img.isPending} hide={saving || img.uploading} />
       </div>
     </div>
   )
