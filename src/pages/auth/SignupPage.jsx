@@ -40,6 +40,19 @@ export default function SignupPage() {
     return () => clearTimeout(id)
   }, [resendCooldown])
 
+  // Reset the loading spinner when the page is restored from bfcache —
+  // i.e. user clicked "Continue with Google", landed on Google's OAuth
+  // consent, then hit browser back without signing in. Without this, the
+  // "Connecting..." label stays stuck because handleGoogle set loading=true
+  // expecting a full-page redirect that never completed.
+  useEffect(() => {
+    function onPageShow(e) {
+      if (e.persisted) setLoading(false)
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
+
   function validate() {
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError('Enter a valid email address'); return false

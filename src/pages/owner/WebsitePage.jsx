@@ -2953,7 +2953,7 @@ export default function WebsitePage() {
                   <span>{page.label}</span>
                 </div>
                 {!accessible ? (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded font-bold border border-amber-100">Pro</span>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded font-bold border border-amber-100">{page.minPlan || 'Pro'}</span>
                 ) : (
                   <svg
                     className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
@@ -2995,7 +2995,7 @@ export default function WebsitePage() {
                               ) && (
                                 <span title="Hidden from live site" className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
                               )}
-                              {secLocked && <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded font-bold border border-amber-100">Pro</span>}
+                              {secLocked && <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded font-bold border border-amber-100">{sec.minPlan || 'Pro'}</span>}
                             </div>
                           </div>
                           <span className={`block text-xs mt-0.5 ${activeSection === sec.id ? 'text-indigo-400' : 'text-gray-400'}`}>{sec.desc}</span>

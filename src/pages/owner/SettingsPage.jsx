@@ -407,13 +407,19 @@ export default function SettingsPage() {
   const isSoloCoach = subscription?.status === 'active' && subscription?.plan_name === 'free'
   const email     = profile?.email || user?.email || '—'
 
+  // Source of truth for what each paid plan includes. Aligned with
+  // PRICING_PLANS in src/lib/constants.js + FEATURE_RULES in featureGates.js.
+  // Custom domain is Premium-only (custom_domain: ['premium']); the older
+  // `pro: true` value was a stale leftover from before the V3 pricing split.
   const PLAN_FEATURES = [
-    { feature: 'Member management',    starter: true,  pro: true  },
-    { feature: 'Payment tracking',     starter: true,  pro: true  },
-    { feature: 'Analytics dashboard',  starter: true,  pro: true  },
-    { feature: 'Website builder',      starter: false, pro: true  },
-    { feature: 'Razorpay integration', starter: false, pro: true  },
-    { feature: 'Custom domain',        starter: false, pro: true  },
+    { feature: 'Member management',    starter: true,  pro: true,  premium: true  },
+    { feature: 'Payment tracking',     starter: true,  pro: true,  premium: true  },
+    { feature: 'Analytics dashboard',  starter: true,  pro: true,  premium: true  },
+    { feature: 'Website builder',      starter: true,  pro: true,  premium: true  },
+    { feature: 'Razorpay integration', starter: true,  pro: true,  premium: true  },
+    { feature: 'Custom subdomain',     starter: false, pro: true,  premium: true  },
+    { feature: 'Custom domain',        starter: false, pro: false, premium: true  },
+    { feature: 'Multi-branch',         starter: false, pro: false, premium: true  },
   ]
 
   return (
@@ -497,8 +503,17 @@ export default function SettingsPage() {
             )}
 
             <div className="border-t border-gray-50 pt-4 mt-4 space-y-2 mb-5">
-              {PLAN_FEATURES.map(({ feature, starter, pro }) => {
-                const has = planName === 'Starter' ? starter : pro
+              {PLAN_FEATURES.map(({ feature, starter, pro, premium }) => {
+                // planName comes from the canonical lowercase enum
+                // (free | starter | pro | premium). The old `=== 'Starter'`
+                // comparison never matched (case mismatch) so every paid
+                // tier silently used the pro column — also why Premium users
+                // saw "Custom domain ✓" even after the data was fixed.
+                const lower = String(planName).toLowerCase()
+                const has = lower === 'premium' ? premium
+                          : lower === 'starter' ? starter
+                          : lower === 'pro'     ? pro
+                          : false             // free / Solo Coach: paid-plan features locked
                 return (
                   <div key={feature} className={`flex items-center gap-2 text-xs ${has ? 'text-gray-600' : 'text-gray-300'}`}>
                     <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 ${has ? 'bg-emerald-100' : 'bg-gray-100'}`}>

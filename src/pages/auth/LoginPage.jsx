@@ -66,6 +66,21 @@ export default function LoginPage() {
     }
   }, [])
 
+  // Reset the loading spinner when the page is restored from bfcache —
+  // i.e. user clicked "Continue with Google", landed on Google's OAuth
+  // consent, then hit browser back without signing in. Without this, both
+  // the "Connecting..." and "Signing in..." labels stay stuck forever
+  // because handleGoogle set loading=true expecting a full-page redirect.
+  // event.persisted = true means the page came from the back/forward
+  // cache (typical OAuth-cancel scenario in all modern browsers).
+  useEffect(() => {
+    function onPageShow(e) {
+      if (e.persisted) setLoading(false)
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
+
   // Tick the verify-email resend cooldown down to 0. setTimeout recursion
   // keeps the deps array stable and avoids the cleanup tracking that
   // setInterval would need.
