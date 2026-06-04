@@ -61,9 +61,10 @@ Deno.serve(async (req) => {
     if (!member.gym?.slug)        throw new HttpError(500, 'gym slug not available')
 
     // Portal URL preference order: verified custom domain > subdomain >
-    // path-based /{slug}/login on main host. Mirrors what middleware would
-    // route the visitor to anyway, so the URL the member receives is the
-    // same one they'd see if they typed the gym's name into Google.
+    // path-based /{slug}/join on main host. We point at /join (not /login)
+    // because the member has no auth.users row yet — the invite is the
+    // FIRST step where they set a password + verify their email. The /login
+    // path would just fail their (non-existent) credentials and confuse them.
     const portalUrl = resolvePortalUrl(member.gym)
 
     const result = await sendNotification({
@@ -89,10 +90,10 @@ Deno.serve(async (req) => {
 
 function resolvePortalUrl(gym: { slug: string; custom_domain: string | null; subdomain: string | null; domain_status: string | null }): string {
   if (gym.custom_domain && gym.domain_status === 'verified') {
-    return `https://${gym.custom_domain}/login`
+    return `https://${gym.custom_domain}/join`
   }
   if (gym.subdomain) {
-    return `https://${gym.subdomain}.${MAIN_DOMAIN}/login`
+    return `https://${gym.subdomain}.${MAIN_DOMAIN}/join`
   }
-  return `https://${MAIN_DOMAIN}/${gym.slug}/login`
+  return `https://${MAIN_DOMAIN}/${gym.slug}/join`
 }
