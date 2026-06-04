@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { fetchGymBySlug, fetchGymBySubdomain, fetchGymByCustomDomain, resolveSlugRedirect, fetchGymActivePlan } from '../services/gymPublicService'
-import { detectHost } from '../lib/host'
+import { detectHost, getPublicBasePath } from '../lib/host'
 import { useTenantMeta } from '../hooks/useTenantMeta'
 import PwaInstallBanner from '../components/PwaInstallBanner'
 
@@ -121,8 +121,22 @@ export function GymProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolveKey])
 
+  // Path prefix for in-gym navigation. Main-domain mounts the gym site under
+  // /:gymSlug/* so internal links must include the slug; subdomain + custom
+  // domains mount it at /* so the slug must be OMITTED. Hardcoded
+  // `/${gym.slug}/login` style hrefs only work on the main domain — anywhere
+  // else they produce broken routes like `owngains.online/owngains/login`.
+  // Every internal link should use `${basePath}/...` instead.
+  //
+  // Delegates to the existing getPublicBasePath helper (used by GymNavbar +
+  // GymLayout) so we have one source of truth for host-aware path math.
+  const basePath = getPublicBasePath(
+    typeof window !== 'undefined' ? window.location.hostname : '',
+    gym?.slug,
+  )
+
   return (
-    <GymContext.Provider value={{ gym, loading, error, hostInfo, activePlan, isSoloCoach: activePlan === 'free' }}>
+    <GymContext.Provider value={{ gym, loading, error, hostInfo, activePlan, isSoloCoach: activePlan === 'free', basePath }}>
       {children}
       {gym && <PwaInstallBanner logo={gym.logo_url} appName={gym.name} />}
     </GymContext.Provider>

@@ -13,7 +13,7 @@ const DEFAULT_HOURS = [
 ]
 
 export default function GymContact() {
-  const { gym } = useGym()
+  const { gym, basePath } = useGym()
   const hours = (Array.isArray(gym?.working_hours) && gym.working_hours.length > 0)
     ? gym.working_hours
     : DEFAULT_HOURS
@@ -236,7 +236,7 @@ export default function GymContact() {
               {content?.cta_contact || 'COME VISIT US'}
             </motion.h2>
             <Link
-              to={`/${gym.slug}/pricing`}
+              to={`${basePath}/pricing`}
               className="inline-flex items-center gap-2 px-10 py-4 bg-white font-bold text-sm font-sans hover:-translate-y-1 transition-all duration-300"
               style={{ color: 'var(--gym-primary)', borderRadius: 'var(--gym-card-radius)' }}
             >

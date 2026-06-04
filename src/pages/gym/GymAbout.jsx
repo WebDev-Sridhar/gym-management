@@ -32,7 +32,7 @@ const visionMission = [
 ]
 
 export default function GymAbout() {
-  const { gym } = useGym()
+  const { gym, basePath } = useGym()
   const [content, setContent] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -233,7 +233,7 @@ export default function GymAbout() {
               {content?.cta_about || 'JOIN US TODAY'}
             </motion.h2>
             <Link
-              to={`/${gym.slug}/pricing`}
+              to={`${basePath}/pricing`}
               className="inline-flex items-center gap-2 px-10 py-4 bg-white font-bold text-sm font-sans hover:-translate-y-1 transition-all duration-300 hover:shadow-2xl"
               style={{ color: 'var(--gym-primary)', borderRadius: 'var(--gym-card-radius)' }}
             >

@@ -33,7 +33,7 @@ const labelStyle = {
 }
 
 export default function GymRegisterPage() {
-  const { gym } = useGym()
+  const { gym, basePath } = useGym()
   const [name, setName]       = useState('')
   const [phone, setPhone]     = useState('')
   const [email, setEmail]     = useState('')
@@ -185,7 +185,7 @@ export default function GymRegisterPage() {
 
             <p className="text-xs text-center leading-relaxed" style={{ color: 'var(--gym-text-muted)' }}>
               Already a member?{' '}
-              <Link to={`/${gym.slug}/login`} className="font-semibold hover:opacity-80 transition-opacity"
+              <Link to={`${basePath}/login`} className="font-semibold hover:opacity-80 transition-opacity"
                 style={{ color: 'var(--gym-text)' }}>
                 Sign in
               </Link>

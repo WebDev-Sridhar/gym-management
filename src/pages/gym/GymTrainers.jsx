@@ -8,7 +8,7 @@ import { staggerContainer, scrollViewport, fadeUp } from '../../lib/animations'
 import TrainerCard from '../../components/gym/TrainerCard'
 
 export default function GymTrainers() {
-  const { gym } = useGym()
+  const { gym, basePath } = useGym()
   const [trainers, setTrainers] = useState([])
   const [content, setContent] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -121,7 +121,7 @@ export default function GymTrainers() {
                     )}
                     <div className="h-px mb-8" style={{ background: 'var(--gym-border)' }} />
                     <Link
-                      to={`/${gym.slug}/pricing`}
+                      to={`${basePath}/pricing`}
                       className="inline-flex items-center gap-2 px-8 py-4 font-bold text-sm font-sans text-white hover:-translate-y-0.5 transition-all duration-300"
                       style={{ background: 'var(--gym-gradient)', boxShadow: '0 8px 24px var(--gym-glow)', borderRadius: 'var(--gym-card-radius)' }}
                     >
@@ -148,7 +148,7 @@ export default function GymTrainers() {
               READY TO TRAIN?
             </motion.h2>
             <Link
-              to={`/${gym.slug}/pricing`}
+              to={`${basePath}/pricing`}
               className="inline-flex items-center gap-2 px-10 py-4 bg-white font-bold text-sm font-sans hover:-translate-y-1 transition-all duration-300"
               style={{ color: 'var(--gym-primary)', borderRadius: 'var(--gym-card-radius)' }}
             >

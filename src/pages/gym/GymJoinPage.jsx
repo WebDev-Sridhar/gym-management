@@ -38,7 +38,7 @@ const labelStyle = {
 }
 
 export default function GymJoinPage() {
-  const { gym } = useGym()
+  const { gym, basePath } = useGym()
   const [searchParams] = useSearchParams()
   const returnTo = safeReturnUrl(searchParams.get('return'))
 
@@ -77,12 +77,12 @@ export default function GymJoinPage() {
   }, [done, resendIn])
 
   if (!gym) return null
-  const base = `/${gym.slug}`
+  // basePath: '/:gym.slug' on main domain, '' on subdomain/custom-domain.
   // Forward the return URL through to the post-signup login link so the
   // QR-code check-in flow comes full circle.
   const loginHref = returnTo
-    ? `${base}/login?return=${encodeURIComponent(returnTo)}`
-    : `${base}/login`
+    ? `${basePath}/login?return=${encodeURIComponent(returnTo)}`
+    : `${basePath}/login`
 
   async function handleSubmit(e) {
     e.preventDefault()

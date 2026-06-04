@@ -46,7 +46,7 @@ function safeReturnUrl(raw) {
 }
 
 export default function GymLoginPage() {
-  const { gym } = useGym()
+  const { gym, basePath } = useGym()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const returnTo = safeReturnUrl(searchParams.get('return'))
@@ -160,9 +160,12 @@ export default function GymLoginPage() {
   }, [])
 
   if (!gym) return null
-  const base = `/${gym.slug}`
+  // basePath honours the current host: /:gym.slug on main domain, '' on
+  // subdomain/custom-domain. Empty-string + '/' resolves to '/' which is
+  // the gym home on those hosts.
+  const base = basePath || '/'
   // Preserve the return URL when offering the "Create account" link.
-  const joinHref = returnTo ? `${base}/join?return=${encodeURIComponent(returnTo)}` : `${base}/join`
+  const joinHref = returnTo ? `${basePath}/join?return=${encodeURIComponent(returnTo)}` : `${basePath}/join`
 
   function handleEmailContinue(e) {
     e.preventDefault()

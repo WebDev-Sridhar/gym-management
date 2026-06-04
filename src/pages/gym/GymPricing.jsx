@@ -18,7 +18,7 @@ const faqs = [
 ]
 
 export default function GymPricing() {
-  const { gym } = useGym()
+  const { gym, basePath } = useGym()
   const [plans, setPlans] = useState([])
   const [content, setContent] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -221,7 +221,7 @@ export default function GymPricing() {
               {content?.cta_pricing || 'START TODAY'}
             </motion.h2>
             <Link
-              to={`/${gym.slug}/contact`}
+              to={`${basePath}/contact`}
               className="inline-flex items-center gap-2 px-10 py-4 bg-white font-bold text-sm font-sans hover:-translate-y-1 transition-all duration-300"
               style={{ color: 'var(--gym-primary)', borderRadius: 'var(--gym-card-radius)' }}
             >
