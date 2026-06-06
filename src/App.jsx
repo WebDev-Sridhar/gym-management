@@ -12,7 +12,12 @@ import LandingPage from './pages/landing/LandingPage'
 import ScrollToTop from './ScrollToTop'
 import PwaInstallBanner from './components/PwaInstallBanner'
 import { ROUTES } from './lib/constants/routes'
-import { detectHost } from './lib/host'
+import { detectHost, isAdminHost } from './lib/host'
+
+// Lazy: the entire internal super-admin app. Brings its own AdminAuthProvider
+// (resolves platform_admins, not gym users) so none of the tenant providers
+// load on the admin surface. Fully code-split — zero bytes in the tenant bundle.
+const AdminRoot = lazy(() => import('./admin/AdminRoot'))
 
 // Lazy: auth + onboarding pages. Each one is a separate chunk so a user
 // signing up doesn't pay for the dashboard JS up front.
@@ -72,6 +77,11 @@ const GymRegisterPage = lazy(() => import('./pages/gym/GymRegisterPage'))
 const HOST_KIND = typeof window !== 'undefined'
   ? detectHost(window.location.hostname).kind
   : 'main'
+
+// Internal super-admin surface. True on admin.gymmobius.com (prod) or
+// admin.localhost (dev). Takes over the whole app when set.
+const IS_ADMIN_HOST = typeof window !== 'undefined'
+  && isAdminHost(window.location.hostname)
 
 // Lazy-load marketing & legal pages — they're public, not the hot path.
 const FeaturesPage = lazy(() => import('./pages/landing/FeaturesPage'))
@@ -176,6 +186,22 @@ function TenantRoutes() {
 }
 
 export default function App() {
+  // INTERNAL SUPER-ADMIN SURFACE — takes over the whole app on the admin host.
+  // No tenant providers (AuthProvider/ThemeProvider/Dialog) load here; AdminRoot
+  // mounts its own AdminAuthProvider. Routes are absolute from root.
+  if (IS_ADMIN_HOST) {
+    return (
+      <BrowserRouter>
+        <ScrollToTop />
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/*" element={<AdminRoot />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    )
+  }
+
   return (
     <BrowserRouter>
       <ScrollToTop />
@@ -190,6 +216,9 @@ export default function App() {
           <Route path={ROUTES.HOME} element={<LandingPage />} />
           <Route path="/checkin" element={<CheckinPage />} />
           <Route path="/pay/:token" element={<PayLandingPage />} />
+          {/* Local-dev entry to the internal admin app (prod uses
+              admin.gymmobius.com). AdminRoot brings its own auth context. */}
+          <Route path="/admin/*" element={<AdminRoot />} />
           <Route path={ROUTES.FEATURES} element={<FeaturesPage />} />
           <Route path={ROUTES.PRICING} element={<PricingPage />} />
           <Route path={ROUTES.DEMO} element={<DemoPage />} />

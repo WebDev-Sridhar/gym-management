@@ -7,7 +7,7 @@ import { supabaseData as supabase } from './supabaseClient'
 export async function fetchUserProfile(authId) {
   const { data, error } = await supabase
     .from('users')
-    .select('*, gym:gym_id(name, slug, onboarding_step)')
+    .select('*, gym:gym_id(name, slug, onboarding_step, status)')
     .eq('id', authId)
     .maybeSingle()
 
@@ -16,6 +16,9 @@ export async function fetchUserProfile(authId) {
     data.onboarding_step = data.gym?.onboarding_step ?? null
     data.gym_name = data.gym?.name ?? null
     data.gym_slug = data.gym?.slug ?? null
+    // Platform-admin suspension flag — read by AuthContext / ProtectedRoute to
+    // block the dashboard when staff suspend a gym.
+    data.gym_status = data.gym?.status ?? null
     delete data.gym
   }
   return data

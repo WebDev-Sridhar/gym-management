@@ -3,7 +3,7 @@ import { useAuth } from '../../store/AuthContext'
 import { nextRouteFor, roleHome } from '../../lib/onboarding'
 
 export default function ProtectedRoute({ allowedRoles, children }) {
-  const { isAuthenticated, profile, role, loading, initialized } = useAuth()
+  const { isAuthenticated, profile, role, loading, initialized, gymSuspended, logout } = useAuth()
 
   // Block route decisions until the very first auth check has finished —
   // without this, a re-render between setSession() and loadProfile() could
@@ -33,6 +33,32 @@ export default function ProtectedRoute({ allowedRoles, children }) {
   // No profile yet — brand new user who hasn't created a gym
   if (!profile) {
     return <Navigate to="/create-gym" replace />
+  }
+
+  // Gym suspended by platform staff — block everyone in the gym with a clear
+  // message instead of a broken dashboard. (Public site enforcement is a
+  // later phase; this covers the authenticated owner/trainer/member surfaces.)
+  if (gymSuspended) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <div className="max-w-sm text-center">
+          <h1 className="text-lg font-semibold text-gray-900">Account suspended</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Access to this gym is temporarily suspended. Please contact Gymmobius
+            support to restore your account.
+          </p>
+          <a
+            href="mailto:support@gymmobius.com"
+            className="mt-4 inline-block rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white"
+          >
+            Contact support
+          </a>
+          <button onClick={logout} className="mt-3 block w-full text-sm text-gray-500">
+            Sign out
+          </button>
+        </div>
+      </div>
+    )
   }
 
   // Owner-specific onboarding gate. nextRouteFor returns the path the user

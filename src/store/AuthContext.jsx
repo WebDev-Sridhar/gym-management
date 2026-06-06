@@ -282,6 +282,9 @@ export function AuthProvider({ children }) {
     gymId: profile?.gym_id ?? null,
     gymName: profile?.gym_name ?? null,
     gymSlug: profile?.gym_slug ?? null,   // used by member/trainer apps to route logout → /{slug}/login
+    // Platform-admin suspension — when staff suspend a gym, every member of
+    // that gym (owner/trainer/member) is blocked at ProtectedRoute.
+    gymSuspended: profile?.gym_status === 'suspended',
     // Trainer's pinned branch (null for owners — they use BranchContext to switch)
     branchId: profile?.branch_id ?? null,
     // V3 P0 lifecycle: status is the dominant signal — never report active

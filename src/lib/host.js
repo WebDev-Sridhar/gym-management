@@ -82,6 +82,24 @@ export function isMainHost(host = (typeof window !== 'undefined' ? window.locati
 }
 
 /**
+ * True when the visitor is on the INTERNAL super-admin surface.
+ *
+ *   admin.gymmobius.com → true   (production)
+ *   admin.localhost     → true   (local dev via /etc/hosts or browser)
+ *   anything else       → false
+ *
+ * `admin` is a reserved subdomain (detectHost returns kind:'main' for it), so
+ * the React app + middleware never treat it as a tenant. This helper is the
+ * explicit switch App.jsx uses to mount the admin app instead of the tenant /
+ * marketing tree. For local dev without a hosts entry, App.jsx also accepts a
+ * `/admin` path prefix on the main host.
+ */
+export function isAdminHost(host = (typeof window !== 'undefined' ? window.location.hostname : '')) {
+  const h = normaliseHost(host)
+  return h === `admin.${MAIN_DOMAIN}` || h === 'admin.localhost'
+}
+
+/**
  * Returns the tenant subdomain for the current hostname, or null.
  *
  *   owngainz.gymmobius.com → 'owngainz'

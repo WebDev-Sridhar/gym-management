@@ -1,0 +1,107 @@
+/* Internal super-admin chrome. Fully themeable via the --a-* variables: the
+   dark palette is the default on .app-admin; a light palette is layered on when
+   <html data-admin-theme="light">. Scoped under .app-admin so nothing leaks
+   into the tenant app. */
+
+.app-admin {
+  /* ── Dark (default) ── */
+  --a-bg: #0a0a12;
+  --a-surface: #12121c;
+  --a-surface-2: #181826;
+  --a-border: rgba(255, 255, 255, 0.08);
+  --a-border-strong: rgba(255, 255, 255, 0.14);
+  --a-text: #f4f4f6;
+  --a-text-dim: #a1a1b0;
+  --a-text-faint: #6c6c7a;
+  --a-accent: #6366f1;
+  --a-accent-soft: rgba(99, 102, 241, 0.16);
+  --a-accent-text: #c7d2fe;          /* active nav/tab text */
+  --a-success: #10b981;
+  --a-warning: #f59e0b;
+  --a-danger: #ef4444;
+  --a-hover: rgba(255, 255, 255, 0.05);
+  --a-chip: rgba(255, 255, 255, 0.07);
+  --a-shimmer-base: rgba(255, 255, 255, 0.04);
+  --a-shimmer-hi: rgba(255, 255, 255, 0.09);
+  --a-scroll: rgba(255, 255, 255, 0.10);
+  /* Status / KPI tones */
+  --a-tone-green-bg: rgba(16, 185, 129, 0.14);  --a-tone-green-fg: #34d399;
+  --a-tone-amber-bg: rgba(245, 158, 11, 0.14);  --a-tone-amber-fg: #fbbf24;
+  --a-tone-red-bg: rgba(239, 68, 68, 0.14);     --a-tone-red-fg: #f87171;
+  --a-tone-gray-bg: var(--a-chip);              --a-tone-gray-fg: #a1a1b0;
+  --a-tone-indigo-bg: rgba(99, 102, 241, 0.16); --a-tone-indigo-fg: #a5b4fc;
+
+  background: var(--a-bg);
+  color: var(--a-text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Light ── */
+html[data-admin-theme="light"] .app-admin {
+  --a-bg: #f5f6f8;
+  --a-surface: #ffffff;
+  --a-surface-2: #f1f2f5;
+  --a-border: rgba(0, 0, 0, 0.09);
+  --a-border-strong: rgba(0, 0, 0, 0.16);
+  --a-text: #18181b;
+  --a-text-dim: #52525b;
+  --a-text-faint: #8b8b94;
+  --a-accent: #6366f1;
+  --a-accent-soft: rgba(99, 102, 241, 0.12);
+  --a-accent-text: #4f46e5;
+  --a-success: #059669;
+  --a-warning: #d97706;
+  --a-danger: #dc2626;
+  --a-hover: rgba(0, 0, 0, 0.04);
+  --a-chip: rgba(0, 0, 0, 0.06);
+  --a-shimmer-base: rgba(0, 0, 0, 0.05);
+  --a-shimmer-hi: rgba(0, 0, 0, 0.09);
+  --a-scroll: rgba(0, 0, 0, 0.18);
+  --a-tone-green-bg: rgba(5, 150, 105, 0.12);   --a-tone-green-fg: #047857;
+  --a-tone-amber-bg: rgba(217, 119, 6, 0.14);   --a-tone-amber-fg: #b45309;
+  --a-tone-red-bg: rgba(220, 38, 38, 0.10);     --a-tone-red-fg: #b91c1c;
+  --a-tone-gray-bg: var(--a-chip);              --a-tone-gray-fg: #52525b;
+  --a-tone-indigo-bg: rgba(99, 102, 241, 0.12); --a-tone-indigo-fg: #4338ca;
+}
+
+.app-admin ::-webkit-scrollbar { width: 10px; height: 10px; }
+.app-admin ::-webkit-scrollbar-thumb { background: var(--a-scroll); border-radius: 8px; }
+.app-admin ::-webkit-scrollbar-track { background: transparent; }
+
+/* Theme-aware hover surface (replaces hardcoded hover:bg-white/5). */
+.app-admin .admin-hover { transition: background-color 0.12s ease; }
+.app-admin .admin-hover:hover { background: var(--a-hover); }
+
+/* Tailwind v4's divide-y renders the divider as border-bottom on every child
+   except the last, and defaults its color to currentColor (= text color) —
+   which reads too strong in both themes. Pin it to the subtle border token.
+   Must match Tailwind's selector (:not(:last-child)) so the FIRST row's bottom
+   line is included; a `~` selector would skip row 1. */
+.app-admin .divide-y > :not(:last-child) {
+  border-color: var(--a-border);
+}
+
+@keyframes adminFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.admin-fade-in { animation: adminFadeIn 0.18s ease-out; }
+
+@keyframes adminShimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.app-admin .admin-input {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--a-border);
+  background: var(--a-surface-2);
+  color: var(--a-text);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  outline: none;
+}
+.app-admin .admin-input:focus { border-color: var(--a-accent); }
+.app-admin .admin-input option { background: var(--a-surface-2); color: var(--a-text); }
