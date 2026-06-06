@@ -33,6 +33,7 @@ const ACTION_MATRIX = {
   'subscription.cancel':        ['super_admin', 'finance'],
   'subscription.grant_founder': ['super_admin', 'finance'],
   'subscription.remove_founder':['super_admin', 'finance'],
+  'messaging.pause':         ['super_admin', 'developer'],
   'admin.manage':            ['super_admin'],
 }
 

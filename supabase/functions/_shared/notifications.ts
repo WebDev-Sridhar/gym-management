@@ -149,6 +149,39 @@ export async function sendNotification(p: SendNotificationParams): Promise<SendN
 
   if (!gym) throw new Error(`gym ${gymId} not found`)
 
+  // Global ops kill-switch (admin "pause sending"). When on, NOTHING dispatches
+  // platform-wide; the attempt is audited as skipped so the activity log shows
+  // why. Toggled from the admin Messaging control center (platform_settings).
+  {
+    const { data: ps } = await supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', 'messaging_paused')
+      .maybeSingle()
+    if (ps?.value === true) {
+      const { data: skipped } = await supabase
+        .from('notifications')
+        .insert({
+          gym_id: gymId,
+          user_id: userId ?? null,
+          member_id: memberId ?? null,
+          type,
+          channels: [],
+          status: 'skipped',
+          metadata: { ...metadata, suppressed_reason: 'platform_paused' },
+          triggered_by: triggeredBy,
+          sent_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+      return {
+        notificationId: skipped?.id ?? '',
+        status: 'skipped',
+        channelResults: {} as Record<Channel, ChannelResult | undefined>,
+      }
+    }
+  }
+
   // Daily summary respects its own toggle — short-circuit if disabled
   if (type === 'weekly_summary' && gym.weekly_summary_enabled === false) {
     return { notificationId: '', status: 'sent', channelResults: {} as Record<Channel, ChannelResult | undefined> }

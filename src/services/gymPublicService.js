@@ -28,6 +28,7 @@ export async function fetchGymBySlug(slug) {
     .from('gyms')
 .select('id, name, slug, logo_url, theme_color, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, description, city, phone, email, address, lat, lng, hero_style, social_links, working_hours, payment_mode, razorpay_enabled, upi_id')
     .eq('slug', slug)
+    .neq('status', 'suspended')   // suspended gyms read as not-found publicly
     .maybeSingle()
 
   if (error) throw error
@@ -44,6 +45,7 @@ export async function fetchGymBySubdomain(subdomain) {
     .from('gyms')
 .select('id, name, slug, subdomain, logo_url, theme_color, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, description, city, phone, email, address, lat, lng, hero_style, social_links, working_hours, payment_mode, razorpay_enabled, upi_id')
     .eq('subdomain', subdomain)
+    .neq('status', 'suspended')   // suspended gyms read as not-found publicly
     .maybeSingle()
 
   if (error) throw error
@@ -62,6 +64,7 @@ export async function fetchGymByCustomDomain(domain) {
 .select('id, name, slug, subdomain, custom_domain, logo_url, theme_color, secondary_color, font_family, card_style, border_radius, shadow_intensity, spacing, theme_mode, heading_size, description, city, phone, email, address, lat, lng, hero_style, social_links, working_hours, payment_mode, razorpay_enabled, upi_id')
     .eq('custom_domain', domain)
     .eq('domain_status', 'verified')
+    .neq('status', 'suspended')   // suspended gyms read as not-found publicly
     .maybeSingle()
 
   if (error) throw error

@@ -114,7 +114,7 @@ async function fetchGymBy(column, value) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/gyms?${column}=eq.${encodeURIComponent(value)}&select=name,slug,subdomain,custom_domain,domain_status,city,description,logo_url,theme_color,seo_description,seo_og_image,seo_keywords&limit=1`,
+      `${SUPABASE_URL}/rest/v1/gyms?${column}=eq.${encodeURIComponent(value)}&status=neq.suspended&select=name,slug,subdomain,custom_domain,domain_status,city,description,logo_url,theme_color,seo_description,seo_og_image,seo_keywords&limit=1`,
       {
         headers: {
           apikey: SUPABASE_KEY,
@@ -330,7 +330,7 @@ export default async function middleware(request) {
     if (SUPABASE_URL && SUPABASE_KEY) {
       try {
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/gyms?custom_domain=eq.${encodeURIComponent(lookupHost)}&domain_status=eq.verified&select=name,slug,subdomain,custom_domain,domain_status,city,description,logo_url,theme_color,seo_description,seo_og_image,seo_keywords&limit=1`,
+          `${SUPABASE_URL}/rest/v1/gyms?custom_domain=eq.${encodeURIComponent(lookupHost)}&domain_status=eq.verified&status=neq.suspended&select=name,slug,subdomain,custom_domain,domain_status,city,description,logo_url,theme_color,seo_description,seo_og_image,seo_keywords&limit=1`,
           { headers: { apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}` } },
         )
         if (res.ok) gym = (await res.json())[0] || null
