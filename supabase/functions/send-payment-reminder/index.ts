@@ -41,8 +41,27 @@ interface Body {
   dueDate?: string
 }
 
-const TEMPLATE_UPI  = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI')  ?? 'payment_reminder_upi'
-const TEMPLATE_LINK = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK') ?? 'payment_reminder_link'
+// Per-day-urgency templates — same set as daily-expiry-reminders so the
+// manual Remind button + cron stay perfectly aligned. The plain LINK / UPI
+// env vars are kept as DUE-tone fallbacks for legacy deploys.
+const TEMPLATE_LINK_3DAY = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK_3DAY') ?? 'payment_reminder_link_3day'
+const TEMPLATE_LINK_1DAY = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK_1DAY') ?? 'payment_reminder_link_1day'
+const TEMPLATE_LINK_DUE  = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK_DUE')
+                        ?? Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK')
+                        ?? 'payment_reminder_link_due'
+const TEMPLATE_UPI_3DAY  = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI_3DAY')  ?? 'payment_reminder_upi_3day'
+const TEMPLATE_UPI_1DAY  = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI_1DAY')  ?? 'payment_reminder_upi_1day'
+const TEMPLATE_UPI_DUE   = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI_DUE')
+                        ?? Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI')
+                        ?? 'payment_reminder_upi_due'
+
+function pickReminderTemplate(mode: string, daysOut: number): string {
+  const isRazorpay = mode === 'razorpay'
+  if (daysOut >= 3) return isRazorpay ? TEMPLATE_LINK_3DAY : TEMPLATE_UPI_3DAY
+  if (daysOut >= 1) return isRazorpay ? TEMPLATE_LINK_1DAY : TEMPLATE_UPI_1DAY
+  return            isRazorpay ? TEMPLATE_LINK_DUE  : TEMPLATE_UPI_DUE
+}
+
 const PUBLIC_APP_URL = Deno.env.get('PUBLIC_APP_URL') ?? 'https://app.gymos.in'
 
 function generatePayToken(): string {
@@ -141,7 +160,7 @@ Deno.serve(async (req) => {
     if (body.paymentId) {
       const { data, error } = await supabase
         .from('payments')
-        .select('id, gym_id, branch_id, member_id, plan_id, amount, status, razorpay_payment_link_id, razorpay_link_url, member:members(id, name, phone), plan:plans(id, name, price)')
+        .select('id, gym_id, branch_id, member_id, plan_id, amount, status, due_date, razorpay_payment_link_id, razorpay_link_url, member:members(id, name, phone, expiry_date), plan:plans(id, name, price)')
         .eq('id', body.paymentId)
         .eq('gym_id', gymId)
         .single()
@@ -350,7 +369,18 @@ Deno.serve(async (req) => {
 
     // ── Branch: build the pay link ─────────────────────────────────────────
     let payLink: string
-    let templateName: string
+    // Compute days-until-expiry so the manual Remind button uses the same
+    // urgency-tiered template as the cron. Falls back to member.expiry_date;
+    // owner-initiated Remind on an expired member resolves to daysOut=0
+    // (urgent "renew now" template). UTC midnight both sides → no tz drift.
+    const expirySource = payment.member.expiry_date ?? payment.due_date ?? null
+    let daysOut = 0
+    if (expirySource) {
+      const todayUtc  = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())
+      const expiryUtc = Date.parse(String(expirySource).slice(0, 10) + 'T00:00:00Z')
+      daysOut = Math.max(0, Math.round((expiryUtc - todayUtc) / 86_400_000))
+    }
+    let templateName: string = pickReminderTemplate(gym.payment_mode, daysOut)
 
     if (gym.payment_mode === 'razorpay') {
       if (!gym.razorpay_enabled) {
@@ -403,8 +433,7 @@ Deno.serve(async (req) => {
           razorpay_link_url: link.short_url,
         }).eq('id', payment.id)
       }
-
-      templateName = TEMPLATE_LINK
+      // templateName already picked by pickReminderTemplate() based on daysOut.
     } else {
       // UPI mode — link goes to our public /pay/{token} page (Pay + I-Paid)
       if (!gym.upi_id) throw new HttpError(400, 'gym UPI ID is not set')
@@ -427,7 +456,7 @@ Deno.serve(async (req) => {
       }
 
       payLink = `${PUBLIC_APP_URL}/pay/${token}`
-      templateName = TEMPLATE_UPI
+      // templateName already picked by pickReminderTemplate() based on daysOut.
     }
 
     // ── Route through the central notification engine ─────────────────────

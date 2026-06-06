@@ -34,87 +34,182 @@ For every template:
 
 ---
 
-## 1. `payment_reminder_link` — Razorpay mode
+## Payment reminders — 6 templates (3 urgency tiers × 2 payment modes)
 
-**Category:** UTILITY
-**When sent:** Daily cron, 3/1/0 days before member's `expiry_date`. Also on manual "Remind" button (owner dashboard) when gym is in Razorpay payment_mode.
-**Recipient:** Member
-**Code:** [`daily-expiry-reminders/index.ts`](supabase/functions/daily-expiry-reminders/index.ts) + [`send-payment-reminder/index.ts`](supabase/functions/send-payment-reminder/index.ts)
+The cron at [`daily-expiry-reminders/index.ts`](supabase/functions/daily-expiry-reminders/index.ts) fires reminders on days **−3 / −1 / 0** relative to the member's `expiry_date`. Each tier uses its own template so the same person doesn't receive identical wording 3 times in 4 days (anti-fatigue + better engagement).
 
-### Variables
+Tier mapping (computed at send time in `pickReminderTemplate()`):
+
+| Days until expiry | Tier | Tone | Razorpay template | UPI template |
+|---|---|---|---|---|
+| ≥ 3 | Friendly heads-up | warm, no pressure | `payment_reminder_link_3day` | `payment_reminder_upi_3day` |
+| 1–2 | Medium urgent | nudge, clear deadline | `payment_reminder_link_1day` | `payment_reminder_upi_1day` |
+| 0 or past | Urgent | act-now, last call | `payment_reminder_link_due` | `payment_reminder_upi_due` |
+
+Manual "Remind" button (`send-payment-reminder/index.ts`) uses the same picker, so an owner clicking Remind on a member 5 days out gets the friendly template; on the day of expiry gets the urgent one.
+
+All 6 templates share the **same 4 variables** so the code substitutes the same payload — only the wrapper text changes:
 
 | Position | Maps to | Example |
 |---|---|---|
 | `{{1}}` | Member name | Ravi |
 | `{{2}}` | Plan name | Monthly Pro |
 | `{{3}}` | Amount with rupee symbol | ₹1,500 |
-| `{{4}}` | Payment link (Razorpay short URL) | https://rzp.io/i/abc123 |
-
-### Body (paste verbatim)
-
-```
-Hi {{1}}, your {{2}} membership renewal is due. Amount: {{3}}.
-
-Pay securely here: {{4}}
-
-Tap the link to complete your payment in under 60 seconds. See you at the gym!
-```
-
-### Footer
-
-*(leave empty)*
-
-### Sample preview
-
-> Hi Ravi, your Monthly Pro membership renewal is due. Amount: ₹1,500.
->
-> Pay securely here: https://rzp.io/i/abc123
->
-> Tap the link to complete your payment in under 60 seconds. See you at the gym!
+| `{{4}}` | Payment link | https://rzp.io/i/abc123 *(Razorpay)* or https://gymmobius.com/pay/abc123 *(UPI)* |
 
 ---
 
-## 2. `payment_reminder_upi` — UPI mode
+## 1. `payment_reminder_link_3day` — Razorpay, friendly heads-up
 
 **Category:** UTILITY
-**When sent:** Same triggers as `payment_reminder_link` but when gym is in UPI payment_mode.
-**Recipient:** Member
-**Code:** Same files as above (template selected based on `gym.payment_mode`).
-
-### Variables
-
-| Position | Maps to | Example |
-|---|---|---|
-| `{{1}}` | Member name | Ravi |
-| `{{2}}` | Plan name | Monthly Pro |
-| `{{3}}` | Amount with rupee symbol | ₹1,500 |
-| `{{4}}` | Public payment page URL | https://gymmobius.com/pay/abc123def456 |
+**When sent:** Cron fires on day −3 in Razorpay mode (or manual Remind ≥ 3 days out).
 
 ### Body
 
 ```
-Hi {{1}}, your {{2}} membership renewal is due. Amount: {{3}}.
+Hi {{1}}, friendly heads-up — your {{2}} membership renews in 3 days. Amount: {{3}}.
 
-Pay via UPI (GPay / PhonePe / Paytm): {{4}}
+When you're ready, you can pay here: {{4}}
 
-The link opens a quick checkout page — tap to pay, or mark "I paid" after sending UPI directly to the gym.
+No rush — sharing this early so you have plenty of time. See you at the gym!
 ```
-
-### Footer
-
-*(leave empty)*
 
 ### Sample preview
 
-> Hi Ravi, your Monthly Pro membership renewal is due. Amount: ₹1,500.
+> Hi Ravi, friendly heads-up — your Monthly Pro membership renews in 3 days. Amount: ₹1,500.
 >
-> Pay via UPI (GPay / PhonePe / Paytm): https://gymmobius.com/pay/abc123def456
+> When you're ready, you can pay here: https://rzp.io/i/abc123
 >
-> The link opens a quick checkout page — tap to pay, or mark "I paid" after sending UPI directly to the gym.
+> No rush — sharing this early so you have plenty of time. See you at the gym!
 
 ---
 
-## 3. `member_welcome` — First-payment welcome
+## 2. `payment_reminder_link_1day` — Razorpay, medium urgent
+
+**Category:** UTILITY
+**When sent:** Cron fires on day −1 in Razorpay mode (or manual Remind 1–2 days out).
+
+### Body
+
+```
+Hi {{1}}, just one day left on your {{2}} membership. Renew today to keep your access without a gap.
+
+Amount: {{3}}. Pay securely here: {{4}}
+
+Takes under a minute. Tap the link when you're ready.
+```
+
+### Sample preview
+
+> Hi Ravi, just one day left on your Monthly Pro membership. Renew today to keep your access without a gap.
+>
+> Amount: ₹1,500. Pay securely here: https://rzp.io/i/abc123
+>
+> Takes under a minute. Tap the link when you're ready.
+
+---
+
+## 3. `payment_reminder_link_due` — Razorpay, urgent (renew now)
+
+**Category:** UTILITY
+**When sent:** Cron fires on day 0 in Razorpay mode (or manual Remind on expiry / past expiry).
+
+### Body
+
+```
+{{1}}, your {{2}} membership expires today. Renew now to keep your gym access active.
+
+Amount: {{3}}. Pay here: {{4}}
+
+If you've already paid, please ignore — it may take a few minutes for our records to update.
+```
+
+### Sample preview
+
+> Ravi, your Monthly Pro membership expires today. Renew now to keep your gym access active.
+>
+> Amount: ₹1,500. Pay here: https://rzp.io/i/abc123
+>
+> If you've already paid, please ignore — it may take a few minutes for our records to update.
+
+---
+
+## 4. `payment_reminder_upi_3day` — UPI, friendly heads-up
+
+**Category:** UTILITY
+**When sent:** Cron day −3 in UPI mode.
+
+### Body
+
+```
+Hi {{1}}, friendly heads-up — your {{2}} membership renews in 3 days. Amount: {{3}}.
+
+When you're ready, pay via UPI here: {{4}}
+
+The link opens a quick checkout — tap to pay, or mark "I paid" after sending UPI to the gym directly. See you at the gym!
+```
+
+### Sample preview
+
+> Hi Ravi, friendly heads-up — your Monthly Pro membership renews in 3 days. Amount: ₹1,500.
+>
+> When you're ready, pay via UPI here: https://gymmobius.com/pay/abc123def456
+>
+> The link opens a quick checkout — tap to pay, or mark "I paid" after sending UPI to the gym directly. See you at the gym!
+
+---
+
+## 5. `payment_reminder_upi_1day` — UPI, medium urgent
+
+**Category:** UTILITY
+**When sent:** Cron day −1 in UPI mode.
+
+### Body
+
+```
+Hi {{1}}, just one day left on your {{2}} membership. Renew today to keep your access without a gap.
+
+Amount: {{3}}. Pay via UPI: {{4}}
+
+Tap the link, pay with GPay / PhonePe / Paytm, and you're set.
+```
+
+### Sample preview
+
+> Hi Ravi, just one day left on your Monthly Pro membership. Renew today to keep your access without a gap.
+>
+> Amount: ₹1,500. Pay via UPI: https://gymmobius.com/pay/abc123def456
+>
+> Tap the link, pay with GPay / PhonePe / Paytm, and you're set.
+
+---
+
+## 6. `payment_reminder_upi_due` — UPI, urgent (renew now)
+
+**Category:** UTILITY
+**When sent:** Cron day 0 in UPI mode.
+
+### Body
+
+```
+{{1}}, your {{2}} membership expires today. Renew now to keep your gym access active.
+
+Amount: {{3}}. Pay via UPI: {{4}}
+
+If you've already paid, mark "I paid" on the link page so the gym can confirm your renewal.
+```
+
+### Sample preview
+
+> Ravi, your Monthly Pro membership expires today. Renew now to keep your gym access active.
+>
+> Amount: ₹1,500. Pay via UPI: https://gymmobius.com/pay/abc123def456
+>
+> If you've already paid, mark "I paid" on the link page so the gym can confirm your renewal.
+
+---
+
+## 7. `member_welcome` — First-payment welcome
 
 **Category:** UTILITY
 **When sent:** After a member's FIRST successful payment (status flips from `pending`/`inactive` to `active`).
@@ -153,7 +248,7 @@ Looking forward to seeing you train with us!
 
 ---
 
-## 4. `membership_expiry_reminder` — Pre-expiry alert (no payment context)
+## 8. `membership_expiry_reminder` — Pre-expiry alert (no payment context)
 
 **Category:** UTILITY
 **When sent:** Reserved for the `expiry_alert` notification type — used when a separate "your membership ends in X days" reminder is fired independently of the payment-link flow.
@@ -188,7 +283,7 @@ Drop by the gym anytime — we'll help you renew on the spot, or you can reach o
 
 ---
 
-## 5. `ghost_member_recall` — "We miss you" nudge
+## 9. `ghost_member_recall` — "We miss you" nudge
 
 **Category:** MARKETING ← *the only marketing template in this set; re-engagement, not transactional*
 **When sent:** Daily ghost-detection cron, on days 5 / 14 / 30 of consecutive inactivity (configurable via `GHOST_REMINDER_DAYS` env).
@@ -225,7 +320,7 @@ Your goals are waiting. Drop by this week and we'll help you pick up right where
 
 ---
 
-## 6. `saas_expiry_reminder` — Gym owner's subscription expiring
+## 10. `saas_expiry_reminder` — Gym owner's subscription expiring
 
 **Category:** UTILITY
 **When sent:** Daily SaaS-side cron, on days 7 / 3 / 1 / 0 before the gym OWNER's subscription expires.
@@ -269,7 +364,7 @@ If you don't renew, you'll lose access to add new members and send reminders. Ex
 
 ---
 
-## 7. `weekly_summary` — Owner weekly digest
+## 11. `weekly_summary` — Owner weekly digest
 
 **Category:** UTILITY
 **When sent:** Sunday 18:00 IST cron, if the owner has enabled WhatsApp summary delivery in Communication settings.
@@ -326,12 +421,18 @@ Open your dashboard to follow up on pending payments and review expiring members
 Submit in this order — Meta usually approves the simpler ones faster, and a fast-approved template lets you smoke-test before the harder ones come back:
 
 1. `member_welcome` *(simplest body, fast approval)*
-2. `payment_reminder_link`
-3. `payment_reminder_upi`
-4. `membership_expiry_reminder`
-5. `saas_expiry_reminder`
-6. `weekly_summary`
-7. `ghost_member_recall` *(MARKETING category — different review queue, often slower)*
+2. `payment_reminder_link_3day`
+3. `payment_reminder_link_1day`
+4. `payment_reminder_link_due`
+5. `payment_reminder_upi_3day`
+6. `payment_reminder_upi_1day`
+7. `payment_reminder_upi_due`
+8. `membership_expiry_reminder`
+9. `saas_expiry_reminder`
+10. `weekly_summary`
+11. `ghost_member_recall` *(MARKETING category — different review queue, often slower)*
+
+**Submission tip:** the 6 payment reminders share the same 4 variables — submit the 3day one first, then duplicate-and-edit-body for the other 5. Cuts the work from 6 fresh templates to 1 + 5 copies.
 
 Approval typically takes 24–48 hours per template. Submit them all in one sitting.
 
@@ -343,8 +444,14 @@ Set these as Supabase Edge Functions secrets if your Interakt template names dif
 
 | Env var | Default | Set when |
 |---|---|---|
-| `INTERAKT_TEMPLATE_PAYMENT_LINK` | `payment_reminder_link` | You renamed the Razorpay reminder template |
-| `INTERAKT_TEMPLATE_PAYMENT_UPI` | `payment_reminder_upi` | You renamed the UPI reminder template |
+| `INTERAKT_TEMPLATE_PAYMENT_LINK_3DAY` | `payment_reminder_link_3day` | You renamed the Razorpay 3-day reminder |
+| `INTERAKT_TEMPLATE_PAYMENT_LINK_1DAY` | `payment_reminder_link_1day` | You renamed the Razorpay 1-day reminder |
+| `INTERAKT_TEMPLATE_PAYMENT_LINK_DUE` | `payment_reminder_link_due` | You renamed the Razorpay due-day reminder |
+| `INTERAKT_TEMPLATE_PAYMENT_LINK` | *(legacy fallback for `_DUE`)* | Only set this if you have an old approved `payment_reminder_link` template you want to keep using as the urgent tier. Otherwise leave unset and submit `_due` as a fresh template. |
+| `INTERAKT_TEMPLATE_PAYMENT_UPI_3DAY` | `payment_reminder_upi_3day` | You renamed the UPI 3-day reminder |
+| `INTERAKT_TEMPLATE_PAYMENT_UPI_1DAY` | `payment_reminder_upi_1day` | You renamed the UPI 1-day reminder |
+| `INTERAKT_TEMPLATE_PAYMENT_UPI_DUE` | `payment_reminder_upi_due` | You renamed the UPI due-day reminder |
+| `INTERAKT_TEMPLATE_PAYMENT_UPI` | *(legacy fallback for `_DUE`)* | Same as above — only set if you have an existing approved `payment_reminder_upi` template to keep using as the urgent tier. |
 | `INTERAKT_TEMPLATE_WELCOME` | `member_welcome` | You renamed the welcome template |
 | `INTERAKT_TEMPLATE_EXPIRY` | `membership_expiry_reminder` | You renamed the expiry alert |
 | `INTERAKT_TEMPLATE_GHOST_REMINDER` | `ghost_member_recall` | You renamed the recall template |
@@ -386,7 +493,7 @@ If a template fires with `status='failed'` and the error mentions "template not 
 Today the pay link is a plain text variable {{4}}. WhatsApp also supports dynamic URL buttons that render as a tappable "Pay Now" button at the bottom of the message — much higher click-through rate.
 
 To migrate:
-1. In Interakt, edit `payment_reminder_link` (or create v2): add a URL button labeled "Pay Now" with dynamic URL pattern like `https://rzp.io/i/{{1}}` where {{1}} = token suffix.
+1. In Interakt, edit each of the 6 `payment_reminder_*` templates: add a URL button labeled "Pay Now" with dynamic URL pattern like `https://rzp.io/i/{{1}}` where {{1}} = token suffix.
 2. Code change: pass the token suffix separately as a button-param in the dispatcher.
 3. Drop {{4}} from the body (or keep as a fallback for clients that don't render buttons).
 

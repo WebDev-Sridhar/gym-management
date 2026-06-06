@@ -14,8 +14,36 @@ import { buildUpiLink } from '../_shared/upi.ts'
 import { normalizeIndianPhone } from '../_shared/interakt.ts'
 import { sendNotification } from '../_shared/notifications.ts'
 
-const TEMPLATE_UPI         = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI')   ?? 'payment_reminder_upi'
-const TEMPLATE_LINK        = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK')  ?? 'payment_reminder_link'
+// Per-day-urgency reminder templates. Each (mode, day-offset) pair maps to
+// its own Interakt template so a member doesn't receive the identical message
+// 3 times across the 3/1/0 reminder cadence. The single-template defaults
+// (PAYMENT_UPI / PAYMENT_LINK) are kept as the "due" tone for legacy ops —
+// any deployment that hasn't submitted the urgency-tiered templates yet
+// keeps working, every day just uses the most-urgent variant. New deploys
+// should submit all 6 (see INTERAKT_TEMPLATES.md).
+const TEMPLATE_LINK_3DAY = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK_3DAY') ?? 'payment_reminder_link_3day'
+const TEMPLATE_LINK_1DAY = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK_1DAY') ?? 'payment_reminder_link_1day'
+const TEMPLATE_LINK_DUE  = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK_DUE')
+                        ?? Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_LINK')
+                        ?? 'payment_reminder_link_due'
+const TEMPLATE_UPI_3DAY  = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI_3DAY')  ?? 'payment_reminder_upi_3day'
+const TEMPLATE_UPI_1DAY  = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI_1DAY')  ?? 'payment_reminder_upi_1day'
+const TEMPLATE_UPI_DUE   = Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI_DUE')
+                        ?? Deno.env.get('INTERAKT_TEMPLATE_PAYMENT_UPI')
+                        ?? 'payment_reminder_upi_due'
+
+// Picks the right reminder template based on how many days until the
+// member's plan expires. Buckets: 3+ days = friendly heads-up, 1-2 days =
+// medium urgent, 0 or past = urgent "renew now". The bucketing is a strict
+// "at least N days out" check so a manual Remind clicked on day 5 (rare)
+// still gets the friendly template instead of falling through to urgent.
+function pickReminderTemplate(mode: string, daysOut: number): string {
+  const isRazorpay = mode === 'razorpay'
+  if (daysOut >= 3) return isRazorpay ? TEMPLATE_LINK_3DAY : TEMPLATE_UPI_3DAY
+  if (daysOut >= 1) return isRazorpay ? TEMPLATE_LINK_1DAY : TEMPLATE_UPI_1DAY
+  return            isRazorpay ? TEMPLATE_LINK_DUE  : TEMPLATE_UPI_DUE
+}
+
 // TEMPLATE_SAAS_EXPIRY was removed when the SaaS branch moved to the
 // notifications engine — engine's templateName('saas_expiry_alert') reads
 // the same INTERAKT_TEMPLATE_SAAS_EXPIRY env var.
@@ -258,7 +286,13 @@ async function sendMemberReminder(
   const amountFormatted = `₹${amount.toLocaleString('en-IN')}`
 
   let payLink: string
-  let templateName: string
+  // Compute days-until-expiry to pick the right urgency tier (friendly /
+  // medium / urgent). expiry_date is a yyyy-mm-dd string; force UTC midnight
+  // on both sides so tz drift doesn't shift the bucket near midnight IST.
+  const todayUtc  = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())
+  const expiryUtc = Date.parse(member.expiry_date + 'T00:00:00Z')
+  const daysOut   = Math.max(0, Math.round((expiryUtc - todayUtc) / 86_400_000))
+  let templateName: string = pickReminderTemplate(gym.payment_mode, daysOut)
 
   if (gym.payment_mode === 'razorpay') {
     if (!gym.razorpay_enabled) throw new Error('razorpay mode but not enabled')
@@ -295,7 +329,7 @@ async function sendMemberReminder(
         razorpay_payment_link_id: link.id, razorpay_link_url: link.short_url,
       }).eq('id', paymentId!)
     }
-    templateName = TEMPLATE_LINK
+    // templateName already picked by pickReminderTemplate() based on daysOut.
   } else {
     if (!gym.upi_id) throw new Error('gym UPI ID not set')
 
@@ -315,7 +349,7 @@ async function sendMemberReminder(
     }
 
     payLink = `${PUBLIC_APP_URL}/pay/${token}`
-    templateName = TEMPLATE_UPI
+    // templateName already picked by pickReminderTemplate() based on daysOut.
   }
 
   // CLAIM the reminder slot BEFORE dispatching. The H3 partial unique
