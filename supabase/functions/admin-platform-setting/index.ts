@@ -15,7 +15,7 @@ import {
 import { requireAdmin, logAdminAction } from '../_shared/adminAuth.ts'
 
 // Allow-list of settable keys (prevents arbitrary key writes).
-const ALLOWED_KEYS = new Set(['messaging_paused'])
+const ALLOWED_KEYS = new Set(['messaging_paused', 'founder_slot_cap', 'trial_duration_days'])
 
 interface Body {
   key: string

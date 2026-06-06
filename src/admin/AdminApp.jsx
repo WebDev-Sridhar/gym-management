@@ -11,6 +11,9 @@ import MessagingPage from './pages/MessagingPage'
 import DomainsPage from './pages/DomainsPage'
 import QuotasPage from './pages/QuotasPage'
 import SupportPage from './pages/SupportPage'
+import OperationsPage from './pages/OperationsPage'
+import FeatureFlagsPage from './pages/FeatureFlagsPage'
+import SettingsPage from './pages/SettingsPage'
 import AuditLogPage from './pages/AuditLogPage'
 import AdminsPage from './pages/AdminsPage'
 
@@ -39,6 +42,9 @@ export default function AdminApp() {
           <Route path="domains" element={<DomainsPage />} />
           <Route path="quotas" element={<QuotasPage />} />
           <Route path="support" element={<SupportPage />} />
+          <Route path="operations" element={<OperationsPage />} />
+          <Route path="flags" element={<FeatureFlagsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
           <Route path="audit" element={<AuditLogPage />} />
           <Route path="admins" element={<AdminsPage />} />
           <Route path="*" element={<Navigate to={adminPath('')} replace />} />

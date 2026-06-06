@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Building2, CreditCard, ScrollText, Users, ShieldCheck,
-  IndianRupee, MessageSquare, Globe, Gauge, LifeBuoy,
+  IndianRupee, MessageSquare, Globe, Gauge, LifeBuoy, Activity, Flag, Settings,
 } from 'lucide-react'
 import { useAdminAuth } from '../store/AdminAuthContext'
 import { canSeeNav, ROLE_LABELS } from '../lib/adminRbac'
@@ -18,6 +18,9 @@ const NAV = [
   { key: 'domains',       to: adminPath('domains'),       label: 'Domains',       Icon: Globe },
   { key: 'quotas',        to: adminPath('quotas'),        label: 'Quotas',        Icon: Gauge },
   { key: 'support',       to: adminPath('support'),       label: 'Support',       Icon: LifeBuoy },
+  { key: 'operations',    to: adminPath('operations'),    label: 'Operations',    Icon: Activity },
+  { key: 'flags',         to: adminPath('flags'),         label: 'Feature Flags', Icon: Flag },
+  { key: 'settings',      to: adminPath('settings'),      label: 'Settings',      Icon: Settings },
   { key: 'audit',         to: adminPath('audit'),         label: 'Audit Log',     Icon: ScrollText },
   { key: 'admins',        to: adminPath('admins'),        label: 'Admins',        Icon: Users },
 ]

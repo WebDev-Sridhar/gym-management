@@ -36,6 +36,9 @@ const ACTION_MATRIX = {
   'messaging.pause':         ['super_admin', 'developer'],
   'quota.override':          ['super_admin', 'support'],
   'ticket.update':           ['super_admin', 'support'],
+  'feature_flag.manage':     ['super_admin', 'developer'],
+  'saas_plan.manage':        ['super_admin', 'finance'],
+  'platform_setting.manage': ['super_admin'],
   'admin.manage':            ['super_admin'],
 }
 
