@@ -368,39 +368,50 @@ function DomainRow({ label, value, pill, href }) {
 }
 
 function QuotaTab({ data }) {
-  const { currentSub, counts } = data
+  const { currentSub, counts, overrides = [] } = data
   const plan = currentSub?.plan_name || 'free'
   const status = currentSub?.status
-  const memberCap = getPlanCap('members', plan, status)
-  const trainerCap = getPlanCap('trainers', plan, status)
-  const waCap = getWhatsappCap(currentSub || { plan_name: plan, status })
+
+  // Active overrides (null value = unlimited).
+  const ovr = {}
+  for (const o of overrides) {
+    if (!o.expires_at || new Date(o.expires_at) > new Date()) {
+      ovr[o.quota] = o.override_value === null ? Infinity : o.override_value
+    }
+  }
+  const memberCap = 'members' in ovr ? ovr.members : getPlanCap('members', plan, status)
+  const trainerCap = 'trainers' in ovr ? ovr.trainers : getPlanCap('trainers', plan, status)
+  const waCap = 'whatsapp' in ovr ? ovr.whatsapp : getWhatsappCap(currentSub || { plan_name: plan, status })
 
   return (
     <div className="space-y-4">
       <Card>
-        <SectionTitle>Usage vs plan caps</SectionTitle>
+        <SectionTitle>Usage vs effective caps</SectionTitle>
         <div className="space-y-3">
-          <QuotaBar label="Members" used={counts.members} cap={memberCap} />
-          <QuotaBar label="Trainers" used={counts.trainers} cap={trainerCap} />
-          <QuotaBar label="WhatsApp / period" used={null} cap={waCap} note="Live usage on the Messaging dashboard (P2)" />
+          <QuotaBar label="Members" used={counts.members} cap={memberCap} overridden={'members' in ovr} />
+          <QuotaBar label="Trainers" used={counts.trainers} cap={trainerCap} overridden={'trainers' in ovr} />
+          <QuotaBar label="WhatsApp / period" used={null} cap={waCap} overridden={'whatsapp' in ovr} note="Live usage on the Messaging dashboard" />
         </div>
       </Card>
       <p className="text-xs" style={{ color: 'var(--a-text-faint)' }}>
-        Caps are derived from the current plan ({planLabel(plan)}{status === 'trial' ? ', trial bump applied' : ''}).
-        Quota overrides + storage metering arrive with the Quotas module (P3).
+        Caps derive from the current plan ({planLabel(plan)}{status === 'trial' ? ', trial bump applied' : ''}).
+        Set per-gym overrides from the Quotas module. Tenant-side hard enforcement lands with the gym app’s V3.
       </p>
     </div>
   )
 }
 
-function QuotaBar({ label, used, cap, note }) {
+function QuotaBar({ label, used, cap, note, overridden }) {
   const unlimited = !Number.isFinite(cap)
   const pct = unlimited || used == null || cap === 0 ? 0 : Math.min(100, Math.round((used / cap) * 100))
   const danger = pct >= 90
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
-        <span style={{ color: 'var(--a-text-dim)' }}>{label}</span>
+        <span style={{ color: 'var(--a-text-dim)' }}>
+          {label}
+          {overridden && <span className="ml-1.5" style={{ color: 'var(--a-accent-text)' }}>· override</span>}
+        </span>
         <span style={{ color: 'var(--a-text-faint)' }}>
           {used == null ? '' : used}{used == null ? '' : ' / '}{unlimited ? 'Unlimited' : cap}
         </span>

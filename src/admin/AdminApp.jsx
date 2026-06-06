@@ -8,6 +8,9 @@ import GymProfilePage from './pages/GymProfilePage'
 import SubscriptionsPage from './pages/SubscriptionsPage'
 import RevenuePage from './pages/RevenuePage'
 import MessagingPage from './pages/MessagingPage'
+import DomainsPage from './pages/DomainsPage'
+import QuotasPage from './pages/QuotasPage'
+import SupportPage from './pages/SupportPage'
 import AuditLogPage from './pages/AuditLogPage'
 import AdminsPage from './pages/AdminsPage'
 
@@ -33,6 +36,9 @@ export default function AdminApp() {
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="revenue" element={<RevenuePage />} />
           <Route path="messaging" element={<MessagingPage />} />
+          <Route path="domains" element={<DomainsPage />} />
+          <Route path="quotas" element={<QuotasPage />} />
+          <Route path="support" element={<SupportPage />} />
           <Route path="audit" element={<AuditLogPage />} />
           <Route path="admins" element={<AdminsPage />} />
           <Route path="*" element={<Navigate to={adminPath('')} replace />} />

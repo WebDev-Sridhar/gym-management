@@ -43,7 +43,7 @@ export async function listGyms({ search = '', status = 'all', page = 0, pageSize
 
 /** Full read-only Customer 360 for a single gym. */
 export async function getGymProfile(gymId) {
-  const [{ data: gym, error: gymErr }, ownerRes, subsRes, countsRes, paymentsRes, notifRes, remindersRes, auditRes] =
+  const [{ data: gym, error: gymErr }, ownerRes, subsRes, countsRes, paymentsRes, notifRes, remindersRes, auditRes, overridesRes] =
     await Promise.all([
       supabaseData.from('gyms')
         .select('id, name, slug, city, status, suspended_at, suspended_reason, onboarding_step, ' +
@@ -81,6 +81,10 @@ export async function getGymProfile(gymId) {
       supabaseData.from('admin_audit_log')
         .select('id, admin_email, admin_role, action, reason, metadata, created_at')
         .eq('gym_id', gymId).order('created_at', { ascending: false }).limit(25),
+
+      supabaseData.from('gym_quota_overrides')
+        .select('quota, override_value, reason, expires_at')
+        .eq('gym_id', gymId),
     ])
 
   if (gymErr) throw gymErr
@@ -101,6 +105,7 @@ export async function getGymProfile(gymId) {
     notifications: notifRes.data || [],
     reminders: remindersRes.data || [],
     audit: auditRes.data || [],
+    overrides: overridesRes.data || [],
   }
 }
 

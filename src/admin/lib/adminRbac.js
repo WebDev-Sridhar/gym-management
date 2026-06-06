@@ -34,6 +34,8 @@ const ACTION_MATRIX = {
   'subscription.grant_founder': ['super_admin', 'finance'],
   'subscription.remove_founder':['super_admin', 'finance'],
   'messaging.pause':         ['super_admin', 'developer'],
+  'quota.override':          ['super_admin', 'support'],
+  'ticket.update':           ['super_admin', 'support'],
   'admin.manage':            ['super_admin'],
 }
 
