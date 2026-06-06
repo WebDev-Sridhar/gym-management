@@ -143,7 +143,7 @@ export default function PricingPage() {
               must be produced by translator/designer track (see
               V3_PHASE_1_IMPLEMENTATION_GUIDE.md TASK 9). Hidden
               until at least one PDF is present in /public/downloads/. */}
-          <SectionWrapper>
+          {/* <SectionWrapper>
             <div className="max-w-2xl mx-auto text-center">
               <p className="text-sm text-text-muted mb-4">
                 Share Gymmobius with your peers
@@ -166,7 +166,7 @@ export default function PricingPage() {
                 </a>
               </div>
             </div>
-          </SectionWrapper>
+          </SectionWrapper> */}
 
         </div>
       </MarketingErrorBoundary>

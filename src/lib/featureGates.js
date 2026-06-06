@@ -59,7 +59,10 @@ const FEATURE_RULES = {
   section_reorder:  ['premium'],
   page_hero_image:      ['premium'],     // background image on page heroes
   page_hero_align:      ['premium'],     // text alignment on page heroes
-  section_visibility:   ['premium'],     // hide/show sections from CMS
+  // section_visibility — REMOVED 2026-06-05. Hide/show controls in the
+  // website CMS are now available on every plan (including Solo Coach). No
+  // call site should reference 'section_visibility' anymore; if a new one
+  // needs it, render unconditionally instead of re-adding a gate here.
 
   // ── Analytics tiers ────────────────────────────────────────────────────
   advanced_analytics:   ['pro', 'premium'],   // peak hours, churn, insights, pie breakdowns

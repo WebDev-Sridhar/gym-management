@@ -130,6 +130,102 @@ async function fetchGymBy(column, value) {
   }
 }
 
+// Lookup helper for payment-link OG injection. Joins the minimum we need to
+// build a "Complete your payment — {Gym}" preview when the /pay/{token}
+// URL is shared on WhatsApp / Slack / LinkedIn / Telegram. The token-keyed
+// payments row is publicly addressable by design (the whole point of the
+// /pay/{token} page is anonymous access) so RLS-via-anon-key is safe here.
+async function fetchPaymentByToken(token) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null
+  if (!token || token.length < 16) return null
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/payments?pay_token=eq.${encodeURIComponent(token)}&select=amount,status,due_date,member:members(name),plan:plans(name,duration_days),gym:gyms(name,logo_url,theme_color)&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      },
+    )
+    if (!res.ok) return null
+    const rows = await res.json()
+    return rows[0] || null
+  } catch {
+    return null
+  }
+}
+
+// Format a number as Indian rupees with thousand separators. We avoid
+// Intl.NumberFormat in the hot path because the Vercel Edge runtime's ICU
+// data is locale-restricted; manual formatting always works.
+function formatINR(amount) {
+  const n = Number(amount)
+  if (!Number.isFinite(n)) return ''
+  return n.toLocaleString('en-IN')
+}
+
+function buildPaymentMetaBlock(payment, requestUrl) {
+  const origin   = new URL(requestUrl).origin
+  const gymName  = payment.gym?.name || 'Your gym'
+  const planName = payment.plan?.name || 'membership'
+  const amountStr = formatINR(payment.amount)
+  const isPaid    = payment.status === 'paid'
+
+  const title = isPaid
+    ? `Payment received — ${gymName}`
+    : `Complete your payment — ${gymName}`
+
+  const memberPrefix = payment.member?.name ? `Hi ${payment.member.name}, ` : ''
+  const description = isPaid
+    ? `Thanks — your ₹${amountStr} ${planName} payment to ${gymName} is recorded.`
+    : `${memberPrefix}pay ₹${amountStr} for your ${planName} at ${gymName}. Quick UPI or card checkout.`
+
+  const image = payment.gym?.logo_url || `${origin}/logo.png`
+  const themeColor = payment.gym?.theme_color || '#8B5CF6'
+
+  return [
+    `<title>${escapeHtml(title)}</title>`,
+    `<meta name="description" content="${escapeHtml(description)}" />`,
+
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:title" content="${escapeHtml(title)}" />`,
+    `<meta property="og:description" content="${escapeHtml(description)}" />`,
+    `<meta property="og:image" content="${escapeHtml(image)}" />`,
+    `<meta property="og:url" content="${escapeHtml(requestUrl)}" />`,
+    `<meta property="og:site_name" content="${escapeHtml(gymName)}" />`,
+
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+    `<meta name="twitter:image" content="${escapeHtml(image)}" />`,
+
+    `<meta name="theme-color" content="${escapeHtml(themeColor)}" />`,
+    payment.gym?.logo_url ? `<link rel="icon" type="image/png" href="${escapeHtml(payment.gym.logo_url)}" />` : '',
+  ].filter(Boolean).join('\n    ')
+}
+
+// Same rewrite shape as rewriteIndexHtml but takes a prebuilt meta block.
+// Factored separately to avoid coupling the payment-OG path to the gym
+// row shape (different schema, different fallback chain).
+async function rewriteIndexHtmlWithBlock(originUrl, metaBlock) {
+  let html
+  try {
+    const upstream = await fetch(`${originUrl}/index.html`, { headers: { accept: 'text/html' } })
+    if (!upstream.ok) return null
+    html = await upstream.text()
+  } catch {
+    return null
+  }
+  if (!/<\/head>/i.test(html)) return null
+
+  return html
+    .replace(/<title>[\s\S]*?<\/title>/i, '')
+    .replace(/<meta[^>]+(?:name|property)="(?:description|og:[^"]+|twitter:[^"]+|theme-color|keywords)"[^>]*>\s*/gi, '')
+    .replace(/<link[^>]+rel="(?:icon|shortcut icon|apple-touch-icon)"[^>]*>\s*/gi, '')
+    .replace(/<\/head>/i, `    ${metaBlock}\n  </head>`)
+}
+
 function buildMetaBlock(gym, requestUrl) {
   const origin = new URL(requestUrl).origin
   const title  = `${gym.name} — Train with us`
@@ -245,6 +341,27 @@ export default async function middleware(request) {
 
     const html = await rewriteIndexHtml(origin, gym, request.url)
     return html ? htmlResponse(html) : undefined
+  }
+
+  // ── PATH A0: /pay/{token} — payment-link OG injection ──────────────
+  // Member receives a WhatsApp/SMS link → previews used to render the
+  // generic Gymmobius marketing copy because /pay is a reserved path and
+  // fell through to the SPA's static index.html meta tags. We now look up
+  // the payment by token and inject "Complete your payment — {Gym}" tags
+  // so the social preview matches what the link is actually for.
+  // Failure modes (invalid token, supabase down) fall through to SPA which
+  // already renders the "payment not found" screen — never error here.
+  if (path.startsWith('/pay/')) {
+    const token = path.slice('/pay/'.length).split('/')[0].split('?')[0]
+    if (token) {
+      const payment = await fetchPaymentByToken(token)
+      if (payment) {
+        const block = buildPaymentMetaBlock(payment, request.url)
+        const html  = await rewriteIndexHtmlWithBlock(origin, block)
+        if (html) return htmlResponse(html)
+      }
+    }
+    return  // unknown token or fetch failed → SPA handles it
   }
 
   // ── PATH A: main domain ──────────────────────────────────────────────

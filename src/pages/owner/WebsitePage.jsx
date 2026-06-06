@@ -1467,13 +1467,11 @@ function StatsPanel({ content, gymId, planName, onSave, setPreviewData }) {
     <form onSubmit={handleSave} className="space-y-5">
       <SectionHeader title="Stats" description="4 animated counters shown on the home and about pages." />
 
-      {/* Visibility toggles — Enterprise only */}
-      {canAccess('section_visibility', planName) && (
-        <div className="space-y-2">
-          <SectionVisibilityToggle sectionId="stats_home"  gymId={gymId} content={content} onSave={onSave} label="Home Page" />
-          <SectionVisibilityToggle sectionId="stats_about" gymId={gymId} content={content} onSave={onSave} label="About Page" />
-        </div>
-      )}
+      {/* Visibility toggles — available on every plan as of 2026-06-05. */}
+      <div className="space-y-2">
+        <SectionVisibilityToggle sectionId="stats_home"  gymId={gymId} content={content} onSave={onSave} label="Home Page" />
+        <SectionVisibilityToggle sectionId="stats_about" gymId={gymId} content={content} onSave={onSave} label="About Page" />
+      </div>
 
       <div className="space-y-2">
         <div className="grid grid-cols-2 gap-3">
@@ -2986,7 +2984,7 @@ export default function WebsitePage() {
                           <div className="flex items-center justify-between gap-1">
                             <span className={`block text-sm font-medium ${activeSection === sec.id ? 'text-indigo-700' : ''}`}>{sec.label}</span>
                             <div className="flex items-center gap-1 shrink-0">
-                              {canAccess('section_visibility', planName) && (
+                              {(
                                 (TOGGLEABLE_SECTIONS.has(sec.id) && (content?.hidden_sections || []).includes(sec.id)) ||
                                 (sec.id === 'stats' && (
                                   (content?.hidden_sections || []).includes('stats_home') ||
@@ -3105,8 +3103,8 @@ export default function WebsitePage() {
 
         {/* Form panel */}
         <div className={`flex-1 min-w-0 bg-white rounded-xl border border-gray-200 p-5 sm:p-6 ${showPreview ? 'xl:max-w-lg' : ''}`}>
-          {/* Visibility toggle — Enterprise only */}
-          {TOGGLEABLE_SECTIONS.has(activeSection) && canAccess('section_visibility', planName) && (
+          {/* Visibility toggle — available on every plan as of 2026-06-05. */}
+          {TOGGLEABLE_SECTIONS.has(activeSection) && (
             <SectionVisibilityToggle
               sectionId={activeSection}
               gymId={gymId}

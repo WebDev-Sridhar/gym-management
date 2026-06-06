@@ -32,13 +32,18 @@ export default function FormModal({ title, onClose, children, wide = false, dark
 
   const d = dark
 
+  // z-[80] sits above MemberDrawer + Topbar side sheets (both z-[70]) so a
+  // modal triggered from inside a drawer (e.g. UpgradeRequiredModal when the
+  // owner clicks "Remind" on an expired sub) renders ON TOP of the drawer's
+  // blur backdrop instead of being trapped beneath it. Stays well under
+  // Dialog (z-[9999]) so confirm/alert dialogs still preempt everything.
   return createPortal(
     <div
       ref={backdropRef}
       onMouseDown={handleBackdrop}
       data-theme-aware="true"
       data-modal-root="form"
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+      className="fixed inset-0 z-[80] flex items-center justify-center px-4 py-6"
       style={{ background: d ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)' }}
     >
       <div

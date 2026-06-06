@@ -69,11 +69,13 @@ function templateName(type: NotificationType): string {
     case 'payment_reminder':     return fromEnv('INTERAKT_TEMPLATE_PAYMENT_LINK',  'payment_reminder_link')
     case 'expiry_alert':         return fromEnv('INTERAKT_TEMPLATE_EXPIRY',        'membership_expiry_reminder')
     case 'saas_expiry_alert':    return fromEnv('INTERAKT_TEMPLATE_SAAS_EXPIRY',   'saas_expiry_reminder')
-    // Interakt template fallback intentionally kept as 'daily_summary' —
-    // that's the existing approved template ID. Once you've registered a
-    // dedicated weekly template in Interakt, set INTERAKT_TEMPLATE_DAILY_SUMMARY
-    // (env var name unchanged for ops continuity) to its name.
-    case 'weekly_summary':        return fromEnv('INTERAKT_TEMPLATE_DAILY_SUMMARY', 'daily_summary')
+    // Default is 'weekly_summary' to match the actual cadence + the codebase
+    // rename. Env var name kept as INTERAKT_TEMPLATE_DAILY_SUMMARY for ops
+    // continuity (so anyone already pointing at an old approved 'daily_summary'
+    // template doesn't break — they just set the env to the legacy name).
+    // Fresh gyms submit a template named 'weekly_summary' in Interakt and
+    // need no env override.
+    case 'weekly_summary':        return fromEnv('INTERAKT_TEMPLATE_DAILY_SUMMARY', 'weekly_summary')
     case 'payment_confirmation': return fromEnv('INTERAKT_TEMPLATE_PAYMENT_CONFIRM','payment_confirmation')
     case 'saas_payment_receipt': return fromEnv('INTERAKT_TEMPLATE_SAAS_RECEIPT',  'saas_payment_receipt')
     case 'welcome':              return fromEnv('INTERAKT_TEMPLATE_WELCOME',       'member_welcome')
