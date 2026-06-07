@@ -33,11 +33,11 @@ const footerSections = [
   },
 ]
 
-const socialLinks = [
-  { label: 'Twitter', href: 'https://twitter.com/gymmobius' },
-  { label: 'LinkedIn', href: 'https://linkedin.com/company/gymmobius' },
-  { label: 'Instagram', href: 'https://instagram.com/gymmobius' },
-]
+// const socialLinks = [
+//   { label: 'Twitter', href: 'https://twitter.com/gymmobius' },
+//   { label: 'LinkedIn', href: 'https://linkedin.com/company/gymmobius' },
+//   { label: 'Instagram', href: 'https://instagram.com/gymmobius' },
+// ]
 
 export default function Footer() {
   return (
@@ -90,7 +90,7 @@ export default function Footer() {
           <p className="text-text-muted text-sm">
             &copy; {new Date().getFullYear()} {SITE.NAME}. All rights reserved.
           </p>
-          <div className="flex gap-6">
+          {/* <div className="flex gap-6">
             {socialLinks.map((social) => (
               <a
                 key={social.label}
@@ -102,7 +102,7 @@ export default function Footer() {
                 {social.label}
               </a>
             ))}
-          </div>
+          </div> */}
         </motion.div>
       </div>
     </motion.footer>
