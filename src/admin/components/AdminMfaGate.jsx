@@ -62,11 +62,13 @@ export default function AdminMfaGate() {
     try {
       const { data: ch, error: chErr } = await supabase.auth.mfa.challenge({ factorId })
       if (chErr) throw chErr
-      const { error: vErr } = await supabase.auth.mfa.verify({
+      const { data: vData, error: vErr } = await supabase.auth.mfa.verify({
         factorId, challengeId: ch.id, code: code.trim(),
       })
       if (vErr) throw vErr
-      await recheckMfa()   // session is now aal2 → gate clears
+      // vData is the upgraded AAL2 session — hand it to the context so it can
+      // resolve assurance locally (no extra auth call → no lock contention).
+      await recheckMfa(vData)   // gate clears → panel renders
     } catch (err) {
       setError(err?.message || 'Invalid code — try again')
       setCode('')

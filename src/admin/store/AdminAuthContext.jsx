@@ -57,14 +57,21 @@ export function AdminAuthProvider({ children }) {
     init()
 
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
-      async (event, s) => {
+      (event, s) => {
         if (event === 'INITIAL_SESSION') return
         if (!initializedRef.current) return
+        // setAccessToken is a plain local setter (no lock) — safe to run inline.
         setAccessToken(s?.access_token ?? null)
         if (event === 'TOKEN_REFRESHED') return
-        setSession(s)
-        if (s?.user) await loadAdmin(s.user.id)
-        else { setAdmin(null); setLoading(false) }
+        // CRITICAL: this callback runs while supabase-js holds the auth
+        // Navigator Lock. Calling any supabase.auth.* method here (loadAdmin →
+        // computeMfa → getAuthenticatorAssuranceLevel) deadlocks. Defer with
+        // setTimeout(0) to run AFTER the lock is released.
+        setTimeout(() => {
+          setSession(s)
+          if (s?.user) loadAdmin(s.user.id)
+          else { setAdmin(null); setMfaStatus(null); setLoading(false) }
+        }, 0)
       },
     )
 
@@ -105,12 +112,20 @@ export function AdminAuthProvider({ children }) {
     }
   }
 
-  // Re-read the session (picks up the upgraded aal2 token after MFA verify),
-  // refresh the data-client token, and recompute assurance. Called by the gate.
-  async function recheckMfa() {
+  // Refresh assurance after an MFA verify. The gate passes the session that
+  // mfa.verify() returns so we can resolve AAL2 from the token locally — no
+  // getSession()/auth call, which avoids Navigator Lock contention right after
+  // the verify. Falls back to full detection only when no session is supplied.
+  async function recheckMfa(newSession = null) {
+    if (newSession?.access_token) {
+      setSession(newSession)
+      setAccessToken(newSession.access_token)
+      if (aalFromToken(newSession.access_token) === 'aal2') { setMfaStatus('ok'); return }
+    }
     const { data: { session: s } } = await supabase.auth.getSession()
     setSession(s)
     setAccessToken(s?.access_token ?? null)
+    if (aalFromToken(s?.access_token) === 'aal2') { setMfaStatus('ok'); return }
     await computeMfa()
   }
 
