@@ -40,6 +40,7 @@ const ACTION_MATRIX = {
   'saas_plan.manage':        ['super_admin', 'finance'],
   'platform_setting.manage': ['super_admin'],
   'admin.manage':            ['super_admin'],
+  'admin.mfa_reset':         ['super_admin'],
 }
 
 // Sidebar modules → roles that should see them. Everyone sees read modules;

@@ -17,3 +17,12 @@ export async function manageAdmin(body) {
   if (error) throw await normalizeInvokeError(error)
   return data
 }
+
+/** Clear another admin's MFA factors (super_admin only, audited). */
+export async function resetAdminMfa(userId, reason) {
+  const { data, error } = await supabaseData.functions.invoke('admin-mfa-reset', {
+    body: { userId, reason },
+  })
+  if (error) throw await normalizeInvokeError(error)
+  return data
+}

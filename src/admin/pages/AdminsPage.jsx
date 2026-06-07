@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react'
-import { Users, UserPlus, ShieldAlert, Loader2 } from 'lucide-react'
+import { Users, UserPlus, ShieldAlert, Loader2, KeyRound } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Sk from '../components/ui/Sk'
 import StatusPill from '../components/ui/StatusPill'
 import EmptyState from '../components/ui/EmptyState'
-import Modal from '../components/ui/Modal'
-import { listAdmins, manageAdmin } from '../services/adminStaffService'
+import Modal, { ActionModal } from '../components/ui/Modal'
+import { listAdmins, manageAdmin, resetAdminMfa } from '../services/adminStaffService'
 import { usePolledData } from '../hooks/usePolledData'
 import { useAdminAuth } from '../store/AdminAuthContext'
 import { ADMIN_ROLES, ROLE_LABELS } from '../lib/adminRbac'
@@ -21,6 +21,12 @@ export default function AdminsPage() {
   const [busy, setBusy] = useState(false)
   const [formErr, setFormErr] = useState('')
   const [rowBusy, setRowBusy] = useState(null)
+
+  // Reset-MFA modal
+  const [mfaTarget, setMfaTarget] = useState(null)
+  const [mfaReason, setMfaReason] = useState('')
+  const [mfaBusy, setMfaBusy] = useState(false)
+  const [mfaErr, setMfaErr] = useState('')
 
   if (role !== 'super_admin') {
     return (
@@ -53,6 +59,19 @@ export default function AdminsPage() {
     try { await manageAdmin(body); await refresh() }
     catch (err) { alert(err.message || 'Action failed') }
     finally { setRowBusy(null) }
+  }
+
+  async function doResetMfa() {
+    setMfaBusy(true); setMfaErr('')
+    try {
+      await resetAdminMfa(mfaTarget.id, mfaReason.trim() || undefined)
+      setMfaTarget(null); setMfaReason('')
+      await refresh()
+    } catch (err) {
+      setMfaErr(err.message || 'Failed to reset MFA')
+    } finally {
+      setMfaBusy(false)
+    }
   }
 
   return (
@@ -98,6 +117,13 @@ export default function AdminsPage() {
                     >
                       {ADMIN_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                     </select>
+                    {!isMe && (
+                      <button onClick={() => { setMfaTarget(a); setMfaReason(''); setMfaErr('') }} disabled={rowBusy === a.id}
+                        className="admin-hover inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs"
+                        style={{ borderColor: 'var(--a-border-strong)', color: 'var(--a-text-dim)' }} title="Clear this admin's MFA factors">
+                        <KeyRound className="h-3.5 w-3.5" /> Reset MFA
+                      </button>
+                    )}
                     {!isMe && (
                       a.is_active ? (
                         <button onClick={() => rowAction({ action: 'deactivate', userId: a.id }, a.id)} disabled={rowBusy === a.id}
@@ -151,6 +177,23 @@ export default function AdminsPage() {
           </button>
         </div>
       </Modal>
+
+      <ActionModal
+        open={!!mfaTarget}
+        onClose={() => setMfaTarget(null)}
+        title="Reset MFA"
+        description={mfaTarget
+          ? `Clear all MFA factors for ${mfaTarget.name || mfaTarget.email}? They'll be prompted to enroll a new authenticator on their next admin login.`
+          : ''}
+        confirmLabel="Reset MFA"
+        destructive
+        requireReason
+        busy={mfaBusy}
+        error={mfaErr}
+        reason={mfaReason}
+        setReason={setMfaReason}
+        onConfirm={doResetMfa}
+      />
     </div>
   )
 }
