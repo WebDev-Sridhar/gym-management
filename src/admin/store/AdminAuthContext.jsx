@@ -2,6 +2,21 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase, setAccessToken } from '../../services/supabaseClient'
 import { fetchAdminProfile } from '../services/adminAuthService'
 
+// Decode the AAL claim from a JWT locally (no auth-client call → no Navigator
+// Lock). Used so the post-verify path can resolve assurance without touching
+// supabase.auth.* (which deadlocks if called inside onAuthStateChange).
+function aalFromToken(token) {
+  try {
+    const part = String(token || '').split('.')[1]
+    if (!part) return 'aal1'
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+    return JSON.parse(atob(padded))?.aal ?? 'aal1'
+  } catch {
+    return 'aal1'
+  }
+}
+
 /**
  * Auth context for the INTERNAL super-admin app. Reuses the same Supabase Auth
  * session + the shared data-client token cache (setAccessToken) as the tenant
