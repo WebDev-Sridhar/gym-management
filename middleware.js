@@ -28,7 +28,7 @@
 
 export const config = {
   matcher: [
-    '/((?!_next|_vercel|api|assets|static|sw\\.js|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|woff2?|ttf|map)).*)',
+    '/((?!_next|_vercel|api|assets|static|sw\\.js|__shell\\.html|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|woff2?|ttf|map)).*)',
   ],
 }
 
@@ -211,7 +211,10 @@ function buildPaymentMetaBlock(payment, requestUrl) {
 async function rewriteIndexHtmlWithBlock(originUrl, metaBlock) {
   let html
   try {
-    const upstream = await fetch(`${originUrl}/index.html`, { headers: { accept: 'text/html' } })
+    // Fetch the pristine SPA shell (NOT /index.html, which is the prerendered
+    // marketing homepage). See scripts/gen-seo-files.mjs for why __shell.html
+    // exists. Falls back gracefully (return null → SPA) if it's missing.
+    const upstream = await fetch(`${originUrl}/__shell.html`, { headers: { accept: 'text/html' } })
     if (!upstream.ok) return null
     html = await upstream.text()
   } catch {
@@ -259,7 +262,10 @@ function buildMetaBlock(gym, requestUrl) {
 async function rewriteIndexHtml(originUrl, gym, requestUrl) {
   let html
   try {
-    const upstream = await fetch(`${originUrl}/index.html`, { headers: { accept: 'text/html' } })
+    // Fetch the pristine SPA shell (NOT /index.html, which is the prerendered
+    // marketing homepage). __shell.html is the empty Vite shell that every
+    // tenant/custom-domain page is built from. See scripts/gen-seo-files.mjs.
+    const upstream = await fetch(`${originUrl}/__shell.html`, { headers: { accept: 'text/html' } })
     if (!upstream.ok) return null
     html = await upstream.text()
   } catch {

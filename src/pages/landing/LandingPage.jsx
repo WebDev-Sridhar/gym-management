@@ -12,6 +12,7 @@ import MarketingErrorBoundary from '../../components/error/MarketingErrorBoundar
 import SEO from '../../components/seo/SEO'
 import { usePageTracking } from '../../lib/hooks/usePageTracking'
 import { ROUTES, SITE } from '../../lib/constants/routes'
+import { organizationSchema, websiteSchema, softwareApplicationSchema } from '../../lib/seo/structuredData'
 
 export default function LandingPage() {
   useLenis()
@@ -20,10 +21,11 @@ export default function LandingPage() {
   return (
     <div className="bg-bg min-h-screen overflow-x-hidden">
       <SEO
-        title=""
+        title="Gym Management Software | Gymmobius"
         description={`${SITE.NAME} — ${SITE.TAGLINE}. Automate attendance, payments, and member retention for your gym.`}
         canonical={ROUTES.HOME}
         keywords="gym management software, gym crm, gym automation, member retention, gymmobius"
+        jsonLd={[organizationSchema(), websiteSchema(), softwareApplicationSchema()]}
       />
       <Navbar />
       <main>

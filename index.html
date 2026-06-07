@@ -33,8 +33,23 @@
     <meta name="twitter:title" content="Gymmobius — Run Your Gym Like a Business" />
     <meta name="twitter:description" content="Manage members, automate payments and reminders, launch your gym website. All in one place." />
     <meta name="twitter:image" content="/og-image.png" />
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@400..700&family=Delius&family=Do+Hyeon&family=Frijole&family=Lexend+Deca:wght@100..900&family=Luckiest+Guy&family=Port+Lligat+Slab&family=MuseoModerno:ital,wght@0,100..900;1,100..900&family=Alexandria&family=Nova+Square&family=Overlock+SC&family=Viga&display=swap" rel="stylesheet">
-    <script src="https://checkout.razorpay.com/v1/checkout.js" async defer data-razorpay-checkout="true"></script>
+    <!-- Search-console verification — replace the content values with your real
+         tokens from Google Search Console / Bing Webmaster Tools. Harmless if
+         left as placeholders; remove if you verify via DNS instead. -->
+    <!-- <meta name="google-site-verification" content="REPLACE_WITH_GSC_TOKEN" /> -->
+    <!-- <meta name="msvalidate.01" content="REPLACE_WITH_BING_TOKEN" /> -->
+
+    <!-- Google Fonts = the gym website-builder type palette. Loaded async so it
+         never blocks first paint on marketing pages; <noscript> keeps it working
+         without JS. Do NOT remove families here — they back tenant site typography
+         (see src/pages/owner/WebsitePage.jsx). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@400..700&family=Delius&family=Do+Hyeon&family=Frijole&family=Lexend+Deca:wght@100..900&family=Luckiest+Guy&family=Port+Lligat+Slab&family=MuseoModerno:ital,wght@0,100..900;1,100..900&family=Alexandria&family=Nova+Square&family=Overlock+SC&family=Viga&display=swap" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@400..700&family=Delius&family=Do+Hyeon&family=Frijole&family=Lexend+Deca:wght@100..900&family=Luckiest+Guy&family=Port+Lligat+Slab&family=MuseoModerno:ital,wght@0,100..900;1,100..900&family=Alexandria&family=Nova+Square&family=Overlock+SC&family=Viga&display=swap" /></noscript>
+    <!-- Razorpay checkout is loaded on demand by loadRazorpayScript() in
+         src/services/*Service.js (only when a payment modal opens) — no eager
+         third-party script on marketing/dashboard page loads. -->
     <script>
       /* Anti-flash: apply the saved theme before React mounts. Sync with src/store/ThemeContext.jsx */
       (function () {

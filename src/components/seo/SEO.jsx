@@ -1,4 +1,5 @@
 import { SITE } from '../../lib/constants/routes'
+import JsonLd from './JsonLd'
 
 // React 19 hoists <title>, <meta>, and <link> tags rendered anywhere in the
 // component tree into <head>. No provider, no library required.
@@ -10,6 +11,7 @@ export default function SEO({
   ogImage,
   ogType = 'website',
   robots = 'index,follow',
+  jsonLd,
 }) {
   const fullTitle = title ? `${title} | ${SITE.NAME}` : SITE.NAME
   const canonicalUrl = canonical
@@ -37,6 +39,9 @@ export default function SEO({
       <meta name="twitter:title" content={fullTitle} />
       {description && <meta name="twitter:description" content={description} />}
       {ogImage && <meta name="twitter:image" content={ogImage} />}
+
+      {/* Optional page-level structured data */}
+      {jsonLd && <JsonLd data={jsonLd} />}
     </>
   )
 }
