@@ -9,7 +9,7 @@ export const CONTACT_CONTENT = {
   },
   hero: {
     title: 'Talk to a human.',
-    subtitle: 'Sales, onboarding, or product questions — drop us a note below and a real person will reply within one business day. For urgent account issues, email support@gymmobius.com.',
+    subtitle: 'Sales, onboarding, or product questions — drop us a note below and a real person will reply within one business day. For urgent account issues, email gymmobius.support@gmail.com.',
   },
   form: {
     nameLabel: 'Full name',
@@ -19,6 +19,6 @@ export const CONTACT_CONTENT = {
     submitLabel: 'Send message',
     submittingLabel: 'Sending…',
     successMessage: 'Thanks — we got it. A team member will reply within one business day.',
-    errorMessage: 'We couldn’t send your message. Please try again, or email us directly at support@gymmobius.com.',
+    errorMessage: 'We couldn’t send your message. Please try again, or email us directly at gymmobius.support@gmail.com.',
   },
 }

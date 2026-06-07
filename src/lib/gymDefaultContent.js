@@ -115,19 +115,18 @@ export function getDefaultContent(gymName = 'Our Gym', gymCity = '') {
       fallbackTrainers: [
         { id: 'dt-1', name: 'Alex Rivera', specialization: 'Strength & Conditioning', bio: 'NSCA-certified with 8+ years transforming athletes and beginners into their strongest selves.', image_url: `${UNS}1701481080490-cb2e7f4fd5f8${fit}` },
         { id: 'dt-2', name: 'Priya Sharma', specialization: 'Yoga & Mobility', bio: 'RYT-500 certified. Builds flexibility, balance, and mental clarity through power yoga.', image_url: `${UNS}1689897229406-0f600543bb8d${fit}` },
-        { id: 'dt-3', name: 'Marcus Chen', specialization: 'HIIT & Cardio', bio: 'Explosive workouts, real results. Marcus has trained over 200+ athletes to peak fitness.', image_url: `${UNS}1665851299249-2106aa4d725c${fit}` },
+        { id: 'dt-3', name: 'Marcus Chen', specialization: 'HIIT & Cardio', bio: 'Explosive workouts, real results. Sample bio — replace with your trainer\'s real background and certifications.', image_url: `${UNS}1665851299249-2106aa4d725c${fit}` },
       ],
     },
     testimonials: {
       heading: 'REAL PEOPLE.\nREAL RESULTS.',
       subtitle: 'Stories from members who changed everything',
+      // Sample placeholder reviews — gym owners should replace these with
+      // real, consenting member testimonials before publishing their site.
       fallbackTestimonials: [
-        { id: 'ft-1', name: 'Rahul M.', role: 'Member since 2022', message: `Joining ${gymName} was the best decision I made. The trainers genuinely care about your progress. I lost 18kg in 6 months.`, rating: 5 },
-        { id: 'ft-2', name: 'Sneha K.', role: 'Pro Member', message: 'Nothing compares to this place. The community keeps you accountable and the results speak for themselves. Life-changing.', rating: 5 },
-        { id: 'ft-3', name: 'Arjun P.', role: 'Elite Member', message: "World-class equipment, expert trainers, and an atmosphere that pushes you to do more every single day. Five stars isn't enough.", rating: 5 },
-        { id: 'ft-4', name: 'Divya R.', role: 'Starter Member', message: `I was nervous joining a gym for the first time, but ${gymName} made me feel at home from day one. Down 12kg and absolutely loving it.`, rating: 5 },
-        { id: 'ft-5', name: 'Karan S.', role: 'Pro Member', message: 'The HIIT classes here are absolutely brutal — in the best way possible. My endurance has skyrocketed in just three months.', rating: 5 },
-        { id: 'ft-6', name: 'Meera T.', role: 'Elite Member', message: 'Best investment I ever made in myself. The personal trainers design programs that actually fit your lifestyle and goals. Incredible team.', rating: 5 },
+        { id: 'ft-1', name: 'Sample Review', role: 'Replace with a real member', message: `This is placeholder text. Add a genuine review from a ${gymName} member here before publishing your site.`, rating: 5 },
+        { id: 'ft-2', name: 'Sample Review', role: 'Replace with a real member', message: 'This is placeholder text. Swap it out for a real testimonial — members are usually happy to share a quick quote.', rating: 5 },
+        { id: 'ft-3', name: 'Sample Review', role: 'Replace with a real member', message: 'This is placeholder text. Ask a long-time member for a short quote about why they keep coming back.', rating: 5 },
       ],
     },
     gallery: [

@@ -575,7 +575,7 @@ export default function SettingsPage() {
             <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
               {[
                 { icon: HelpCircle,    label: 'Help Center',     sub: 'Search FAQs & raise tickets',     to:   '/owner-dashboard/help' },
-                { icon: Mail,          label: 'Email support',   sub: 'support@gymmobius.com',           href: 'mailto:support@gymmobius.com' },
+                { icon: Mail,          label: 'Email support',   sub: 'gymmobius.support@gmail.com',     href: 'mailto:gymmobius.support@gmail.com' },
                 { icon: AlertTriangle, label: 'Report a bug',    sub: 'Tracked in your tickets',         to:   '/owner-dashboard/help?compose=bug' },
               ].map(({ icon: Icon, label, sub, href, to }) => {
                 const inner = (

@@ -31,6 +31,6 @@ export const SITE = {
   NAME: 'Gymmobius',
   TAGLINE: 'The operating system for modern gyms',
   URL: 'https://gymmobius.com',
-  SUPPORT_EMAIL: 'support@gymmobius.com',
-  SALES_EMAIL: 'sales@gymmobius.com',
+  SUPPORT_EMAIL: 'gymmobius.support@gmail.com',
+  SALES_EMAIL: 'gymmobius.support@gmail.com',
 }

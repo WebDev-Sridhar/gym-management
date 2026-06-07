@@ -1,7 +1,7 @@
 export const LEGAL_META = {
   jurisdiction: 'India',
   governingLaw: 'Laws of India',
-  supportContact: 'support@gymmobius.com',
+  supportContact: 'gymmobius.support@gmail.com',
   companyName: 'Gymmobius',
   effectiveDate: '2026-05-01',
   lastUpdated: '2026-05-18',

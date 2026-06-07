@@ -3,7 +3,7 @@ import { ROUTES } from './constants/routes'
 export const NAV_LINKS = [
   { label: 'Features', to: ROUTES.FEATURES },
   { label: 'Pricing', to: ROUTES.PRICING },
-  { label: 'Testimonials', to: '/#testimonials' },
+  { label: 'Blog', to: ROUTES.BLOG },
   { label: 'About', to: ROUTES.ABOUT },
 ]
 
@@ -72,36 +72,24 @@ export const FEATURES = [
   },
 ]
 
-export const TESTIMONIALS = [
+// Replaced fabricated testimonials (2026-06-07 trust audit) with truthful,
+// defensible reasons to choose Gymmobius — no invented names, gyms, or metrics.
+export const WHY_GYMMOBIUS = [
   {
-    quote: 'We went from managing everything on paper to having a complete system in one week. Our collections improved by 40%.',
-    name: 'Rajesh Kumar',
-    role: 'Owner, FitZone Gym',
-    initials: 'RK',
+    title: 'WhatsApp-first, by design',
+    description: 'Payment reminders, attendance nudges, and renewal links go where your members already are — WhatsApp. No app download required for them.',
   },
   {
-    quote: 'The QR attendance system alone saved us 2 hours daily. Members love how quick check-in is now.',
-    name: 'Priya Sharma',
-    role: 'Manager, Iron Paradise',
-    initials: 'PS',
+    title: 'Built for Indian gyms',
+    description: 'Pricing in rupees, Razorpay payment links, and workflows designed around how gyms in India actually operate — not a US template with the currency swapped.',
   },
   {
-    quote: 'Ghost member detection is a game-changer. We re-engaged 30+ members who were about to leave.',
-    name: 'Amit Patel',
-    role: 'Owner, PowerHouse Fitness',
-    initials: 'AP',
+    title: 'Personal onboarding, not a help center article',
+    description: 'Switching from registers and Excel sheets is the hard part. We sit with you and get your member data into the system — a real person, not a chatbot.',
   },
   {
-    quote: 'Finally a gym management tool that doesn\'t feel like it was built in 2005. Clean, fast, and actually useful.',
-    name: 'Sneha Reddy',
-    role: 'Owner, FlexFit Studio',
-    initials: 'SR',
-  },
-  {
-    quote: 'The analytics dashboard gives me clarity I never had before. I know exactly where my revenue comes from.',
-    name: 'Vikram Singh',
-    role: 'Owner, Beast Mode Gym',
-    initials: 'VS',
+    title: 'Founder pricing for early gyms',
+    description: 'We\'re early, and we want our first gyms to grow with us. Lock in founder-era pricing now — it won\'t be this low once we scale.',
   },
 ]
 

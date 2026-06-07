@@ -48,7 +48,7 @@ export default function ProtectedRoute({ allowedRoles, children }) {
             support to restore your account.
           </p>
           <a
-            href="mailto:support@gymmobius.com"
+            href="mailto:gymmobius.support@gmail.com"
             className="mt-4 inline-block rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white"
           >
             Contact support

@@ -37,7 +37,7 @@ export default function FinalCTA() {
           variants={fadeUp}
           className="mt-6 text-text-secondary text-lg max-w-2xl mx-auto leading-relaxed"
         >
-          Join 500+ gym owners who've already made the switch. Set up takes under 10 minutes. No credit card required.
+          Founder pricing for our first gyms — built for Indian gyms, WhatsApp-first, with personal onboarding included. No credit card required.
         </motion.p>
 
         <motion.div

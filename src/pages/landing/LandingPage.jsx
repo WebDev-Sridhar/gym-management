@@ -21,7 +21,7 @@ export default function LandingPage() {
   return (
     <div className="bg-bg min-h-screen overflow-x-hidden">
       <SEO
-        title="Gym Management Software | Gymmobius"
+        title="Gym Management Software"
         description={`${SITE.NAME} — ${SITE.TAGLINE}. Automate attendance, payments, and member retention for your gym.`}
         canonical={ROUTES.HOME}
         keywords="gym management software, gym crm, gym automation, member retention, gymmobius"

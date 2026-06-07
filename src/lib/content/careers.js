@@ -3,13 +3,13 @@ import { ROUTES } from '../constants/routes'
 export const CAREERS_CONTENT = {
   seo: {
     title: 'Careers',
-    description: 'Join Gymmobius. We’re a small, deliberate team building software that thousands of gym owners run their business on. Remote-friendly, India-based, and shipping every week.',
+    description: 'Join Gymmobius. We’re a small, deliberate team building gym-management software for Indian gym owners. Remote-friendly, India-based, and shipping fast.',
     canonical: ROUTES.CAREERS,
     keywords: 'gymmobius careers, gym tech jobs, saas careers india, remote react jobs, fitness tech jobs',
   },
   hero: {
     title: 'Build software gyms run their business on.',
-    subtitle: 'We’re a small team — under 15 people — with disproportionate impact. If you want to ship features that go live in real gyms the week you build them, you’ll feel at home here.',
+    subtitle: 'We’re a small team — under 15 people. We’re early, which means your work ships to real gym owners almost as soon as you build it, and you’ll have real influence over what we build next.',
   },
   jobs: [
     {

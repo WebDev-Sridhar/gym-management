@@ -158,11 +158,11 @@ export default function SignupPage() {
               Build your gym's<br />future today.
             </h1>
             <p className="text-white/70 max-w-md text-xl leading-relaxed">
-              Join 500+ gym owners who have automated their business and reclaimed their time.
+              Built for Indian gyms — WhatsApp-first, with personal onboarding and founder pricing for early adopters.
             </p>
           </div>
           <div className="flex gap-8 text-white/60 text-sm font-medium">
-            <p className="flex items-center gap-2"><span className="text-violet-400">✔</span> Free 14-day trial</p>
+            <p className="flex items-center gap-2"><span className="text-violet-400">✔</span> Free 30-day trial</p>
             <p className="flex items-center gap-2"><span className="text-violet-400">✔</span> No credit card</p>
             <p className="flex items-center gap-2"><span className="text-violet-400">✔</span> Setup in 2 mins</p>
           </div>

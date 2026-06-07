@@ -15,12 +15,12 @@ export const BLOG_CONTENT = {
     {
       slug: 'reduce-member-churn-first-90-days',
       title: 'The First 90 Days: Why Most Members Quit (And How to Stop It)',
-      excerpt: 'Churn data from 200+ gyms shows the same pattern — most members who quit do so within 90 days of joining. Here’s the onboarding system that fixes it.',
+      excerpt: 'It’s a pattern gym owners keep telling us about — most member churn happens in the first 90 days after joining. Here’s the onboarding system we built to fight it.',
     },
     {
       slug: 'pricing-tiers-that-actually-work',
       title: 'Pricing Tiers That Actually Work for Indian Gyms',
-      excerpt: 'Three-tier pricing, family memberships, and corporate plans — what converts, what doesn’t, and the rate cards we’ve seen drive 30%+ revenue lift.',
+      excerpt: 'Three-tier pricing, family memberships, and corporate plans — how to structure each one, and which combinations tend to convert best for Indian gyms.',
     },
     {
       slug: 'whatsapp-automation-for-gyms',
@@ -30,7 +30,7 @@ export const BLOG_CONTENT = {
     {
       slug: 'ghost-members-detection-playbook',
       title: 'How to Spot a Ghost Member Before They Cancel',
-      excerpt: 'A member who hasn’t checked in for 14 days is 4x more likely to cancel. Here’s the early-warning system we built into Gymmobius — and how to run it manually if you don’t use us yet.',
+      excerpt: 'The longer a member goes without checking in, the more likely they are to cancel. Here’s the early-warning system we built into Gymmobius — and how to run it manually if you don’t use us yet.',
     },
     {
       slug: 'trainer-comp-models',
