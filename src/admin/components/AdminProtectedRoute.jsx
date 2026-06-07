@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '../store/AdminAuthContext'
 import AdminLoginPage from '../pages/AdminLoginPage'
+import AdminMfaGate from './AdminMfaGate'
 import { adminPath } from '../lib/adminBase'
 import { ShieldAlert, LogOut } from 'lucide-react'
 
@@ -10,7 +11,7 @@ import { ShieldAlert, LogOut } from 'lucide-react'
  * spinner until the first auth resolution completes.
  */
 export default function AdminProtectedRoute({ children }) {
-  const { initialized, loading, isAuthenticated, isAdmin, logout } = useAdminAuth()
+  const { initialized, loading, isAuthenticated, isAdmin, mfaStatus, logout } = useAdminAuth()
   const navigate = useNavigate()
   const signOut = async () => { await logout(); navigate(adminPath(''), { replace: true }) }
 
@@ -44,6 +45,10 @@ export default function AdminProtectedRoute({ children }) {
       </div>
     )
   }
+
+  // Admin identity confirmed, but the session must be MFA-verified (AAL2)
+  // before the panel renders. Mirrors the server-side enforcement.
+  if (mfaStatus && mfaStatus !== 'ok') return <AdminMfaGate />
 
   return children
 }

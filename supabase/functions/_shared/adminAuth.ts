@@ -20,6 +20,22 @@ export interface AdminContext {
   role: AdminRole
 }
 
+// Decode the Authenticator Assurance Level from a Supabase JWT payload.
+// 'aal2' = the session completed an MFA (TOTP) challenge. Defaults to 'aal1'
+// (single-factor) on any parse failure — fail-closed for MFA enforcement.
+function decodeAal(token: string): string {
+  try {
+    const part = token.split('.')[1]
+    if (!part) return 'aal1'
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+    const claims = JSON.parse(atob(padded))
+    return typeof claims?.aal === 'string' ? claims.aal : 'aal1'
+  } catch {
+    return 'aal1'
+  }
+}
+
 // Verify the caller's JWT, confirm they are an ACTIVE platform admin, and
 // (optionally) that their role is allowed for this action. Returns the admin
 // context. Throws HttpError(401/403) otherwise.
@@ -43,6 +59,13 @@ export async function requireAdmin(
 
   if (adminErr) throw new HttpError(500, adminErr.message)
   if (!admin || !admin.is_active) throw new HttpError(403, 'not a platform admin')
+
+  // MFA gate: every privileged admin action requires a fully verified (AAL2)
+  // session. Enrollment itself uses native GoTrue (auth.mfa.*), not these
+  // functions, so a not-yet-enrolled admin can still enroll at AAL1.
+  if (decodeAal(token) !== 'aal2') {
+    throw new HttpError(403, 'mfa_required', { error: 'mfa_required' })
+  }
 
   if (allowedRoles && !allowedRoles.includes(admin.role as AdminRole)) {
     throw new HttpError(403, `role '${admin.role}' not permitted for this action`)

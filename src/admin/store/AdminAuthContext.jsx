@@ -18,6 +18,9 @@ export function AdminAuthProvider({ children }) {
   const [admin, setAdmin] = useState(null)
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
+  // MFA assurance for the admin session: 'ok' (aal2) | 'challenge' (has a
+  // verified factor, needs step-up) | 'enroll' (admin, no factor) | null.
+  const [mfaStatus, setMfaStatus] = useState(null)
   const initializedRef = useRef(false)
 
   useEffect(() => {
@@ -62,12 +65,38 @@ export function AdminAuthProvider({ children }) {
     try {
       const a = await fetchAdminProfile(authId)
       setAdmin(a)
+      if (a) await computeMfa()
+      else setMfaStatus(null)
     } catch (err) {
       console.error('Failed to load admin profile:', err)
       setAdmin(null)
+      setMfaStatus(null)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Resolve the session's MFA assurance level. enroll = admin has no TOTP
+  // factor yet; challenge = factor exists but session is still aal1; ok = aal2.
+  async function computeMfa() {
+    try {
+      const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (error || !data) { setMfaStatus('enroll'); return }
+      if (data.currentLevel === 'aal2') setMfaStatus('ok')
+      else if (data.nextLevel === 'aal2') setMfaStatus('challenge')
+      else setMfaStatus('enroll')
+    } catch {
+      setMfaStatus('enroll')
+    }
+  }
+
+  // Re-read the session (picks up the upgraded aal2 token after MFA verify),
+  // refresh the data-client token, and recompute assurance. Called by the gate.
+  async function recheckMfa() {
+    const { data: { session: s } } = await supabase.auth.getSession()
+    setSession(s)
+    setAccessToken(s?.access_token ?? null)
+    await computeMfa()
   }
 
   async function login(email, password) {
@@ -93,6 +122,7 @@ export function AdminAuthProvider({ children }) {
     }
     setSession(null)
     setAdmin(null)
+    setMfaStatus(null)
   }
 
   const value = {
@@ -103,6 +133,9 @@ export function AdminAuthProvider({ children }) {
     initialized,
     isAuthenticated: !!session,
     isAdmin: !!admin,
+    mfaStatus,            // 'ok' | 'challenge' | 'enroll' | null
+    mfaVerified: mfaStatus === 'ok',
+    recheckMfa,
     login,
     logout,
     refresh: () => session?.user && loadAdmin(session.user.id),
