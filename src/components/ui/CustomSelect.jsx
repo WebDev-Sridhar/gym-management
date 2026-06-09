@@ -22,6 +22,11 @@ export default function CustomSelect({
   compact = false,
   className = '',
   disabled = false,
+  // dark — opt-in dark theme matching the Member/Trainer apps (rgba whites
+  // on near-black background, indigo-400 accent). Trigger + portal dropdown
+  // both switch styles. Default false keeps every existing call site (owner
+  // dashboard, CMS) on the original light theme.
+  dark = false,
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, flip: false })
@@ -103,17 +108,25 @@ export default function CustomSelect({
         disabled={disabled}
         onClick={toggleDropdown}
         className={`w-full flex items-center justify-between gap-2 ${px} ${py} ${textSz} border rounded-lg text-left transition-colors outline-none
-          ${open
-            ? 'border-indigo-500 ring-1 ring-indigo-500 bg-white'
-            : 'bg-gray-50 border-gray-200 hover:border-gray-300'}
+          ${dark
+            ? (open
+                ? 'border-indigo-400/60 ring-1 ring-indigo-400/40 bg-white/[0.06]'
+                : 'bg-white/[0.05] border-white/10 hover:border-white/20')
+            : (open
+                ? 'border-indigo-500 ring-1 ring-indigo-500 bg-white'
+                : 'bg-gray-50 border-gray-200 hover:border-gray-300')}
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
       >
-        <span className={`truncate ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
+        <span className={`truncate ${
+          dark
+            ? (selected ? 'text-white' : 'text-white/40')
+            : (selected ? 'text-gray-900' : 'text-gray-400')
+        }`}>
           {selected ? selected.label : placeholder}
         </span>
         <svg
-          className={`w-4 h-4 shrink-0 text-gray-400 transition-transform duration-200 ${open ? (pos.flip ? 'rotate-0' : 'rotate-180') : ''}`}
+          className={`w-4 h-4 shrink-0 transition-transform duration-200 ${dark ? 'text-white/40' : 'text-gray-400'} ${open ? (pos.flip ? 'rotate-0' : 'rotate-180') : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -126,11 +139,16 @@ export default function CustomSelect({
           ref={dropdownRef}
           data-theme-aware="true"
           style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, zIndex: 9999 }}
-          className="bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
+          className={dark
+            ? 'border border-white/10 rounded-lg shadow-2xl overflow-hidden'
+            : 'bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden'}
+          // Dark BG via inline style so it matches the solid dark surface used
+          // by Member/Trainer apps (#1a1b2e) regardless of any parent bg.
+          {...(dark ? { style: { position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, zIndex: 9999, background: '#1a1b2e' } } : {})}
         >
           <ul className="max-h-56 overflow-y-auto py-1">
             {options.length === 0 && (
-              <li className="px-4 py-3 text-sm text-gray-400">No options</li>
+              <li className={`px-4 py-3 text-sm ${dark ? 'text-white/40' : 'text-gray-400'}`}>No options</li>
             )}
             {options.map((opt) => {
               const isSelected = opt.value === value
@@ -146,20 +164,26 @@ export default function CustomSelect({
                       setOpen(false)
                     }}
                     className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors text-sm
-                      ${isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50'}
+                      ${dark
+                        ? (isSelected ? 'bg-indigo-500/15' : 'hover:bg-white/[0.04]')
+                        : (isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50')}
                       ${opt.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
                     `}
                   >
                     <span className="flex-1 min-w-0 truncate">
-                      <span className={isSelected ? 'font-medium text-indigo-900' : 'text-gray-800'}>
+                      <span className={
+                        dark
+                          ? (isSelected ? 'font-medium text-indigo-300' : 'text-white/85')
+                          : (isSelected ? 'font-medium text-indigo-900' : 'text-gray-800')
+                      }>
                         {opt.label}
                       </span>
                       {opt.hint && (
-                        <span className="ml-2 text-gray-400 text-xs">{opt.hint}</span>
+                        <span className={`ml-2 text-xs ${dark ? 'text-white/40' : 'text-gray-400'}`}>{opt.hint}</span>
                       )}
                     </span>
                     {isSelected && (
-                      <svg className="w-4 h-4 text-indigo-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className={`w-4 h-4 shrink-0 ${dark ? 'text-indigo-300' : 'text-indigo-600'}`} fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     )}

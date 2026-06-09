@@ -2,31 +2,74 @@ import { useState, useMemo } from 'react'
 import { useTrainerData } from '../../store/TrainerDataContext'
 import { updateMemberHealth } from '../../services/membershipService'
 import CalculatorPanel from '../../components/calculators/CalculatorPanel'
+import CustomSelect from '../../components/ui/CustomSelect'
 import { calculateAll } from '../../lib/calculators'
 
 // Trainer dashboard → Tools tab.
+// Dark theme matches the rest of the trainer app.
 //
 // Flow:
-//   1. Trainer picks a member from the dropdown (their assigned clients only).
-//   2. Selected member's stored health profile (height/weight/dob/sex) pre-
-//      fills an editable card.
-//   3. Trainer can update + save the profile (writes to members table).
-//   4. Three calculator cards below use the saved profile as pre-fill.
-//   5. Or: trainer picks "No member — quick calc" to use the calculators
-//      without persisting anything (useful for a walk-in inquiry).
-//
-// Mirrors the member-app Tools page (same CalculatorPanel + updateMemberHealth
-// service) so the math + UI stay consistent across both audiences.
+//   1. Member picker (CustomSelect dark) — assigned clients only, hints
+//      whether profile is complete vs incomplete
+//   2. Profile editor — height/weight/age/sex (saves to selected member)
+//   3. Snapshot card (live from local form state)
+//   4. Three CalculatorPanel cards pre-filled from local form
 
-const inputCls =
-  'w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+const card = {
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.07)',
+  borderRadius: 14,
+  padding: 16,
+}
+const input = {
+  width: '100%',
+  padding: '10px 12px',
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 10,
+  color: '#f5f5f7',
+  fontSize: 13,
+  fontWeight: 500,
+  outline: 'none',
+  boxSizing: 'border-box',
+}
+const label = {
+  display: 'block',
+  fontSize: 10,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'rgba(255,255,255,0.45)',
+  marginBottom: 6,
+}
+
+function SexToggle({ value, onChange }) {
+  const btn = (v) => ({
+    flex: 1,
+    padding: '10px 12px',
+    background: value === v ? 'rgba(129,140,248,0.18)' : 'rgba(255,255,255,0.05)',
+    border: value === v ? '1px solid rgba(129,140,248,0.5)' : '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 10,
+    color: value === v ? '#a5b4fc' : 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  })
+  return (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button type="button" style={btn('male')}   onClick={() => onChange('male')}>Male</button>
+      <button type="button" style={btn('female')} onClick={() => onChange('female')}>Female</button>
+    </div>
+  )
+}
 
 export default function TrainerToolsPage() {
   const { members, refreshMembers } = useTrainerData()
-  const [selectedId, setSelectedId] = useState('')   // member id, or '' for standalone
+  const [selectedId, setSelectedId] = useState('')
   const [heightCm, setHeightCm]     = useState('')
   const [weightKg, setWeightKg]     = useState('')
-  const [dob, setDob]               = useState('')
+  const [age, setAge]               = useState('')
   const [sex, setSex]               = useState('')
   const [saving, setSaving]         = useState(false)
   const [saveMsg, setSaveMsg]       = useState('')
@@ -37,9 +80,6 @@ export default function TrainerToolsPage() {
     [members, selectedId],
   )
 
-  // When trainer picks a different member, hydrate the form from that
-  // member's stored values. Standalone mode (no member) keeps whatever's
-  // currently entered.
   function handlePickMember(id) {
     setSelectedId(id)
     setSaveMsg(''); setSaveErr('')
@@ -48,7 +88,7 @@ export default function TrainerToolsPage() {
     if (!m) return
     setHeightCm(m.height_cm ?? '')
     setWeightKg(m.weight_kg ?? '')
-    setDob(m.dob ?? '')
+    setAge(m.age ?? '')
     setSex(m.sex ?? '')
   }
 
@@ -60,7 +100,7 @@ export default function TrainerToolsPage() {
         memberId: selected.id,
         heightCm: heightCm === '' ? null : heightCm,
         weightKg: weightKg === '' ? null : weightKg,
-        dob: dob || null,
+        age: age === '' ? null : age,
         sex: sex || null,
       })
       await refreshMembers?.()
@@ -73,30 +113,34 @@ export default function TrainerToolsPage() {
     }
   }
 
-  // What the calculators pre-fill from — uses the LOCAL form values so the
-  // trainer can tweak inputs without saving (e.g. "what if Ravi lost 5kg?").
-  // When a member is selected, this defaults to their stored values via
-  // handlePickMember; otherwise it's whatever the trainer typed.
-  const initial = useMemo(() => ({
-    heightCm, weightKg, dob, sex,
-  }), [heightCm, weightKg, dob, sex])
-
-  // Summary card uses the current local-state values so it updates live as
-  // the trainer types.
+  // Live snapshot uses local form state — updates as trainer types so
+  // "what if Ravi loses 5kg" can be explored without saving.
+  const initial = useMemo(() => ({ heightCm, weightKg, age, sex }), [heightCm, weightKg, age, sex])
   const summary = useMemo(
     () => calculateAll({
       weightKg: Number(weightKg) || 0,
       heightCm: Number(heightCm) || 0,
-      dob, sex,
+      ageYears: Number(age)      || 0,
+      sex,
     }),
-    [heightCm, weightKg, dob, sex],
+    [heightCm, weightKg, age, sex],
   )
+
+  // Member picker options — show profile-complete hint inline
+  const memberOptions = useMemo(() => [
+    { value: '', label: 'Quick calculation (no member)' },
+    ...(members ?? []).map(m => ({
+      value: m.id,
+      label: m.name,
+      hint: m.height_cm && m.weight_kg && m.age && m.sex ? 'profile complete' : 'profile incomplete',
+    })),
+  ], [members])
 
   if (members === null) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '16px' }}>
-        <div className="max-w-2xl mx-auto pt-8">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-sm text-gray-500">
+      <div style={{ padding: '20px 16px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <div style={{ maxWidth: 600, margin: '0 auto' }}>
+          <div style={{ ...card, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
             Loading…
           </div>
         </div>
@@ -105,121 +149,123 @@ export default function TrainerToolsPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '16px', paddingBottom: '88px' }}>
-      <div className="max-w-2xl mx-auto space-y-4">
+    <div style={{ padding: '20px 16px 96px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Health Tools</h1>
-          <p className="text-xs text-gray-500 mt-1">
-            BMI, BMR, and daily calorie calculators. Pick a member to pre-fill their stored profile, or use standalone for a quick calculation.
+        <div style={{ marginTop: 4 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>Health Tools</h1>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: '4px 0 0' }}>
+            BMI, BMR, and daily calorie calculators. Pick a client to pre-fill their profile, or use standalone.
           </p>
         </div>
 
         {/* Member picker */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-          <label className="block">
-            <span className="block text-xs font-semibold text-gray-700 mb-1">Member</span>
-            <select value={selectedId} onChange={e => handlePickMember(e.target.value)} className={inputCls}>
-              <option value="">— Quick calculation (no member) —</option>
-              {(members ?? []).map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.name}{m.height_cm && m.weight_kg ? '  ·  profile complete' : '  ·  profile incomplete'}
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-gray-500 mt-1.5">
-              {selected
-                ? 'Editing this member’s details writes back to their profile when you click Save.'
-                : 'Standalone mode — no saving, just calculate.'}
-            </p>
-          </label>
+        <div style={card}>
+          <label style={label}>Member</label>
+          <CustomSelect
+            dark
+            value={selectedId}
+            onChange={handlePickMember}
+            placeholder="Quick calculation (no member)"
+            options={memberOptions}
+          />
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', margin: '8px 0 0', lineHeight: 1.4 }}>
+            {selected
+              ? 'Editing this client\'s details writes back to their profile when you click Save.'
+              : 'Standalone mode — no saving, just calculate.'}
+          </p>
         </div>
 
-        {/* Live snapshot card */}
+        {/* Snapshot — live from local state */}
         {summary.bmi && (
-          <div className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-2xl p-5">
-            <p className="text-xs uppercase tracking-wider opacity-80">
+          <div style={{
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            borderRadius: 18,
+            padding: 18,
+            color: '#fff',
+          }}>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.85, margin: 0 }}>
               {selected ? `${selected.name}'s snapshot` : 'Live snapshot'}
             </p>
-            <div className="grid grid-cols-3 gap-3 mt-3">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
               <div>
-                <p className="text-[10px] uppercase opacity-70">BMI</p>
-                <p className="text-xl font-bold">{summary.bmi.value}</p>
-                <p className="text-[10px] opacity-80">{summary.bmi.label}</p>
+                <p style={{ fontSize: 9, opacity: 0.7, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BMI</p>
+                <p style={{ fontSize: 20, fontWeight: 800, margin: '2px 0 0' }}>{summary.bmi.value}</p>
+                <p style={{ fontSize: 10, opacity: 0.8, margin: 0 }}>{summary.bmi.label}</p>
               </div>
               {summary.bmr && (
                 <div>
-                  <p className="text-[10px] uppercase opacity-70">BMR</p>
-                  <p className="text-xl font-bold">{summary.bmr.toLocaleString('en-IN')}</p>
-                  <p className="text-[10px] opacity-80">kcal/day rest</p>
+                  <p style={{ fontSize: 9, opacity: 0.7, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BMR</p>
+                  <p style={{ fontSize: 20, fontWeight: 800, margin: '2px 0 0' }}>{summary.bmr.toLocaleString('en-IN')}</p>
+                  <p style={{ fontSize: 10, opacity: 0.8, margin: 0 }}>kcal at rest</p>
                 </div>
               )}
               {summary.calories && (
                 <div>
-                  <p className="text-[10px] uppercase opacity-70">TDEE</p>
-                  <p className="text-xl font-bold">{summary.calories.toLocaleString('en-IN')}</p>
-                  <p className="text-[10px] opacity-80">moderate activity</p>
+                  <p style={{ fontSize: 9, opacity: 0.7, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>TDEE</p>
+                  <p style={{ fontSize: 20, fontWeight: 800, margin: '2px 0 0' }}>{summary.calories.toLocaleString('en-IN')}</p>
+                  <p style={{ fontSize: 10, opacity: 0.8, margin: 0 }}>moderate activity</p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Profile editor — only enabled when a member is selected */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Profile details</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+        {/* Profile editor */}
+        <div style={card}>
+          <div style={{ marginBottom: 14 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>Profile details</h2>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', margin: '4px 0 0' }}>
               {selected
                 ? `Editing ${selected.name}. Save persists to their member record.`
-                : 'Type values here to feed the calculators below — nothing is saved without a member selected.'}
+                : 'Type values here to feed the calculators below — nothing saves without a member selected.'}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="block text-xs font-semibold text-gray-700 mb-1">Height (cm)</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={label}>Height (cm)</label>
               <input type="number" inputMode="decimal" min="50" max="275" step="0.5"
-                value={heightCm} onChange={e => setHeightCm(e.target.value)} placeholder="170" className={inputCls} />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-semibold text-gray-700 mb-1">Weight (kg)</span>
+                value={heightCm} onChange={e => setHeightCm(e.target.value)} placeholder="170" style={input} />
+            </div>
+            <div>
+              <label style={label}>Weight (kg)</label>
               <input type="number" inputMode="decimal" min="20" max="500" step="0.1"
-                value={weightKg} onChange={e => setWeightKg(e.target.value)} placeholder="65" className={inputCls} />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-semibold text-gray-700 mb-1">Date of birth</span>
-              <input type="date" max={new Date(Date.now() - 5*365*86400000).toISOString().slice(0,10)}
-                value={dob} onChange={e => setDob(e.target.value)} className={inputCls} />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-semibold text-gray-700 mb-1">Sex</span>
-              <select value={sex} onChange={e => setSex(e.target.value)} className={inputCls}>
-                <option value="">Select…</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-            </label>
+                value={weightKg} onChange={e => setWeightKg(e.target.value)} placeholder="65" style={input} />
+            </div>
+            <div>
+              <label style={label}>Age (years)</label>
+              <input type="number" inputMode="numeric" min="5" max="120" step="1"
+                value={age} onChange={e => setAge(e.target.value)} placeholder="28" style={input} />
+            </div>
+            <div>
+              <label style={label}>Sex</label>
+              <SexToggle value={sex} onChange={setSex} />
+            </div>
           </div>
           {selected && (
-            <div className="flex items-center gap-3 pt-2 flex-wrap">
-              <button type="button" onClick={handleSave} disabled={saving}
-                className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 14, flexWrap: 'wrap' }}>
+              <button type="button" onClick={handleSave} disabled={saving} style={{
+                padding: '10px 18px',
+                background: saving ? 'rgba(129,140,248,0.5)' : '#818cf8',
+                border: 'none', borderRadius: 10,
+                color: '#fff', fontSize: 13, fontWeight: 700,
+                cursor: saving ? 'not-allowed' : 'pointer',
+              }}>
                 {saving ? 'Saving…' : 'Save to profile'}
               </button>
-              {saveMsg && <span className="text-xs text-emerald-600">{saveMsg}</span>}
-              {saveErr && <span className="text-xs text-red-500">{saveErr}</span>}
+              {saveMsg && <span style={{ fontSize: 12, color: '#34d399' }}>{saveMsg}</span>}
+              {saveErr && <span style={{ fontSize: 12, color: '#f87171' }}>{saveErr}</span>}
             </div>
           )}
         </div>
 
-        {/* The three calculators — feed from the LOCAL form state so they
-            update live as the trainer types, no save round-trip needed. */}
+        {/* Calculators */}
         <CalculatorPanel type="bmi"      initial={initial} />
         <CalculatorPanel type="bmr"      initial={initial} />
         <CalculatorPanel type="calories" initial={initial} />
 
-        <p className="text-[11px] text-gray-400 text-center pt-2">
-          BMR uses the Mifflin-St Jeor formula. Use these as starting points for diet programming — adjust based on client response over 2-3 weeks.
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: 8, margin: 0, lineHeight: 1.5 }}>
+          BMR uses Mifflin-St Jeor. Use these as starting points — adjust based on client response over 2-3 weeks.
         </p>
       </div>
     </div>

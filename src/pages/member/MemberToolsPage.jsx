@@ -5,19 +5,63 @@ import CalculatorPanel from '../../components/calculators/CalculatorPanel'
 import { calculateAll } from '../../lib/calculators'
 
 // Member app → Tools tab.
+// Dark theme matches the rest of the member app (#0f1023 base, rgba whites,
+// indigo-400 accents). Same shell/spacing pattern as MemberApp.jsx and
+// MemberProfilePage.jsx so the tab transition feels native.
 //
-// Two-part layout:
-//   1. "Your details" card — editable height/weight/dob/sex. Saved values
-//      become the pre-fill source for the calculators below.
-//   2. Three CalculatorPanel cards (BMI / BMR / Calories) that read the
-//      member's stored profile via `initial=`. Members can also tweak the
-//      inputs in-place for "what if" exploration without persisting.
-//
-// We deliberately put the health profile here (not on the Profile tab) so
-// the data-entry + calculation workflow is one screen — fewer tab jumps.
+// Layout:
+//   1. Snapshot card — gradient indigo, shows current BMI/BMR/TDEE at a glance
+//   2. "Your details" editor — height, weight, age, sex with Save
+//   3. Three CalculatorPanel cards pre-filled from saved profile
 
-const inputCls =
-  'w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+const card = {
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.07)',
+  borderRadius: 14,
+  padding: 16,
+}
+const input = {
+  width: '100%',
+  padding: '10px 12px',
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 10,
+  color: '#f5f5f7',
+  fontSize: 13,
+  fontWeight: 500,
+  outline: 'none',
+  boxSizing: 'border-box',
+}
+const label = {
+  display: 'block',
+  fontSize: 10,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'rgba(255,255,255,0.45)',
+  marginBottom: 6,
+}
+
+function SexToggle({ value, onChange }) {
+  const btn = (v) => ({
+    flex: 1,
+    padding: '10px 12px',
+    background: value === v ? 'rgba(129,140,248,0.18)' : 'rgba(255,255,255,0.05)',
+    border: value === v ? '1px solid rgba(129,140,248,0.5)' : '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 10,
+    color: value === v ? '#a5b4fc' : 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  })
+  return (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button type="button" style={btn('male')}   onClick={() => onChange('male')}>Male</button>
+      <button type="button" style={btn('female')} onClick={() => onChange('female')}>Female</button>
+    </div>
+  )
+}
 
 export default function MemberToolsPage() {
   const { member, setMember } = useMemberData()
@@ -25,32 +69,25 @@ export default function MemberToolsPage() {
   const [saveMsg, setSaveMsg] = useState('')
   const [saveErr, setSaveErr] = useState('')
 
-  // Local form state mirrors the stored profile. Initialized once from
-  // member; useState ignores prop changes after mount — that's fine because
-  // setMember after a Save updates the same context object the parent reads
-  // and we don't want the form fighting the user's in-progress edits.
   const [heightCm, setHeightCm] = useState(member?.height_cm ?? '')
   const [weightKg, setWeightKg] = useState(member?.weight_kg ?? '')
-  const [dob, setDob]           = useState(member?.dob ?? '')
+  const [age, setAge]           = useState(member?.age ?? '')
   const [sex, setSex]           = useState(member?.sex ?? '')
 
-  // Snapshot of saved profile values for the calculators. This is what the
-  // CalculatorPanel uses as pre-fill — we pass the SAVED values, not the
-  // local in-progress form values, so calculators show "what the gym has on
-  // file" until the member explicitly saves changes.
+  // Snapshot uses SAVED values (what the gym has on file) so calculators
+  // below see "current truth" until member explicitly saves their edits.
   const initial = useMemo(() => ({
     heightCm: member?.height_cm ?? '',
     weightKg: member?.weight_kg ?? '',
-    dob:      member?.dob ?? '',
+    age:      member?.age ?? '',
     sex:      member?.sex ?? '',
-  }), [member?.height_cm, member?.weight_kg, member?.dob, member?.sex])
+  }), [member?.height_cm, member?.weight_kg, member?.age, member?.sex])
 
-  // Summary metrics for the header card — null if any required field missing.
   const summary = useMemo(
     () => calculateAll({
       weightKg: Number(initial.weightKg) || 0,
       heightCm: Number(initial.heightCm) || 0,
-      dob: initial.dob,
+      ageYears: Number(initial.age)      || 0,
       sex: initial.sex,
     }),
     [initial],
@@ -63,11 +100,11 @@ export default function MemberToolsPage() {
         memberId: member.id,
         heightCm: heightCm === '' ? null : heightCm,
         weightKg: weightKg === '' ? null : weightKg,
-        dob: dob || null,
+        age: age === '' ? null : age,
         sex: sex || null,
       })
       setMember(updated)
-      setSaveMsg('Saved! Calculators below now use your updated profile.')
+      setSaveMsg('Saved! Calculators below now use your updated details.')
       setTimeout(() => setSaveMsg(''), 3000)
     } catch (err) {
       setSaveErr(err.message || 'Could not save. Please try again.')
@@ -77,91 +114,103 @@ export default function MemberToolsPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '16px', paddingBottom: '88px' }}>
-      <div style={{ maxWidth: '480px', margin: '0 auto' }} className="space-y-4">
+    <div style={{ padding: '20px 16px 96px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <div style={{ maxWidth: 480, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* Header */}
-        <div style={{ marginTop: '4px' }}>
-          <h1 className="text-xl font-bold text-gray-900">Health Tools</h1>
-          <p className="text-xs text-gray-500 mt-1">Update your details once, use the calculators anytime.</p>
+        <div style={{ marginTop: 4 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>Health Tools</h1>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: '4px 0 0' }}>
+            Update your details once. Use the calculators anytime.
+          </p>
         </div>
 
-        {/* At-a-glance summary card — only if member has logged enough data */}
+        {/* Snapshot card (only when at least BMI computes) */}
         {summary.bmi && (
-          <div className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-2xl p-5">
-            <p className="text-xs uppercase tracking-wider opacity-80">Your snapshot</p>
-            <div className="grid grid-cols-3 gap-3 mt-3">
+          <div style={{
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            borderRadius: 18,
+            padding: 18,
+            color: '#fff',
+          }}>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.85, margin: 0 }}>
+              Your snapshot
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
               <div>
-                <p className="text-[10px] uppercase opacity-70">BMI</p>
-                <p className="text-xl font-bold">{summary.bmi.value}</p>
-                <p className="text-[10px] opacity-80">{summary.bmi.label}</p>
+                <p style={{ fontSize: 9, opacity: 0.7, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BMI</p>
+                <p style={{ fontSize: 20, fontWeight: 800, margin: '2px 0 0' }}>{summary.bmi.value}</p>
+                <p style={{ fontSize: 10, opacity: 0.8, margin: 0 }}>{summary.bmi.label}</p>
               </div>
               {summary.bmr && (
                 <div>
-                  <p className="text-[10px] uppercase opacity-70">BMR</p>
-                  <p className="text-xl font-bold">{summary.bmr.toLocaleString('en-IN')}</p>
-                  <p className="text-[10px] opacity-80">kcal/day rest</p>
+                  <p style={{ fontSize: 9, opacity: 0.7, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BMR</p>
+                  <p style={{ fontSize: 20, fontWeight: 800, margin: '2px 0 0' }}>{summary.bmr.toLocaleString('en-IN')}</p>
+                  <p style={{ fontSize: 10, opacity: 0.8, margin: 0 }}>kcal at rest</p>
                 </div>
               )}
               {summary.calories && (
                 <div>
-                  <p className="text-[10px] uppercase opacity-70">TDEE</p>
-                  <p className="text-xl font-bold">{summary.calories.toLocaleString('en-IN')}</p>
-                  <p className="text-[10px] opacity-80">moderate activity</p>
+                  <p style={{ fontSize: 9, opacity: 0.7, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>TDEE</p>
+                  <p style={{ fontSize: 20, fontWeight: 800, margin: '2px 0 0' }}>{summary.calories.toLocaleString('en-IN')}</p>
+                  <p style={{ fontSize: 10, opacity: 0.8, margin: 0 }}>moderate activity</p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Profile editor — saves to members table */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Your details</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Used to personalize calculator results. Editable anytime.</p>
+        {/* Profile editor */}
+        <div style={card}>
+          <div style={{ marginBottom: 14 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>Your details</h2>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', margin: '4px 0 0' }}>
+              Used to personalize calculator results. Editable anytime.
+            </p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="block text-xs font-semibold text-gray-700 mb-1">Height (cm)</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={label}>Height (cm)</label>
               <input type="number" inputMode="decimal" min="50" max="275" step="0.5"
-                value={heightCm} onChange={e => setHeightCm(e.target.value)} placeholder="170" className={inputCls} />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-semibold text-gray-700 mb-1">Weight (kg)</span>
+                value={heightCm} onChange={e => setHeightCm(e.target.value)} placeholder="170" style={input} />
+            </div>
+            <div>
+              <label style={label}>Weight (kg)</label>
               <input type="number" inputMode="decimal" min="20" max="500" step="0.1"
-                value={weightKg} onChange={e => setWeightKg(e.target.value)} placeholder="65" className={inputCls} />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-semibold text-gray-700 mb-1">Date of birth</span>
-              <input type="date" max={new Date(Date.now() - 5*365*86400000).toISOString().slice(0,10)}
-                value={dob} onChange={e => setDob(e.target.value)} className={inputCls} />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-semibold text-gray-700 mb-1">Sex</span>
-              <select value={sex} onChange={e => setSex(e.target.value)} className={inputCls}>
-                <option value="">Select…</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-            </label>
+                value={weightKg} onChange={e => setWeightKg(e.target.value)} placeholder="65" style={input} />
+            </div>
+            <div>
+              <label style={label}>Age (years)</label>
+              <input type="number" inputMode="numeric" min="5" max="120" step="1"
+                value={age} onChange={e => setAge(e.target.value)} placeholder="28" style={input} />
+            </div>
+            <div>
+              <label style={label}>Sex</label>
+              <SexToggle value={sex} onChange={setSex} />
+            </div>
           </div>
-          <div className="flex items-center gap-3 pt-2 flex-wrap">
-            <button type="button" onClick={handleSave} disabled={saving}
-              className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 14, flexWrap: 'wrap' }}>
+            <button type="button" onClick={handleSave} disabled={saving} style={{
+              padding: '10px 18px',
+              background: saving ? 'rgba(129,140,248,0.5)' : '#818cf8',
+              border: 'none', borderRadius: 10,
+              color: '#fff', fontSize: 13, fontWeight: 700,
+              cursor: saving ? 'not-allowed' : 'pointer',
+            }}>
               {saving ? 'Saving…' : 'Save'}
             </button>
-            {saveMsg && <span className="text-xs text-emerald-600">{saveMsg}</span>}
-            {saveErr && <span className="text-xs text-red-500">{saveErr}</span>}
+            {saveMsg && <span style={{ fontSize: 12, color: '#34d399' }}>{saveMsg}</span>}
+            {saveErr && <span style={{ fontSize: 12, color: '#f87171' }}>{saveErr}</span>}
           </div>
         </div>
 
-        {/* The three calculators */}
+        {/* Calculators */}
         <CalculatorPanel type="bmi"      initial={initial} />
         <CalculatorPanel type="bmr"      initial={initial} />
         <CalculatorPanel type="calories" initial={initial} />
 
-        <p className="text-[11px] text-gray-400 text-center pt-2">
-          BMR uses the Mifflin-St Jeor formula. These calculators are estimates — talk to a doctor or registered dietitian for personalized guidance.
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: 8, margin: 0, lineHeight: 1.5 }}>
+          BMR uses the Mifflin-St Jeor formula. These are estimates — consult a doctor or dietitian for personalized guidance.
         </p>
       </div>
     </div>

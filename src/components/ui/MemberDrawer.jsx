@@ -7,7 +7,7 @@ import {
   Dumbbell, Utensils, CreditCard, User, Plus, Archive,
   TriangleAlert, Link2, Check, Activity,
 } from 'lucide-react'
-import { calculateBMI, computeAgeFromDob } from '../../lib/calculators'
+import { calculateBMI } from '../../lib/calculators'
 import {
   updateMember, deleteMember,
   assignPlan as assignMembershipPlan,
@@ -199,11 +199,11 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
           current state + completeness badge here for context (e.g. when
           assigning a trainer, knowing the member's stats helps the match). */}
       {(() => {
-        const fields = [member.height_cm, member.weight_kg, member.dob, member.sex]
+        const fields = [member.height_cm, member.weight_kg, member.age, member.sex]
         const filled = fields.filter(v => v != null && v !== '').length
         const isComplete = filled === 4
         const isEmpty    = filled === 0
-        const age = computeAgeFromDob(member.dob)
+        const age = member.age ?? null
         const bmi = calculateBMI(Number(member.weight_kg), Number(member.height_cm))
         const bmiColorCls = bmi && (
           bmi.color === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
@@ -225,7 +225,7 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
 
             {isEmpty ? (
               <p className="text-xs text-gray-400 italic">
-                Member hasn't filled in their height, weight, date of birth, or sex yet. They can complete this from the member app's Tools tab.
+                Member hasn't filled in their height, weight, age, or sex yet. They can complete this from the member app's Tools tab.
               </p>
             ) : (
               <>

@@ -412,7 +412,7 @@ export async function fetchMemberHealthHistory(memberId, limit = 180) {
   if (!memberId) return []
   const { data, error } = await supabase
     .from('member_health_history')
-    .select('id, height_cm, weight_kg, dob, sex, changed_by, created_at')
+    .select('id, height_cm, weight_kg, age, sex, changed_by, created_at')
     .eq('member_id', memberId)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -421,7 +421,7 @@ export async function fetchMemberHealthHistory(memberId, limit = 180) {
 }
 
 /**
- * Update a member's health metrics (height, weight, dob, sex). Powers the
+ * Update a member's health metrics (height, weight, age, sex). Powers the
  * BMI/BMR/Calorie calculators in the Member app and Trainer dashboard.
  *
  * All fields optional — only provided keys are written. Pass `null` to
@@ -429,13 +429,16 @@ export async function fetchMemberHealthHistory(memberId, limit = 180) {
  * Numeric fields are coerced through Number() so a string input from a
  * form field still lands as a number in the DB.
  *
+ * Why age and not dob: simpler input (number vs date picker on mobile),
+ * acceptable annual drift for fitness use. See 20260610_health_age_not_dob.sql.
+ *
  * Returns the updated member row.
  */
-export async function updateMemberHealth({ memberId, heightCm, weightKg, dob, sex }) {
+export async function updateMemberHealth({ memberId, heightCm, weightKg, age, sex }) {
   const updates = {}
   if (heightCm !== undefined) updates.height_cm = heightCm === null || heightCm === '' ? null : Number(heightCm)
   if (weightKg !== undefined) updates.weight_kg = weightKg === null || weightKg === '' ? null : Number(weightKg)
-  if (dob      !== undefined) updates.dob       = dob       === null || dob       === '' ? null : dob
+  if (age      !== undefined) updates.age       = age       === null || age       === '' ? null : Math.trunc(Number(age))
   if (sex      !== undefined) updates.sex       = sex       === null || sex       === '' ? null : sex
   if (Object.keys(updates).length === 0) {
     throw new Error('updateMemberHealth: nothing to update')

@@ -43,22 +43,6 @@ export const BMI_CATEGORIES = [
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/**
- * Compute current age in whole years from a date-of-birth string (yyyy-mm-dd).
- * Returns null for missing/invalid input so callers can branch on "no DOB yet".
- */
-export function computeAgeFromDob(dob) {
-  if (!dob) return null
-  const birth = new Date(dob)
-  if (Number.isNaN(birth.getTime())) return null
-  const now = new Date()
-  let age = now.getFullYear() - birth.getFullYear()
-  // Haven't had birthday yet this year? subtract one
-  const monthDiff = now.getMonth() - birth.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) age--
-  return age >= 0 ? age : null
-}
-
 function isFinitePositive(n) {
   return typeof n === 'number' && Number.isFinite(n) && n > 0
 }
@@ -115,10 +99,9 @@ export function calculateCalories(bmr, activityLevel) {
 // Convenience: compute all three at once when you have the full profile.
 // Returns { bmi, bmr, calories } where any unknown piece returns null for
 // that field. Useful for dashboards / member profile summary cards.
-export function calculateAll({ weightKg, heightCm, dob, sex, activityLevel = 'moderate' }) {
-  const ageYears = computeAgeFromDob(dob)
+export function calculateAll({ weightKg, heightCm, ageYears, sex, activityLevel = 'moderate' }) {
   const bmi      = calculateBMI(weightKg, heightCm)
   const bmr      = calculateBMR({ weightKg, heightCm, ageYears, sex })
   const calories = bmr ? calculateCalories(bmr, activityLevel) : null
-  return { bmi, bmr, calories, ageYears }
+  return { bmi, bmr, calories }
 }
