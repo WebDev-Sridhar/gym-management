@@ -5,8 +5,9 @@ import { useDialog } from './Dialog'
 import {
   X, Pencil, Trash2, Phone, Mail, Calendar, Clock,
   Dumbbell, Utensils, CreditCard, User, Plus, Archive,
-  TriangleAlert, Link2, Check,
+  TriangleAlert, Link2, Check, Activity,
 } from 'lucide-react'
+import { calculateBMI, computeAgeFromDob } from '../../lib/calculators'
 import {
   updateMember, deleteMember,
   assignPlan as assignMembershipPlan,
@@ -191,6 +192,89 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
           )}
         </div>
       )}
+
+      {/* Health metrics — read-only summary for owner visibility. Members
+          edit their own via /member-app/tools; trainers edit assigned
+          members' via /trainer-dashboard/tools. Owner just sees the
+          current state + completeness badge here for context (e.g. when
+          assigning a trainer, knowing the member's stats helps the match). */}
+      {(() => {
+        const fields = [member.height_cm, member.weight_kg, member.dob, member.sex]
+        const filled = fields.filter(v => v != null && v !== '').length
+        const isComplete = filled === 4
+        const isEmpty    = filled === 0
+        const age = computeAgeFromDob(member.dob)
+        const bmi = calculateBMI(Number(member.weight_kg), Number(member.height_cm))
+        const bmiColorCls = bmi && (
+          bmi.color === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+          bmi.color === 'amber'   ? 'bg-amber-50   text-amber-700   border-amber-200'   :
+                                    'bg-red-50     text-red-700     border-red-200'
+        )
+        return (
+          <div className="px-5 py-5">
+            <div className="flex items-center justify-between mb-3">
+              <SectionLabel>Health</SectionLabel>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                isComplete ? 'bg-emerald-50 text-emerald-700' :
+                isEmpty    ? 'bg-gray-100   text-gray-500'    :
+                             'bg-amber-50   text-amber-700'
+              }`}>
+                {isComplete ? 'Complete' : isEmpty ? 'Not set' : `${filled} of 4 set`}
+              </span>
+            </div>
+
+            {isEmpty ? (
+              <p className="text-xs text-gray-400 italic">
+                Member hasn't filled in their height, weight, date of birth, or sex yet. They can complete this from the member app's Tools tab.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">Height</p>
+                    <p className="text-sm font-medium text-gray-900 mt-0.5">
+                      {member.height_cm ? `${member.height_cm} cm` : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">Weight</p>
+                    <p className="text-sm font-medium text-gray-900 mt-0.5">
+                      {member.weight_kg ? `${member.weight_kg} kg` : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">Age</p>
+                    <p className="text-sm font-medium text-gray-900 mt-0.5">
+                      {age != null ? `${age} years` : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">Sex</p>
+                    <p className="text-sm font-medium text-gray-900 mt-0.5 capitalize">
+                      {member.sex || '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {bmi && (
+                  <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <Activity size={14} className="text-gray-400" />
+                      <div>
+                        <p className="text-[11px] text-gray-400">BMI</p>
+                        <p className="text-sm font-semibold text-gray-900">{bmi.value}</p>
+                      </div>
+                    </div>
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${bmiColorCls}`}>
+                      {bmi.label}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

@@ -400,6 +400,27 @@ export async function assignPlan({ memberId, planId, durationDays, expiryDate = 
 }
 
 /**
+ * Read the timestamped health history for a member. Returns rows newest-first.
+ * Used by trend chart UIs (member app + trainer dashboard) once those ship.
+ * History is populated by a DB trigger on members UPDATE/INSERT — see
+ * `20260609_member_health_history.sql`. No code needs to write here.
+ *
+ * @param {string} memberId
+ * @param {number} [limit=180] — default ~6 months of weekly weigh-ins
+ */
+export async function fetchMemberHealthHistory(memberId, limit = 180) {
+  if (!memberId) return []
+  const { data, error } = await supabase
+    .from('member_health_history')
+    .select('id, height_cm, weight_kg, dob, sex, changed_by, created_at')
+    .eq('member_id', memberId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
+}
+
+/**
  * Update a member's health metrics (height, weight, dob, sex). Powers the
  * BMI/BMR/Calorie calculators in the Member app and Trainer dashboard.
  *
