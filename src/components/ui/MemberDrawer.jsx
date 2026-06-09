@@ -143,6 +143,43 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
             )}
           </div>
         </div>
+        {/* Last check-in — quick engagement signal for the owner. Surfaces
+            "never visited" explicitly so it's not confused with "missing data". */}
+        <div className="flex items-start gap-3">
+          <Activity size={14} className="text-gray-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-[11px] text-gray-400 mb-0.5">Last check-in</p>
+            {member.last_checkin ? (() => {
+              const last = new Date(member.last_checkin)
+              const now = new Date()
+              // Floor both to local-midnight before diffing so "yesterday"
+              // matches the user's mental model regardless of HH:MM.
+              const localMidnight = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+              const daysAgo = Math.round((localMidnight(now) - localMidnight(last)) / 86_400_000)
+              const isStale = daysAgo >= 7   // owner attention threshold
+              const relative = daysAgo === 0 ? 'Today'
+                             : daysAgo === 1 ? 'Yesterday'
+                             : daysAgo < 7   ? `${daysAgo} days ago`
+                             : daysAgo < 30  ? `${daysAgo} days ago — getting cold`
+                             :                 `${daysAgo} days ago — likely lapsed`
+              return (
+                <>
+                  <p className={`text-sm font-medium ${isStale ? 'text-amber-600' : 'text-gray-900'}`}>
+                    {fmtDate(member.last_checkin)}
+                  </p>
+                  <p className={`text-[11px] mt-1 ${isStale ? 'text-amber-500' : 'text-gray-400'}`}>
+                    {relative}
+                  </p>
+                </>
+              )
+            })() : (
+              <>
+                <p className="text-sm font-medium text-gray-400">Never visited</p>
+                <p className="text-[11px] mt-1 text-gray-400">No check-ins recorded yet</p>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {trainers && (

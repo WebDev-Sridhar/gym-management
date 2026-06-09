@@ -33,16 +33,128 @@ function greeting() {
   return 'Good evening'
 }
 
-function StreakDot({ date, attendance }) {
-  const ds = new Date(date).toLocaleDateString('en-CA') // local YYYY-MM-DD
-  const hit = attendance.some(a => parseTS(a.check_in).toLocaleDateString('en-CA') === ds)
-  const today = ds === new Date().toLocaleDateString('en-CA')
+// Month calendar — replaces the old 35-day dot heatmap. Dot grid had no
+// day-of-week labels and no dates, so members couldn't tell which dot was
+// "Tuesday" vs "Friday". Calendar gives them anchored context: day names
+// across the top, real date numbers in each cell, visited days clearly
+// filled, today highlighted with a ring.
+const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+function AttendanceCalendar({ attendance }) {
+  const today = new Date()
+  const todayDate = today.getDate()
+  const month = today.getMonth()
+  const year = today.getFullYear()
+
+  // First day-of-week the month starts on (0 = Sun), and how many days it has.
+  const monthStart = new Date(year, month, 1)
+  const firstDow = monthStart.getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  // Set of day-of-month numbers visited THIS month — O(1) lookup per cell.
+  const visited = new Set(
+    attendance
+      .map(a => parseTS(a.check_in))
+      .filter(d => d.getMonth() === month && d.getFullYear() === year)
+      .map(d => d.getDate()),
+  )
+
+  // Cells = leading blanks (to align day 1 under its weekday) + day numbers.
+  const cells = []
+  for (let i = 0; i < firstDow; i++) cells.push({ blank: true, key: `b${i}` })
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({
+      day: d,
+      hit: visited.has(d),
+      isToday: d === todayDate,
+      isFuture: d > todayDate,
+      key: `d${d}`,
+    })
+  }
+  // Pad to a multiple of 7 so the grid renders even rows.
+  while (cells.length % 7 !== 0) cells.push({ blank: true, key: `t${cells.length}` })
+
+  const monthLabel = today.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+
   return (
-    <div style={{
-      width: '10px', height: '10px', borderRadius: '3px',
-      background: hit ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : today ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.05)',
-      border: today ? '1px solid rgba(99,102,241,0.5)' : '1px solid transparent',
-    }} />
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <p style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Attendance</p>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600 }}>{monthLabel}</p>
+      </div>
+
+      {/* Weekday header */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
+        {WEEKDAY_LABELS.map((d, i) => (
+          <div key={i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.04em' }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {cells.map(c => {
+          if (c.blank) return <div key={c.key} style={{ aspectRatio: '1 / 1' }} />
+          const baseStyle = {
+            aspectRatio: '1 / 1',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: c.hit || c.isToday ? 700 : 500,
+            transition: 'all 0.15s',
+          }
+          // Four visual states, in priority order: visited → today → past → future
+          let cellStyle
+          if (c.hit) {
+            // Visited (highest contrast)
+            cellStyle = {
+              ...baseStyle,
+              background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+              color: '#fff',
+              boxShadow: c.isToday ? '0 0 0 2px rgba(99,102,241,0.5)' : 'none',
+            }
+          } else if (c.isToday) {
+            // Today but not visited yet — outlined
+            cellStyle = {
+              ...baseStyle,
+              background: 'transparent',
+              color: '#a5b4fc',
+              border: '1.5px solid #818cf8',
+            }
+          } else if (c.isFuture) {
+            // Future — very faint, no real visual weight
+            cellStyle = {
+              ...baseStyle,
+              background: 'transparent',
+              color: 'rgba(255,255,255,0.12)',
+            }
+          } else {
+            // Past day, not visited
+            cellStyle = {
+              ...baseStyle,
+              background: 'rgba(255,255,255,0.04)',
+              color: 'rgba(255,255,255,0.35)',
+            }
+          }
+          return <div key={c.key} style={cellStyle}>{c.day}</div>
+        })}
+      </div>
+
+      {/* Legend — compact, only the two states members care about */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 3, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }} />
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Visited</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 3, border: '1.5px solid #818cf8' }} />
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Today</span>
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -334,10 +446,6 @@ export default function MemberApp() {
     return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear()
   }).length
 
-  const streakGrid = Array.from({ length: 35 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (34 - i)); return d
-  })
-
   const workout = plans.find(p => p.plan_type === 'workout')
   const diet    = plans.find(p => p.plan_type === 'diet')
 
@@ -483,25 +591,9 @@ export default function MemberApp() {
           )}
         </motion.div>
 
-        {/* Streak grid */}
+        {/* Attendance calendar — month view replaces the old 35-day dot heatmap */}
         <motion.div {...fadeUp(0.18)} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '20px', padding: '16px 18px', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>Attendance Heatmap</p>
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>Last 35 days</p>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px' }}>
-            {streakGrid.map((d, i) => <StreakDot key={i} date={d} attendance={attendance} />)}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }} />
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>Visited</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(255,255,255,0.05)' }} />
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>Missed</span>
-            </div>
-          </div>
+          <AttendanceCalendar attendance={attendance} />
         </motion.div>
 
         {/* Plans */}

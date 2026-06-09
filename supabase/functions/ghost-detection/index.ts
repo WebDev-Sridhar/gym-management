@@ -136,12 +136,24 @@ Deno.serve(async (req: Request) => {
       // Failed rows are intentionally counted: if Interakt + Resend both
       // errored, we should NOT push the next reminder one day early
       // hoping it works. Manual replay path (Phase 5) handles retries.
+      //
+      // 2026-06-09 fix: status='skipped' rows are NOT counted. A skipped
+      // row means the engine returned before dispatching — recipient
+      // unsubscribed, gym sub expired, or BOTH channels were disabled at
+      // dispatch time. The member never actually received the reminder, so
+      // counting it as "they got one" delays the next real send by the
+      // full schedule gap (16 days from #2 to #3 in the 5/14/30 default).
+      // See incident: member Srivijay's Jun 1 skipped row pushed his day-14
+      // reminder out to day 30 incorrectly. Failed rows (engine tried,
+      // provider errored) still count — those are retry territory, not
+      // delivery territory.
       const sinceStreakStart = member.last_checkin ?? '1970-01-01T00:00:00Z'
       const { count: sentCount } = await supabase
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('member_id', member.id)
         .eq('type', 'ghost_reminder')
+        .in('status', ['sent', 'partial', 'failed'])
         .gte('created_at', sinceStreakStart)
 
       const reminderIndex   = sentCount ?? 0
