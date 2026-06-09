@@ -60,3 +60,6 @@ verify_jwt = false
 
 [functions.submit-member-registration]
 verify_jwt = false
+
+[functions.submit-saas-lead]
+verify_jwt = false

@@ -108,6 +108,47 @@ function saasShell(body: string): string {
 // future support-email change touches one place.
 export const SAAS_REPLY_EMAIL = SAAS_SUPPORT_EMAIL
 
+// SaaS-side inbound lead notification. Fired by submit-saas-lead when
+// someone fills the Contact or Careers form on the marketing site. Goes
+// to the support inbox so the team sees new prospects + applicants in
+// near-real-time instead of polling the contact_leads table.
+export function saasLeadEmail(args: {
+  name: string
+  email: string
+  phone: string | null
+  message: string
+  source: string                // 'contact_page' | 'careers_page'
+  leadId: string
+}): { subject: string; html: string } {
+  const isCareers = args.source === 'careers_page'
+  const heading   = isCareers ? 'New careers inquiry' : 'New contact form submission'
+  const subjectPrefix = isCareers ? '[Careers]' : '[Contact]'
+  const safeName    = safe(args.name)
+  const safeEmail   = safe(args.email)
+  const safePhone   = args.phone ? safe(args.phone) : '—'
+  // Preserve line breaks in the message body. We don't escape <br> after
+  // escaping the message text, so safe() handles all the HTML chars.
+  const safeMessage = safe(args.message).replace(/\n/g, '<br>')
+
+  const body = `
+    <div style="font-size:20px;font-weight:700;color:#0f172a;margin-bottom:6px;">${heading}</div>
+    <div style="color:#6b7280;font-size:13px;margin-bottom:22px;">Submitted via gymmobius.com</div>
+    <table role="presentation" width="100%" style="background:#f9fafb;border:1px solid #f0f0f0;border-radius:10px;padding:18px;margin-bottom:22px;">
+      <tr><td style="color:#6b7280;font-size:13px;padding-bottom:8px;width:90px;">From</td><td style="color:#111827;font-weight:600;">${safeName}</td></tr>
+      <tr><td style="color:#6b7280;font-size:13px;padding-bottom:8px;">Email</td><td><a href="mailto:${safeEmail}" style="color:${SAAS_BRAND_COLOR};text-decoration:none;font-weight:600;">${safeEmail}</a></td></tr>
+      <tr><td style="color:#6b7280;font-size:13px;padding-bottom:8px;">Phone</td><td style="color:#111827;">${safePhone}</td></tr>
+      <tr><td style="color:#6b7280;font-size:13px;">Source</td><td style="color:#111827;font-family:monospace;font-size:13px;">${safe(args.source)}</td></tr>
+    </table>
+    <div style="color:#374151;font-size:14px;margin-bottom:6px;font-weight:600;">Message</div>
+    <div style="background:#ffffff;border:1px solid #f0f0f0;border-radius:10px;padding:16px;color:#374151;line-height:1.55;">${safeMessage}</div>
+    <div style="color:#9ca3af;font-size:12px;margin-top:22px;">Hit Reply to respond directly — this email is configured with reply-to set to the sender. Lead ID: <code>${safe(args.leadId)}</code></div>
+  `
+  return {
+    subject: `${subjectPrefix} ${safeName} — ${args.email}`,
+    html: saasShell(body),
+  }
+}
+
 // ─── Templates ──────────────────────────────────────────────────────────────
 
 export function paymentConfirmationEmail(args: {

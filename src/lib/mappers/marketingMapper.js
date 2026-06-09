@@ -87,6 +87,21 @@ export function mapCareersData(raw) {
     seo: safeSeo(raw?.seo),
     hero: safeHero(raw?.hero),
     jobs: safeSections(raw?.jobs),
+    noOpeningsCopy: raw?.noOpeningsCopy ?? {
+      headline:    'We’re not actively hiring right now',
+      description: 'Drop us your details and we’ll reach out when something opens up.',
+    },
+    talentPool: raw?.talentPool ?? {
+      formHeading: 'Stay in touch',
+      namePlaceholder:    'Your name',
+      emailPlaceholder:   'Email address',
+      phonePlaceholder:   'Phone (optional)',
+      messagePlaceholder: 'Tell us about yourself.',
+      submitLabel:        'Add me to the pool',
+      submittingLabel:    'Submitting…',
+      successMessage:     'You’re in. We’ll reach out when something opens up.',
+      errorMessage:       'Something went wrong. Please try again.',
+    },
   }
 }
 

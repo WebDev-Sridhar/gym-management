@@ -17,6 +17,7 @@ export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '', honeypot: '' })
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('idle') // 'idle' | 'submitting' | 'success' | 'error'
+  const [errorMessage, setErrorMessage] = useState('')
 
   const update = (key) => (e) => {
     setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -41,6 +42,7 @@ export default function ContactPage() {
     if (Object.keys(v).length) return
 
     setStatus('submitting')
+    setErrorMessage('')
     try {
       await submitContactLead({
         name: form.name.trim(),
@@ -54,6 +56,7 @@ export default function ContactPage() {
       setForm({ name: '', email: '', phone: '', message: '', honeypot: '' })
     } catch (err) {
       console.error('[ContactPage] submit failed', err)
+      setErrorMessage(err.message || data.form.errorMessage)
       setStatus('error')
     }
   }
@@ -169,7 +172,7 @@ export default function ContactPage() {
             )}
             {status === 'error' && (
               <p role="alert" className="text-sm text-red-400 text-center">
-                {data.form.errorMessage}
+                {errorMessage || data.form.errorMessage}
               </p>
             )}
 
