@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, ClipboardList, User } from 'lucide-react'
+import { Home, ClipboardList, Calculator, User } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 import { MemberDataProvider } from '../../store/MemberDataContext'
 import { supabaseData as supabase } from '../../services/supabaseClient'
@@ -11,17 +11,20 @@ import ScreenShell from '../trainer/ScreenShell'
 // Direct imports — no Outlet, no lazy loading
 import MemberApp          from '../../pages/member/MemberApp'
 import MemberWorkoutsPage from '../../pages/member/MemberWorkoutsPage'
+import MemberToolsPage    from '../../pages/member/MemberToolsPage'
 import MemberProfilePage  from '../../pages/member/MemberProfilePage'
 
 const NAV_ORDER = [
   '/member-app',
   '/member-app/workouts',
+  '/member-app/tools',
   '/member-app/profile',
 ]
 
 const SCREENS = [
   { path: '/member-app',          label: 'Home',    Icon: Home,          Component: MemberApp },
   { path: '/member-app/workouts', label: 'Plans',   Icon: ClipboardList, Component: MemberWorkoutsPage },
+  { path: '/member-app/tools',    label: 'Tools',   Icon: Calculator,    Component: MemberToolsPage },
   { path: '/member-app/profile',  label: 'Profile', Icon: User,          Component: MemberProfilePage },
 ]
 

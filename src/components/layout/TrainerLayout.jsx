@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, Users, Dumbbell, User } from 'lucide-react'
+import { Home, Users, Dumbbell, Calculator, User } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 import { TrainerDataProvider } from '../../store/TrainerDataContext'
 import { supabaseData as supabase } from '../../services/supabaseClient'
@@ -12,6 +12,7 @@ import ScreenShell from '../trainer/ScreenShell'
 import TrainerDashboard    from '../../pages/trainer/TrainerDashboard'
 import TrainerMembersPage  from '../../pages/trainer/TrainerMembersPage'
 import TrainerWorkoutsPage from '../../pages/trainer/TrainerWorkoutsPage'
+import TrainerToolsPage    from '../../pages/trainer/TrainerToolsPage'
 import TrainerSettingsPage from '../../pages/trainer/TrainerSettingsPage'
 
 // Canonical tab order — index position drives slide direction
@@ -19,14 +20,16 @@ const NAV_ORDER = [
   '/trainer-dashboard',
   '/trainer-dashboard/members',
   '/trainer-dashboard/workouts',
+  '/trainer-dashboard/tools',
   '/trainer-dashboard/settings',
 ]
 
 const SCREENS = [
-  { path: '/trainer-dashboard',          label: 'Home',     Icon: Home,     Component: TrainerDashboard },
-  { path: '/trainer-dashboard/members',  label: 'Members',  Icon: Users,    Component: TrainerMembersPage },
-  { path: '/trainer-dashboard/workouts', label: 'Workouts', Icon: Dumbbell, Component: TrainerWorkoutsPage },
-  { path: '/trainer-dashboard/settings', label: 'Profile',  Icon: User,     Component: TrainerSettingsPage },
+  { path: '/trainer-dashboard',          label: 'Home',     Icon: Home,       Component: TrainerDashboard },
+  { path: '/trainer-dashboard/members',  label: 'Members',  Icon: Users,      Component: TrainerMembersPage },
+  { path: '/trainer-dashboard/workouts', label: 'Workouts', Icon: Dumbbell,   Component: TrainerWorkoutsPage },
+  { path: '/trainer-dashboard/tools',    label: 'Tools',    Icon: Calculator, Component: TrainerToolsPage },
+  { path: '/trainer-dashboard/settings', label: 'Profile',  Icon: User,       Component: TrainerSettingsPage },
 ]
 
 function getActiveIdx(pathname) {

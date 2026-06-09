@@ -399,6 +399,37 @@ export async function assignPlan({ memberId, planId, durationDays, expiryDate = 
   return data
 }
 
+/**
+ * Update a member's health metrics (height, weight, dob, sex). Powers the
+ * BMI/BMR/Calorie calculators in the Member app and Trainer dashboard.
+ *
+ * All fields optional — only provided keys are written. Pass `null` to
+ * explicitly clear a value. Pass `undefined` (or omit) to leave unchanged.
+ * Numeric fields are coerced through Number() so a string input from a
+ * form field still lands as a number in the DB.
+ *
+ * Returns the updated member row.
+ */
+export async function updateMemberHealth({ memberId, heightCm, weightKg, dob, sex }) {
+  const updates = {}
+  if (heightCm !== undefined) updates.height_cm = heightCm === null || heightCm === '' ? null : Number(heightCm)
+  if (weightKg !== undefined) updates.weight_kg = weightKg === null || weightKg === '' ? null : Number(weightKg)
+  if (dob      !== undefined) updates.dob       = dob       === null || dob       === '' ? null : dob
+  if (sex      !== undefined) updates.sex       = sex       === null || sex       === '' ? null : sex
+  if (Object.keys(updates).length === 0) {
+    throw new Error('updateMemberHealth: nothing to update')
+  }
+
+  const { data, error } = await supabase
+    .from('members')
+    .update(updates)
+    .eq('id', memberId)
+    .select('*, plan:plans(id, name, price, duration_days)')
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function updateMember({ memberId, name, phone, email }) {
   const updates = {}
   if (name  !== undefined) updates.name  = name
