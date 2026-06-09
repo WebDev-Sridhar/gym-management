@@ -26,7 +26,6 @@ import {
   handleCorsPreflight,
   HttpError,
 } from '../_shared/auth.ts'
-import { sendNotification } from '../_shared/notifications.ts'
 
 interface Body {
   gymSlug?:  string
@@ -159,40 +158,12 @@ Deno.serve(async (req: Request) => {
       .single()
     if (insErr || !inserted) throw new Error(`Insert failed: ${insErr?.message}`)
 
-    // 7. Notify the gym owner via the notifications engine. Non-fatal — if
-    //    the notify call errors the registration is still in the queue and
-    //    visible in the dashboard's Pending section.
-    try {
-      const { data: owner } = await supabase
-        .from('users')
-        .select('id, name, phone, email')
-        .eq('gym_id', gym.id)
-        .eq('role', 'owner')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle()
-      if (owner) {
-        await sendNotification({
-          supabase,
-          gymId:  gym.id,
-          userId: owner.id,
-          type:   'member_registration_request',
-          triggeredBy: 'system',
-          recipientName:  owner.name,
-          recipientEmail: owner.email,
-          recipientPhone: owner.phone,
-          metadata: {
-            memberName:  name,
-            memberPhone: phone,
-            memberEmail: email,
-            gymName:     gym.name,
-            dashboardUrl: `${Deno.env.get('PUBLIC_APP_URL') ?? ''}/owner-dashboard/members`,
-          },
-        })
-      }
-    } catch (notifyErr) {
-      console.error('submit-member-registration: notify owner failed:', notifyErr)
-    }
+    // Owner notification used to fire here. Removed 2026-06-10 because the
+    // dispatch was silently failing — notifications.type CHECK never
+    // permitted 'member_registration_request'. Owners now poll the Members
+    // page dashboard for the pending-registration queue. If we re-enable
+    // notifications later, also add the type to the CHECK constraint and
+    // re-add memberRegistrationRequestEmail in _shared/emailTemplates.ts.
 
     return jsonResponse({
       ok: true,

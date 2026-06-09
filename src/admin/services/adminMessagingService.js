@@ -4,7 +4,7 @@ import { normalizeInvokeError } from '../lib/invokeError'
 export const NOTIFICATION_TYPES = [
   'payment_reminder', 'expiry_alert', 'saas_expiry_alert', 'weekly_summary',
   'payment_confirmation', 'saas_payment_receipt', 'welcome', 'member_invite',
-  'trainer_invite', 'ghost_reminder', 'member_registration_request',
+  'trainer_invite', 'ghost_reminder',
 ]
 
 export const NOTIFICATION_STATUSES = ['sent', 'partial', 'failed', 'skipped', 'pending']

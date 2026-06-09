@@ -217,7 +217,12 @@ export function weeklySummaryEmail(args: {
   whatsappCap?: number | null
 }): { subject: string; html: string } {
   const gymName = safe(args.gym.name, 'Your gym')
-  const brand   = args.gym.theme_color || '#8B5CF6'
+  // Brand color is the platform indigo, not the gym's theme. This is an
+  // owner-facing platform email (Gymmobius → gym owner), so it carries
+  // Gymmobius branding + footer. Was incorrectly using gym.theme_color +
+  // gymShell, which produced a footer telling the owner to email themselves
+  // for support.
+  const brand   = SAAS_BRAND_COLOR
   const weekRange = args.periodStart && args.periodEnd
     ? `${formatShortDate(args.periodStart)} – ${formatShortDate(args.periodEnd)}`
     : 'this week'
@@ -316,7 +321,7 @@ export function weeklySummaryEmail(args: {
 
     <div style="color:#6b7280;font-size:13px;margin-top:22px;">Open the Gymmobius dashboard for the full picture.</div>
   `
-  return { subject: `📊 ${gymName} — weekly recap (${weekRange})`, html: gymShell(args.gym, body) }
+  return { subject: `📊 ${gymName} — weekly recap (${weekRange})`, html: saasShell(body) }
 }
 
 // Helper for the weekly email date formatting. Defined here (not exported)
@@ -466,33 +471,12 @@ export function findMyGymEmail(args: {
 // ("your membership is active"); this one fires BEFORE that — "your gym
 // added you; click to set up your account". Branded with the gym's
 // theme_color so members recognise the sender.
-// Owner-facing — fires when a prospective member submits the public
-// self-registration form (/:slug/register). Contains the member's details
-// + a one-click link to the dashboard pending-approvals section.
-export function memberRegistrationRequestEmail(args: {
-  ownerName?: string
-  memberName: string
-  memberPhone: string
-  memberEmail: string
-  gym: GymCtx
-  dashboardUrl: string
-}): { subject: string; html: string } {
-  const brand = args.gym.theme_color || '#8B5CF6'
-  const gymName = safe(args.gym.name, 'your gym')
-  const body = `
-    <div style="font-size:22px;font-weight:700;color:#0f172a;margin-bottom:6px;">New member registration request</div>
-    <div style="color:#6b7280;margin-bottom:22px;">Hi ${safe(args.ownerName, 'there')} — someone just filled out the registration form for ${gymName}. Review their details and approve, edit, or reject from the dashboard.</div>
-    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:22px;">
-      <div style="font-size:14px;color:#0f172a;margin-bottom:6px;"><strong>${safe(args.memberName)}</strong></div>
-      <div style="font-size:13px;color:#6b7280;">Phone: ${safe(args.memberPhone)}</div>
-      <div style="font-size:13px;color:#6b7280;">Email: ${safe(args.memberEmail)}</div>
-    </div>
-    ${btn(args.dashboardUrl, 'Review in dashboard', brand)}
-    <div style="color:#9ca3af;font-size:12px;margin-top:22px;">No member account or auth login is created until you approve.</div>
-  `
-  return { subject: `New registration request — ${gymName}`, html: gymShell(args.gym, body) }
-}
-
+//
+// memberRegistrationRequestEmail used to live here — removed 2026-06-10
+// because the notifications.type CHECK constraint never permitted that
+// notification type, so every dispatch silently failed at INSERT. Owners
+// rely on the Members-page dashboard for the pending-registration queue
+// instead. Re-add if/when self-registration volume warrants a notification.
 export function memberInviteEmail(args: {
   memberName: string
   gym: GymCtx
