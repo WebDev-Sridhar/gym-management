@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useMemo, memo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import MemberDrawer from '../../components/ui/MemberDrawer'
 import { useAuth } from '../../store/AuthContext'
@@ -253,7 +253,15 @@ export default function AnalyticsPage() {
   // Filter range chips — Starter capped at 30D
   const visibleRanges = hasExtendedRange ? RANGES : RANGES.filter(r => r.days <= 30)
 
-  const [range,      setRange]      = useState(30)
+  // Deep-link: ?range=0 (Today) etc. lands the page on that range, as long as
+  // the plan allows it (otherwise fall back to 30D). Used by the dashboard's
+  // "Today revenue" tile.
+  const [searchParams] = useSearchParams()
+  const reqRange = Number(searchParams.get('range'))
+  const allowedDays = visibleRanges.map(r => r.days)
+  const [range,      setRange]      = useState(
+    searchParams.get('range') !== null && allowedDays.includes(reqRange) ? reqRange : 30,
+  )
   const [drawerMember, setDrawerMember] = useState(null)
   const [revenue,    setRevenue]    = useState(null)
   const [membership, setMembership] = useState(null)

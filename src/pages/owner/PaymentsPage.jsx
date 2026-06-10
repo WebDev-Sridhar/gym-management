@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
@@ -102,7 +102,12 @@ export default function PaymentsPage() {
   const [generatedLink, setGeneratedLink] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  const [filter, setFilter] = useState('all')
+  // Deep-link support: ?filter=pending lands the page on the pending tab
+  // (e.g. "Send Reminder" from the dashboard Quick Actions).
+  const [searchParams] = useSearchParams()
+  const initialFilter = ['all', 'pending', 'verification_pending', 'paid'].includes(searchParams.get('filter'))
+    ? searchParams.get('filter') : 'all'
+  const [filter, setFilter] = useState(initialFilter)
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 10
   const [drawerMember, setDrawerMember] = useState(null)
@@ -495,7 +500,7 @@ export default function PaymentsPage() {
       )}
 
       {/* Filter tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
+      {/* <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
         {(['all', 'pending', 'verification_pending', 'paid']).map((f) => {
           const label = f === 'verification_pending' ? 'Awaiting verification' : f.charAt(0).toUpperCase() + f.slice(1)
           return (
@@ -510,7 +515,17 @@ export default function PaymentsPage() {
             </button>
           )
         })}
-      </div>
+      </div> */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto md:w-fit max-w-full no-scrollbar">
+            {(['all', 'pending', 'verification_pending', 'paid']).map((f) => {
+              const label = f === 'verification_pending' ? 'Awaiting verification' : f.charAt(0).toUpperCase() + f.slice(1)
+              return (
+                <button key={f} onClick={() => { setFilter(f); setPage(1) }} className={`px-3.5 py-2 text-sm font-medium rounded-md transition-all cursor-pointer whitespace-nowrap ${filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}
+                 ${f === 'verification_pending' && counts[f] > 0 ? 'text-amber-700' : ''}`}>
+                {label} ({counts[f]})
+              </button>
+            )})}
+          </div>
 
       {/* Payments table */}
       {filteredPayments.length === 0 ? (

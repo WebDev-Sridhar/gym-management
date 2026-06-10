@@ -386,6 +386,30 @@ html.lenis body {
 [data-theme="dark"] .app-owner .hover\:bg-gray-50\/50:hover { background-color: rgba(255,255,255,0.035) !important; }
 [data-theme="dark"] .app-owner .hover\:bg-gray-50\/40:hover { background-color: rgba(255,255,255,0.025) !important; }
 
+/* Hover/active variants — the base remaps above only match the resting class
+   token, so hover:/active: variants need their own overrides or they flash the
+   raw light Tailwind colour on a dark surface (dashboard redesign components). */
+[data-theme="dark"] .app-owner .hover\:bg-gray-50:hover      { background-color: var(--owner-surface-2) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-gray-50\/60:hover  { background-color: rgba(255,255,255,0.04) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-gray-100:hover     { background-color: var(--owner-surface-3) !important; }
+[data-theme="dark"] .app-owner .active\:bg-gray-100:active   { background-color: var(--owner-surface-3) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-indigo-50:hover     { background-color: rgba(99,102,241,0.18) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-indigo-50\/50:hover { background-color: rgba(99,102,241,0.12) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-indigo-100:hover    { background-color: rgba(99,102,241,0.26) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-violet-100:hover    { background-color: rgba(139,92,246,0.26) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-green-100:hover     { background-color: rgba(16,185,129,0.26) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-emerald-100:hover   { background-color: rgba(16,185,129,0.26) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-blue-100:hover      { background-color: rgba(59,130,246,0.26) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-amber-100:hover     { background-color: rgba(245,158,11,0.26) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-fuchsia-100:hover   { background-color: rgba(217,70,239,0.26) !important; }
+[data-theme="dark"] .app-owner .hover\:bg-red-100:hover       { background-color: rgba(239,68,68,0.26) !important; }
+
+/* Base tints not previously covered — used by the dashboard Quick Actions. */
+[data-theme="dark"] .app-owner .bg-blue-50      { background-color: rgba(59,130,246,0.14) !important; }
+[data-theme="dark"] .app-owner .bg-blue-100     { background-color: rgba(59,130,246,0.22) !important; }
+[data-theme="dark"] .app-owner .bg-fuchsia-50   { background-color: rgba(217,70,239,0.14) !important; }
+[data-theme="dark"] .app-owner .bg-fuchsia-100  { background-color: rgba(217,70,239,0.22) !important; }
+
 /* Tinted brand surfaces (badges, cards) — translucent over dark */
 [data-theme="dark"] .app-owner .bg-indigo-50           { background-color: rgba(99,102,241,0.14) !important; }
 [data-theme="dark"] .app-owner .bg-indigo-50\/30       { background-color: rgba(99,102,241,0.06) !important; }

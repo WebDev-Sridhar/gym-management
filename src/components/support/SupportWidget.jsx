@@ -303,7 +303,11 @@ export default function SupportWidget() {
             whileTap={{ scale: 0.94 }}
             onClick={() => setOpen(true)}
             aria-label="Open support"
-            className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-[60] group"
+            className={`fixed sm:bottom-6 sm:right-6 z-[60] group ${
+              location.pathname === '/owner-dashboard'
+                ? 'bottom-20 right-4'   // above the sticky Quick-Actions bar
+                : 'bottom-5 right-5'    // original position on all other pages
+            }`}
             style={{ touchAction: 'manipulation' }}
           >
             {/* Pulse halo — only before first open */}

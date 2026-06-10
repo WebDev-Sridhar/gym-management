@@ -1,9 +1,10 @@
 ﻿import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import UpgradeRequiredModal from '../../components/ui/UpgradeRequiredModal'
 import { fetchMembers, createMember, assignPlan, fetchPlans, sendMemberInvite, computeDefaultExpiry } from '../../services/membershipService'
+import { fetchInactiveMembers } from '../../services/analyticsService'
 import { fetchPendingRegistrations, approveRegistration, rejectRegistration } from '../../services/memberRegistrationService'
 import { recordManualPayment } from '../../services/paymentService'
 import { fetchTrainers } from '../../services/trainerService'
@@ -54,7 +55,16 @@ export default function MembersPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [filter, setFilter] = useState('all')
+  // Deep-link tabs: ?tab=expiring | at-risk (+ ?risk=7|14|30 for at-risk).
+  // Dashboard "Win back all" / bucket actions land here.
+  const [searchParams] = useSearchParams()
+  const TABS = ['all', 'active', 'expiring', 'expired', 'at-risk', 'inactive']
+  const tabParam = searchParams.get('tab')
+  const [filter, setFilter] = useState(TABS.includes(tabParam) ? tabParam : 'all')
+  const [riskFilter, setRiskFilter] = useState(
+    [7, 14, 30].includes(Number(searchParams.get('risk'))) ? Number(searchParams.get('risk')) : 7,
+  )
+  const [inactiveMembers, setInactiveMembers] = useState([])
   const [search, setSearch] = useState('')
   const [drawerMember, setDrawerMember] = useState(null)
   const [page, setPage] = useState(1)
@@ -126,13 +136,15 @@ export default function MembersPage() {
       fetchPlans(gymId),
       fetchTrainers(gymId, selectedBranchId),
       fetchPendingRegistrations(gymId).catch(() => []),
+      fetchInactiveMembers(gymId, selectedBranchId).catch(() => []),
     ])
-      .then(([m, p, t, pr]) => {
+      .then(([m, p, t, pr, inactive]) => {
         if (cancelled) return
         setPendingRegs(pr || [])
         setMembers(m)
         setPlans(p)
         setTrainers(t)
+        setInactiveMembers(inactive || [])
       })
       .catch((err) => console.error('Failed to load:', err))
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -291,8 +303,30 @@ export default function MembersPage() {
     return (Date.now() - new Date(createdAt).getTime()) < 86_400_000
   }
 
+  // At-risk = members who used to check in but stopped. Keyed by id →
+  // days-since-last-checkin. We require a real last check-in (exclude
+  // never-checked-in) so brand-new members aren't flagged — same definition
+  // as the dashboard's Ghost Intelligence section.
+  const atRiskById = new Map(
+    (inactiveMembers || [])
+      .filter((r) => r.lastCheckin && r.daysInactive >= 7)
+      .map((r) => [r.id, r.daysInactive]),
+  )
+  const isExpiring = (m) => {
+    if (getMemberStatus(m) !== 'active') return false
+    const d = daysLeft(m.expiry_date)
+    return d !== null && d >= 0 && d <= 7
+  }
+  const matchesTab = (m) => {
+    switch (filter) {
+      case 'all':      return true
+      case 'expiring': return isExpiring(m)
+      case 'at-risk':  return atRiskById.has(m.id) && atRiskById.get(m.id) >= riskFilter
+      default:         return getMemberStatus(m) === filter   // active | expired | inactive
+    }
+  }
   const filteredMembers = members.filter((m) => {
-    if (filter !== 'all' && getMemberStatus(m) !== filter) return false
+    if (!matchesTab(m)) return false
     if (search) {
       const q = search.toLowerCase()
       return (m.name || '').toLowerCase().includes(q) || (m.phone || '').includes(q) || (m.email || '').toLowerCase().includes(q)
@@ -306,8 +340,16 @@ export default function MembersPage() {
   const counts = {
     all: members.length,
     active: members.filter((m) => getMemberStatus(m) === 'active').length,
+    expiring: members.filter(isExpiring).length,
     expired: members.filter((m) => getMemberStatus(m) === 'expired').length,
+    'at-risk': members.filter((m) => atRiskById.has(m.id)).length,
     inactive: members.filter((m) => getMemberStatus(m) === 'inactive').length,
+  }
+  // Per-threshold counts for the at-risk sub-filter chips.
+  const riskCounts = {
+    7:  members.filter((m) => atRiskById.has(m.id) && atRiskById.get(m.id) >= 7).length,
+    14: members.filter((m) => atRiskById.has(m.id) && atRiskById.get(m.id) >= 14).length,
+    30: members.filter((m) => atRiskById.has(m.id) && atRiskById.get(m.id) >= 30).length,
   }
 
   if (loading) return <MembersSkeleton />
@@ -591,15 +633,29 @@ export default function MembersPage() {
       )}
 
       {/* Search + Filter */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-          {(['all', 'active', 'expired', 'inactive']).map((f) => (
-            <button key={f} onClick={() => { setFilter(f); setPage(1) }} className={`px-4 py-2 text-sm font-medium rounded-md transition-all cursor-pointer ${filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
-            </button>
-          ))}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto max-w-full no-scrollbar">
+            {TABS.map((f) => (
+              <button key={f} onClick={() => { setFilter(f); setPage(1) }} className={`px-3.5 py-2 text-sm font-medium rounded-md transition-all cursor-pointer whitespace-nowrap ${filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                {(f === 'at-risk' ? 'At-risk' : f.charAt(0).toUpperCase() + f.slice(1))} ({counts[f]})
+              </button>
+            ))}
+          </div>
+          <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search members..." className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full sm:w-64" />
         </div>
-        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search members..." className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full sm:w-64" />
+
+        {/* At-risk day-threshold sub-filter */}
+        {filter === 'at-risk' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500">No check-in for:</span>
+            {[7, 14, 30].map((d) => (
+              <button key={d} onClick={() => { setRiskFilter(d); setPage(1) }} className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${riskFilter === d ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}>
+                {d}+ days ({riskCounts[d]})
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Members table */}
@@ -650,6 +706,11 @@ export default function MembersPage() {
                               )}
                             </div>
                             <p className="text-xs text-gray-400">{member.phone || member.email || 'No contact'}</p>
+                            {filter === 'at-risk' && atRiskById.has(member.id) && (
+                              <p className="text-[11px] text-amber-600 font-medium mt-0.5">
+                                {atRiskById.get(member.id)}d since last check-in
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
