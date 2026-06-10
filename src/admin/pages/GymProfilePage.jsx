@@ -10,7 +10,7 @@ import StatusPill from '../components/ui/StatusPill'
 import EmptyState from '../components/ui/EmptyState'
 import { ActionModal } from '../components/ui/Modal'
 import SubscriptionActions from '../components/SubscriptionActions'
-import { getGymProfile, gymAction } from '../services/adminGymService'
+import { getGymProfile, gymAction, logGymView } from '../services/adminGymService'
 import { useAdminAuth } from '../store/AdminAuthContext'
 import { can } from '../lib/adminRbac'
 import { inr, date, dateTime, planLabel, daysUntil } from '../lib/format'
@@ -54,6 +54,10 @@ export default function GymProfilePage() {
   }, [gymId])
 
   useEffect(() => { load() }, [load])
+
+  // Read-access audit: record that this admin opened the gym's 360 (once per
+  // gym; server-side deduped to 30 min). Fire-and-forget — never blocks the UI.
+  useEffect(() => { logGymView(gymId) }, [gymId])
 
   if (loading) {
     return (

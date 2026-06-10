@@ -109,6 +109,16 @@ export async function getGymProfile(gymId) {
   }
 }
 
+/**
+ * Record that an admin opened a gym's Customer 360 (read-access audit trail).
+ * Fire-and-forget + self-guarded + 30-min deduped server-side; never blocks
+ * the page or surfaces an error to the viewer.
+ */
+export function logGymView(gymId, context = 'gym_360') {
+  supabaseData.rpc('admin_log_view', { p_gym_id: gymId, p_context: context })
+    .then(() => {}, () => {})
+}
+
 /** Suspend / reactivate a gym (audited service-role edge function). */
 export async function gymAction({ action, gymId, reason }) {
   const { data, error } = await supabaseData.functions.invoke('admin-gym-action', {
