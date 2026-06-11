@@ -54,8 +54,13 @@
       /* Anti-flash: apply the saved theme before React mounts. Sync with src/store/ThemeContext.jsx */
       (function () {
         try {
-          var t = localStorage.getItem('gymmobius-theme');
-          if (t !== 'light' && t !== 'dark') {
+          var pref = localStorage.getItem('gymmobius-theme');
+          /* Explicit light/dark wins. 'system' (and any unknown/missing value)
+             falls through to the OS preference. */
+          var t;
+          if (pref === 'light' || pref === 'dark') {
+            t = pref;
+          } else {
             t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           }
           document.documentElement.setAttribute('data-theme', t);

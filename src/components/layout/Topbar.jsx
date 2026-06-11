@@ -128,7 +128,12 @@ export default function Topbar({ onMenuToggle }) {
         {/* Left — Hamburger (mobile) + Logo + Branch switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 160 }}>
           <button
-            className="flex md:hidden"
+            // Breakpoint sync (2026-06-12): hamburger now mirrors the
+            // Sidebar's lg:flex threshold. Was md:hidden which left tablet
+            // (768-1023px) with no nav at all — sidebar gone, hamburger
+            // gone, drawer unreachable. lg:hidden gives tablets the same
+            // drawer UX as phones until the sidebar takes over at 1024px.
+            className="flex lg:hidden"
             onClick={onMenuToggle}
             style={{ background: 'none', border: 'none', color: 'var(--shell-text)', cursor: 'pointer', padding: '4px 6px', alignItems: 'center', borderRadius: 8 }}
           >
@@ -144,8 +149,11 @@ export default function Topbar({ onMenuToggle }) {
           )}
         </div>
 
-        {/* Center — Nav pills (hidden on mobile, shown md+) */}
-        <div className="hidden md:flex">
+        {/* Center — Nav pills (shown only on desktop ≥1024px).
+            Was md:flex which made the 4 wide pills appear on tablet and
+            collide with the BranchSwitcher + user menu. Synced with the
+            hamburger's lg:hidden threshold 2026-06-12. */}
+        <div className="hidden lg:flex">
           <nav style={{
             display: 'flex',
             alignItems: 'center',

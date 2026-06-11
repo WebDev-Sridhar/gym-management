@@ -21,10 +21,10 @@ let initialized = false
 export function initSentry() {
   if (initialized) return
   if (!DSN) {
-    if (ENV !== 'production') {
-      // eslint-disable-next-line no-console
-      console.info('[sentry] VITE_SENTRY_DSN unset — error tracking disabled')
-    }
+    // VITE_SENTRY_DSN not set — silently skip init. Previously logged an
+    // info line on every dev boot which cluttered the console; removed
+    // 2026-06-12. If you're debugging why errors aren't reaching Sentry,
+    // check whether VITE_SENTRY_DSN is set in your env.
     return
   }
   Sentry.init({

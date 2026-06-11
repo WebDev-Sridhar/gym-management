@@ -150,9 +150,13 @@ export default function DashboardLayout() {
           </main>
         </div>
 
-        {/* ── Mobile nav drawer ── */}
+        {/* ── Mobile + tablet nav drawer ──
+            Was md:hidden — now lg:hidden so tablet (768-1023px) also
+            gets the slide-out drawer instead of falling between the
+            Sidebar (lg:flex) and the hamburger (was md:hidden) into a
+            nav-less limbo. Synced 2026-06-12. */}
         {mobileNavOpen && (
-          <div className="fixed inset-0 z-50 flex md:hidden">
+          <div className="fixed inset-0 z-50 flex lg:hidden">
             {/* Backdrop */}
             <div
               className="absolute inset-0 bg-black/50 backdrop-blur-sm"

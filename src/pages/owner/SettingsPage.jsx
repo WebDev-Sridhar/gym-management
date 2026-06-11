@@ -162,7 +162,7 @@ function SettingsSkeleton() {
 export default function SettingsPage() {
   const navigate    = useNavigate()
   const { user, profile, gymId, gymName, subscription, isTrial, isExpired, trialDaysLeft, logout, refreshProfile } = useAuth()
-  const { theme, setTheme } = useTheme()
+  const { preference, setTheme } = useTheme()
   const { selectedBranchId, isAllBranches, branches, reload: reloadBranches } = useBranch()
 
   // The "Gym Details" card shows org-level data when viewing "All branches",
@@ -613,32 +613,31 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Notifications (placeholder — coming soon) */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <Bell size={15} className="text-indigo-600" />
-                <h2 className="text-sm font-semibold text-gray-900">Notifications</h2>
+          {/* Notifications — redirects to the Communication page where
+              the real controls live (WhatsApp/Email toggles, weekly summary
+              delivery channel, activity log). The old card here advertised
+              4 toggles, only 1 of which was actually shipped (weekly
+              summary) and even that one's true UI lives on Communication. */}
+          <button
+            type="button"
+            onClick={() => navigate('/owner-dashboard/communication')}
+            className="w-full text-left bg-white rounded-xl border border-gray-200 p-5 hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+                <Bell size={16} className="text-indigo-600" />
               </div>
-              <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full uppercase tracking-wide">Coming soon</span>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                  Notifications & messaging
+                  <ChevronRight size={14} className="text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                  Manage WhatsApp + email channels, weekly summary delivery, and review the messaging activity log on the Communication page.
+                </p>
+              </div>
             </div>
-            <div className="space-y-4 opacity-40 pointer-events-none select-none">
-              {[
-                { label: 'Payment received alerts',    desc: 'Notify when a member payment is confirmed'  },
-                { label: 'Member expiry reminders',    desc: 'Daily digest of members expiring in 7 days' },
-                { label: 'New member alerts',          desc: 'Notify when a new member is added'          },
-                { label: 'Weekly performance summary', desc: 'Weekly email with key gym metrics'          },
-              ].map(({ label, desc }) => (
-                <div key={label} className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{label}</p>
-                    <p className="text-xs text-gray-400">{desc}</p>
-                  </div>
-                  <div className="w-9 h-5 bg-gray-200 rounded-full shrink-0" />
-                </div>
-              ))}
-            </div>
-          </div>
+          </button>
 
         </div>{/* end left col */}
 
@@ -1154,22 +1153,24 @@ export default function SettingsPage() {
                   preview: { bg: '#f1f5f9', card: '#ffffff', text: '#0f172a', border: '#e5e7eb' } },
                 { value: 'dark',  label: 'Dark',  Icon: Moon,
                   preview: { bg: '#0a0b14', card: '#15161f', text: '#f4f4f8', border: 'rgba(255,255,255,0.08)' } },
-                { value: 'system', label: 'System', Icon: Monitor, disabled: true,
+                { value: 'system', label: 'System', Icon: Monitor,
                   preview: { bg: 'linear-gradient(135deg,#f1f5f9 50%,#0a0b14 50%)', card: 'linear-gradient(135deg,#fff 50%,#15161f 50%)', text: '#6366f1', border: 'rgba(99,102,241,0.3)' } },
-              ].map(({ value, label, Icon, preview, disabled }) => {
-                const isActive = theme === value
+              ].map(({ value, label, Icon, preview }) => {
+                // Active check uses `preference` (not the resolved theme) so
+                // 'System' stays highlighted even after it resolves to dark
+                // or light per the OS.
+                const isActive = preference === value
                 return (
                   <button
                     key={value}
                     type="button"
-                    disabled={disabled}
-                    onClick={() => !disabled && setTheme(value)}
-                    title={disabled ? 'Coming soon' : `Use ${label.toLowerCase()} mode`}
-                    className={`relative p-3 rounded-xl border-2 text-left transition-all ${
+                    onClick={() => setTheme(value)}
+                    title={`Use ${label.toLowerCase()} mode`}
+                    className={`relative p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
                       isActive
                         ? 'border-indigo-500 bg-indigo-50/40'
                         : 'border-gray-200 hover:border-indigo-300'
-                    } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    }`}
                   >
                     {/* Mini preview card */}
                     <div
@@ -1187,7 +1188,6 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-1.5">
                       <Icon size={12} className={isActive ? 'text-indigo-600' : 'text-gray-400'} />
                       <span className={`text-xs font-semibold ${isActive ? 'text-indigo-700' : 'text-gray-700'}`}>{label}</span>
-                      {disabled && <span className="ml-auto text-[9px] font-bold text-amber-700 uppercase tracking-wide">Soon</span>}
                     </div>
                   </button>
                 )
