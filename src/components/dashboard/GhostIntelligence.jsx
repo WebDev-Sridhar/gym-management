@@ -11,9 +11,14 @@ import { Ghost, Eye, ChevronRight } from 'lucide-react'
  * onViewMember(id) opens the MemberDrawer in place. Bucket / "win back" actions
  * deep-link to the Members page's At-risk tab with the matching day filter.
  */
+// Action labels — plain English, action-oriented, parallel structure.
+// 'Remind' (light) for 7+/14+, 'Win back' (strong) for 30+. Was 'Nudge'
+// previously — too much UX jargon for the gym-owner audience and
+// inconsistent with the rest of the system which says 'reminder' everywhere
+// (payment_reminder, expiry_reminder, ghost_reminder). Relabeled 2026-06-12.
 const BUCKETS = [
-  { key: 'd7',  label: '7+ days absent',  dot: 'bg-yellow-400', action: 'Nudge',    risk: 7 },
-  { key: 'd14', label: '14+ days absent', dot: 'bg-amber-500',  action: 'Nudge',    risk: 14 },
+  { key: 'd7',  label: '7+ days absent',  dot: 'bg-yellow-400', action: 'Check on',   risk: 7 },
+  { key: 'd14', label: '14+ days absent', dot: 'bg-amber-500',  action: 'Check on',   risk: 14 },
   { key: 'd30', label: '30+ days absent', dot: 'bg-red-500',    action: 'Win back', risk: 30 },
 ]
 
