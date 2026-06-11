@@ -214,13 +214,13 @@ export default function TrainersPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Name *</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)}
                   placeholder="Trainer name" autoFocus
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
                 <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                   placeholder="Phone number" maxLength={10}
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -228,12 +228,12 @@ export default function TrainersPage() {
                 </label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="trainer@email.com"
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                 <p className="text-xs text-gray-400 mt-1">The trainer signs up at your gym's login page with this email — their account is automatically set up.</p>
               </div>
               {branches.length > 1 && (
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm text-gray-900 placeholder-gray-400 font-medium text-gray-700 mb-1.5">
                     Branch <span className="text-red-500">*</span>
                   </label>
                   <CustomSelect
@@ -301,20 +301,20 @@ export default function TrainersPage() {
                   <form onSubmit={handleSaveEdit} className="flex flex-col gap-3">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Edit Trainer</p>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Name *</label>
                       <input value={editName} onChange={e => setEditName(e.target.value)} autoFocus
-                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
                       <input value={editPhone} onChange={e => setEditPhone(e.target.value.replace(/\D/g, ''))}
                         maxLength={10} placeholder="Phone number"
-                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
                       <p className="text-sm text-gray-400 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 truncate">{trainer.email}</p>
-                      <p className="text-[10px] text-gray-400 mt-1">Email is the login — cannot be changed here</p>
+                      <p className="text-[10px] text-gray-500 mt-1">Email is the login — cannot be changed here</p>
                     </div>
                     {editError && <p className="text-red-500 text-xs">{editError}</p>}
                     <div className="flex gap-2 pt-1">
