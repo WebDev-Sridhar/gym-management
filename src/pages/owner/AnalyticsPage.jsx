@@ -793,7 +793,7 @@ export default function AnalyticsPage() {
                   <div className="pt-4 border-t border-gray-100">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Pending Dues</p>
-                      <button onClick={() => navigate('/owner-dashboard/payments')}
+                      <button onClick={() => navigate('/owner-dashboard/payments?filter=pending')}
                         className="text-xs text-indigo-600 font-semibold hover:text-indigo-800 cursor-pointer transition-colors">
                         View all →
                       </button>

@@ -50,7 +50,7 @@ export default function GymsPage() {
           <input
             value={search}
             onChange={(e) => changeSearch(e.target.value)}
-            placeholder="Search name, slug, city…"
+            placeholder="Search name, slug, city, or gym ID…"
             className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm outline-none"
             style={{ background: 'var(--a-surface)', borderColor: 'var(--a-border)', color: 'var(--a-text)' }}
           />

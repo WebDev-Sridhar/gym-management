@@ -30,7 +30,23 @@ export async function listGyms({ search = '', status = 'all', page = 0, pageSize
   if (status === 'active') q = q.eq('status', 'active')
 
   const term = search.trim()
-  if (term) q = q.or(`name.ilike.%${term}%,slug.ilike.%${term}%,city.ilike.%${term}%`)
+  if (term) {
+    // Build the OR list: always include text-column ilike for name/slug/city.
+    // Add id.eq.{term} only when the term parses as a full UUID — Postgres
+    // throws on id.eq with non-UUID input, so we can't always include it.
+    // Partial UUID prefix matching (e.g. typing the 8-char chip preview)
+    // would need an id::text cast that REST can't express; admins who want
+    // that should copy the full UUID from GymProfilePage's copy chip.
+    const filters = [
+      `name.ilike.%${term}%`,
+      `slug.ilike.%${term}%`,
+      `city.ilike.%${term}%`,
+    ]
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term)) {
+      filters.push(`id.eq.${term}`)
+    }
+    q = q.or(filters.join(','))
+  }
 
   q = q.order('created_at', { ascending: false }).range(page * pageSize, page * pageSize + pageSize - 1)
 
