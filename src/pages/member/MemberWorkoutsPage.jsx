@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Zap, Salad, Moon, Info, Calendar } from 'lucide-react'
+import { Zap, Salad, Moon, Info, Calendar, History, ChevronDown, ChevronUp } from 'lucide-react'
 import { useMemberData } from '../../store/MemberDataContext'
+import { fetchMyPlanHistory } from '../../services/memberService'
 import WorkoutsSkeleton from '../../components/member/skeletons/WorkoutsSkeleton'
 
 // Day 1 = Monday (JS getDay: 0=Sun,1=Mon,...6=Sat → map to 1-7)
@@ -171,6 +172,13 @@ function WeeklyPlanView({ plan }) {
 
 export default function MemberWorkoutsPage() {
   const { member, plans, isLoading } = useMemberData()
+  // Plan history is lazy-loaded — only fetched when the member expands the
+  // history section. Avoids an extra request on every workouts-page visit
+  // (most sessions are just "show me today's plan" and never touch history).
+  const [history, setHistory]           = useState(null)   // null = not loaded, [] = loaded-empty, [...] = data
+  const [historyOpen, setHistoryOpen]   = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [expandedHistoryId, setExpandedHistoryId] = useState(null)
 
   if (isLoading) return <WorkoutsSkeleton />
 
@@ -178,6 +186,19 @@ export default function MemberWorkoutsPage() {
   const safePlans    = plans ?? []
   const workouts     = safePlans.filter(p => p.plan_type === 'workout')
   const diets        = safePlans.filter(p => p.plan_type === 'diet')
+
+  async function toggleHistory() {
+    const willOpen = !historyOpen
+    setHistoryOpen(willOpen)
+    if (willOpen && history === null && member?.id) {
+      setHistoryLoading(true)
+      try {
+        const rows = await fetchMyPlanHistory(member.id)
+        setHistory(rows)
+      } catch { setHistory([]) }
+      finally { setHistoryLoading(false) }
+    }
+  }
 
   const isLocked = memberStatus === 'inactive' || memberStatus === 'expired' || memberStatus === 'pending_payment'
 
@@ -248,6 +269,123 @@ export default function MemberWorkoutsPage() {
               </div>
             </motion.div>
           )}
+
+          {/* Plan history — past plans the trainer cycled the member off.
+              Lazy-loaded on first expand. Surfaces as a quiet section under
+              active plans so the journey is reviewable but doesn't compete
+              visually with what the member should focus on this week. */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+            style={{ marginTop: '6px' }}>
+            <button onClick={toggleHistory}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '12px 14px', background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px',
+                cursor: 'pointer', color: 'rgba(255,255,255,0.55)',
+              }}>
+              <History size={15} strokeWidth={2} style={{ color: 'rgba(255,255,255,0.4)' }} />
+              <span style={{ flex: 1, textAlign: 'left', fontSize: '13px', fontWeight: 700 }}>
+                Plan history
+                {history && history.length > 0 && (
+                  <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.35)' }}>
+                    {history.length} past plan{history.length === 1 ? '' : 's'}
+                  </span>
+                )}
+              </span>
+              {historyOpen
+                ? <ChevronUp size={15} style={{ color: 'rgba(255,255,255,0.35)' }} />
+                : <ChevronDown size={15} style={{ color: 'rgba(255,255,255,0.35)' }} />}
+            </button>
+
+            <AnimatePresence>
+              {historyOpen && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                  style={{ overflow: 'hidden' }}>
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {historyLoading ? (
+                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '20px 0', margin: 0 }}>
+                        Loading…
+                      </p>
+                    ) : !history || history.length === 0 ? (
+                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', padding: '20px 0', margin: 0 }}>
+                        No past plans yet. Plans your trainer cycles you off will appear here.
+                      </p>
+                    ) : history.map(p => {
+                      const isExpanded = expandedHistoryId === p.id
+                      const days = Array.isArray(p.data) ? p.data : []
+                      const itemKey = p.plan_type === 'workout' ? 'exercises' : 'meals'
+                      const accent = p.plan_type === 'workout' ? '#818cf8' : '#34d399'
+                      return (
+                        <div key={p.id} style={{
+                          background: 'rgba(255,255,255,0.025)',
+                          border: '1px solid rgba(255,255,255,0.05)',
+                          borderRadius: '12px', padding: '10px 12px',
+                        }}>
+                          <button
+                            onClick={() => setExpandedHistoryId(isExpanded ? null : p.id)}
+                            style={{
+                              width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                            }}>
+                            <div style={{
+                              width: '30px', height: '30px', borderRadius: '8px', flexShrink: 0,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: `${accent}22`, color: accent,
+                            }}>
+                              {p.plan_type === 'workout' ? <Zap size={14} strokeWidth={2} /> : <Salad size={14} strokeWidth={2} />}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                              <p style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {p.title}
+                              </p>
+                              <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', margin: '2px 0 0' }}>
+                                {days.length} days · assigned {p.assigned_at ? new Date(p.assigned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                              </p>
+                            </div>
+                            {isExpanded
+                              ? <ChevronUp size={13} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+                              : <ChevronDown size={13} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />}
+                          </button>
+                          {isExpanded && days.length > 0 && (
+                            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {days.map((d, di) => {
+                                const items = d[itemKey] || []
+                                return (
+                                  <div key={di} style={{
+                                    padding: '8px 10px', borderRadius: '8px',
+                                    background: 'rgba(255,255,255,0.025)',
+                                  }}>
+                                    <p style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.55)', margin: 0 }}>
+                                      {d.name?.trim() || `Day ${di + 1}`}
+                                      {d.rest && <span style={{ marginLeft: '6px', color: 'rgba(255,255,255,0.3)', fontWeight: 500 }}>· rest</span>}
+                                    </p>
+                                    {!d.rest && items.length > 0 && (
+                                      <ul style={{ margin: '4px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        {items.map((it, ii) => (
+                                          <li key={ii} style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', display: 'flex', gap: '6px' }}>
+                                            <span style={{ color: 'rgba(255,255,255,0.25)' }}>·</span>
+                                            <span style={{ flex: 1, minWidth: 0 }}>
+                                              {p.plan_type === 'workout'
+                                                ? `${it.name || 'Exercise'}${it.sets ? ` — ${it.sets}×${it.reps || '–'}` : ''}${it.rest ? ` · ${it.rest}` : ''}`
+                                                : `${it.time ? `${it.time} · ` : ''}${it.meal_name || 'Meal'}${it.calories ? ` · ${it.calories} kcal` : ''}`}
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
         </>
       )}
     </div>

@@ -13,6 +13,7 @@ import { MEALS } from '../../data/mealsDb'
 import { Sk } from '../../components/ui/Skeleton'
 import BannerSlot from '../../components/dashboard/banner/BannerSlot'
 import { Dumbbell, Utensils, TriangleAlert, Search, Plus, X, Loader2, Copy } from 'lucide-react'
+import { ExerciseCard, MealCard } from '../../components/programs/PlanItemCards'
 
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -110,7 +111,6 @@ function DbSearch({ type, onAdd }) {
 function DayEditor({ type, day, onChange }) {
   const items   = type === 'workout' ? (day.exercises || []) : (day.meals || [])
   const itemKey = type === 'workout' ? 'exercises' : 'meals'
-  const inputCls = 'px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full transition-all'
 
   const setItems = (fn) => onChange({ ...day, [itemKey]: fn(items) })
   const addItem  = (item) => setItems(r => [...r, item])
@@ -135,43 +135,25 @@ function DayEditor({ type, day, onChange }) {
       <DbSearch type={type} onAdd={addItem} />
 
       {items.length > 0 && (
-        <div className="space-y-1.5">
-          <div className={`grid gap-1.5 px-1 ${type === 'workout' ? 'grid-cols-[1fr_44px_52px_52px_1fr_20px]' : 'grid-cols-[68px_1fr_1fr_48px_52px_20px]'}`}>
-            {(type === 'workout' ? ['Exercise', 'Sets', 'Reps', 'Rest', 'Notes', ''] : ['Time', 'Meal', 'Items', 'Prot.g', 'Kcal', ''])
-              .map(h => <span key={h} className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{h}</span>)}
-          </div>
+        <div className="space-y-2.5">
           {type === 'workout'
             ? items.map((row, i) => (
-                <div key={i} className="grid grid-cols-[1fr_44px_52px_52px_1fr_20px] gap-1.5 items-center bg-gray-50 rounded-lg px-1.5 py-1">
-                  <input value={row.name}  onChange={e => update(i, { name: e.target.value })}  placeholder="Exercise name" className={inputCls} />
-                  <input value={row.sets}  onChange={e => update(i, { sets: e.target.value })}  placeholder="4"    className={inputCls} type="number" min="0" />
-                  <input value={row.reps}  onChange={e => update(i, { reps: e.target.value })}  placeholder="8-12" className={inputCls} />
-                  <input value={row.rest}  onChange={e => update(i, { rest: e.target.value })}  placeholder="60s"  className={inputCls} />
-                  <input value={row.notes} onChange={e => update(i, { notes: e.target.value })} placeholder="Notes" className={inputCls} />
-                  <button type="button" onClick={() => remove(i)} className="text-gray-300 hover:text-red-400 cursor-pointer flex items-center justify-center">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
+                <ExerciseCard key={i} row={row} index={i}
+                  onUpdate={patch => update(i, patch)}
+                  onRemove={() => remove(i)} />
               ))
             : items.map((row, i) => (
-                <div key={i} className="grid grid-cols-[68px_1fr_1fr_48px_52px_20px] gap-1.5 items-center bg-gray-50 rounded-lg px-1.5 py-1">
-                  <input value={row.time}      onChange={e => update(i, { time: e.target.value })}      placeholder="7 AM"  className={inputCls} />
-                  <input value={row.meal_name} onChange={e => update(i, { meal_name: e.target.value })} placeholder="Meal name" className={inputCls} />
-                  <input value={row.items}     onChange={e => update(i, { items: e.target.value })}     placeholder="Items / ingredients" className={inputCls} />
-                  <input value={row.protein}   onChange={e => update(i, { protein: e.target.value })}   placeholder="30"  className={inputCls} type="number" min="0" />
-                  <input value={row.calories}  onChange={e => update(i, { calories: e.target.value })}  placeholder="400" className={inputCls} type="number" min="0" />
-                  <button type="button" onClick={() => remove(i)} className="text-gray-300 hover:text-red-400 cursor-pointer flex items-center justify-center">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
+                <MealCard key={i} row={row} index={i}
+                  onUpdate={patch => update(i, patch)}
+                  onRemove={() => remove(i)} />
               ))
           }
         </div>
       )}
 
       <button type="button" onClick={addEmpty}
-        className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-gray-700 cursor-pointer transition-colors">
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+        className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer transition-colors">
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
         Add {type === 'workout' ? 'exercise' : 'meal'} manually
       </button>
     </div>
@@ -418,10 +400,9 @@ function AssignModal({ template, planType, gymId, onClose, onAssigned }) {
   }
 
   const previewDays = template.exercises ?? template.meals ?? []
-  const lightInput = 'px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full placeholder:text-gray-400 text-gray-900'
 
   return (
-    <FormModal title={`Assign — ${template.title}`} onClose={onClose} wide>
+    <FormModal title={`Assign — ${template.title}`} onClose={onClose} xl>
       <div className="space-y-4">
 
         {/* ── Step 1: Pick member ── */}
@@ -610,40 +591,22 @@ function AssignModal({ template, planType, gymId, onClose, onAssigned }) {
                 {activeDay.rest ? (
                   <p className="text-xs text-gray-400 text-center py-6 m-0">Rest day — no activities scheduled</p>
                 ) : (
-                  <div className="p-3 flex flex-col gap-1.5">
-                    {items.length > 0 && (
-                      <div
-                        className="grid gap-1 pl-0.5"
-                        style={{ gridTemplateColumns: planType === 'workout' ? '1fr 38px 52px 48px 20px' : '56px 1fr 44px 48px 20px' }}
-                      >
-                        {(planType === 'workout' ? ['Exercise','Sets','Reps','Rest',''] : ['Time','Meal','Pro.','Cal','']).map(h => (
-                          <span key={h} className="text-[10px] font-bold text-gray-400 uppercase">{h}</span>
-                        ))}
-                      </div>
-                    )}
-
+                  <div className="p-3 sm:p-4 flex flex-col gap-2.5">
+                    {/* Cards mirror the create/edit template editor (ExerciseCard /
+                        MealCard) so the customize-before-assign flow gets the
+                        same readable Notes/Items textareas. Falls back to the
+                        compact lightInput look would clip long exercise names
+                        and entire ingredient lists. */}
                     {planType === 'workout'
                       ? items.map((r, ii) => (
-                          <div key={ii} className="grid gap-1 items-center" style={{ gridTemplateColumns: '1fr 38px 52px 48px 20px' }}>
-                            <input value={r.name ?? ''} onChange={e => updateItem(safeIdx, ii, { name: e.target.value })} placeholder="Exercise" className={lightInput} />
-                            <input value={r.sets ?? ''} onChange={e => updateItem(safeIdx, ii, { sets: e.target.value })} placeholder="4" type="number" className={lightInput} />
-                            <input value={r.reps ?? ''} onChange={e => updateItem(safeIdx, ii, { reps: e.target.value })} placeholder="8-12" className={lightInput} />
-                            <input value={r.rest ?? ''} onChange={e => updateItem(safeIdx, ii, { rest: e.target.value })} placeholder="60s" className={lightInput} />
-                            <button type="button" onClick={() => removeItem(safeIdx, ii)} className="text-gray-300 hover:text-gray-500 cursor-pointer flex justify-center p-0">
-                              <X size={13} />
-                            </button>
-                          </div>
+                          <ExerciseCard key={ii} row={r} index={ii}
+                            onUpdate={patch => updateItem(safeIdx, ii, patch)}
+                            onRemove={() => removeItem(safeIdx, ii)} />
                         ))
                       : items.map((r, ii) => (
-                          <div key={ii} className="grid gap-1 items-center" style={{ gridTemplateColumns: '56px 1fr 44px 48px 20px' }}>
-                            <input value={r.time ?? ''} onChange={e => updateItem(safeIdx, ii, { time: e.target.value })} placeholder="8 AM" className={lightInput} />
-                            <input value={r.meal_name ?? ''} onChange={e => updateItem(safeIdx, ii, { meal_name: e.target.value })} placeholder="Meal" className={lightInput} />
-                            <input value={r.protein ?? ''} onChange={e => updateItem(safeIdx, ii, { protein: e.target.value })} placeholder="30g" type="number" className={lightInput} />
-                            <input value={r.calories ?? ''} onChange={e => updateItem(safeIdx, ii, { calories: e.target.value })} placeholder="400" type="number" className={lightInput} />
-                            <button type="button" onClick={() => removeItem(safeIdx, ii)} className="text-gray-300 hover:text-gray-500 cursor-pointer flex justify-center p-0">
-                              <X size={13} />
-                            </button>
-                          </div>
+                          <MealCard key={ii} row={r} index={ii}
+                            onUpdate={patch => updateItem(safeIdx, ii, patch)}
+                            onRemove={() => removeItem(safeIdx, ii)} />
                         ))
                     }
 
@@ -908,17 +871,17 @@ export default function ProgramsPage() {
       )}
 
       {showCreate && (
-        <FormModal title={`New Weekly ${activeTab === 'workout' ? 'Workout' : 'Diet'} Template`} onClose={() => setShowCreate(false)} wide>
+        <FormModal title={`New Weekly ${activeTab === 'workout' ? 'Workout' : 'Diet'} Template`} onClose={() => setShowCreate(false)} xl>
           <TemplateForm type={activeTab} onSave={handleCreate} onCancel={() => setShowCreate(false)} />
         </FormModal>
       )}
       {editingTemplate && (
-        <FormModal title="Edit Template" onClose={() => setEditing(null)} wide>
+        <FormModal title="Edit Template" onClose={() => setEditing(null)} xl>
           <TemplateForm type={activeTab} initial={editingTemplate} onSave={handleUpdate} onCancel={() => setEditing(null)} />
         </FormModal>
       )}
       {duplicatingTemplate && (
-        <FormModal title="Duplicate Template" onClose={() => setDuplicating(null)} wide>
+        <FormModal title="Duplicate Template" onClose={() => setDuplicating(null)} xl>
           <TemplateForm
             type={activeTab}
             initial={duplicatingTemplate}

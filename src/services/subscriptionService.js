@@ -174,3 +174,28 @@ export async function fetchSubscription(gymId) {
   if (error) throw error
   return data
 }
+
+/**
+ * Billing history for the SubscriptionPage. Returns every paid/active/expired
+ * subscription row for the gym, newest first, so the owner has a paper trail
+ * for GST/ITR filing + a self-serve "when did I last renew?" lookup.
+ *
+ * Excludes:
+ *   - 'trial' rows — not billable, nothing to receipt
+ *   - 'pending' rows — payment never captured; would be misleading
+ *   - 'cancelled' rows — kept in DB but not part of the paid timeline
+ *
+ * Sort by paid_at when present (fallback to created_at) so renewals appear
+ * in actual payment order rather than insert order.
+ */
+export async function fetchSubscriptionHistory(gymId) {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('id, plan_name, amount, status, starts_at, expires_at, paid_at, created_at, duration_days, razorpay_payment_id, is_founder_pricing')
+    .eq('gym_id', gymId)
+    .in('status', ['active', 'expired'])
+    .order('paid_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}

@@ -5,7 +5,7 @@ import { useDialog } from '../../components/ui/Dialog'
 import FormModal from '../../components/ui/FormModal'
 import {
   fetchMemberAttendance, fetchMemberAssignedPlans,
-  assignPlanToMember, archiveMemberPlan,
+  assignPlanToMember, archiveMemberPlan, unarchiveMemberPlan,
 } from '../../services/trainerService'
 import MembersSkeleton from '../../components/trainer/skeletons/MembersSkeleton'
 import { EXERCISES } from '../../data/exercisesDb'
@@ -14,6 +14,7 @@ import {
   TriangleAlert, X, Plus, Search, Check, ChevronDown, ChevronUp,
   Dumbbell, Salad, Loader2, CircleCheck,
 } from 'lucide-react'
+import { ExerciseCard, MealCard } from '../../components/programs/PlanItemCards'
 
 // ─── Plan customise + assign modal ───────────────────────────────────────────
 function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, onClose, onAssigned }) {
@@ -85,8 +86,6 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
     setDaySearch('')
   }
 
-  const inputCls = 'px-2 py-1.5 bg-white/5 border border-white/10 text-white rounded-lg text-xs outline-none focus:border-indigo-500/60 w-full placeholder:text-white/25'
-
   async function handleSave() {
     if (!title.trim()) { setError('Title is required'); return }
     const hasItems = days.some(d => !d.rest && (d[itemKey] || []).length > 0)
@@ -104,7 +103,7 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
   }
 
   return (
-    <FormModal title={editingPlan ? `Edit Plan — ${member.name}` : `Assign Plan — ${member.name}`} onClose={onClose} wide dark>
+    <FormModal title={editingPlan ? `Edit Plan — ${member.name}` : `Assign Plan — ${member.name}`} onClose={onClose} xl dark>
 
       {/* ── Overview ── */}
       {step === 'overview' && (
@@ -235,36 +234,20 @@ function AssignPlanModal({ member, gymId, activePlans = [], editingPlan = null, 
                 {activeDay.rest ? (
                   <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', textAlign: 'center', padding: '24px 0' }}>Rest day — no exercises scheduled</p>
                 ) : (
-                  <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {items.length > 0 && (
-                      <div style={{ display: 'grid', gap: 4, paddingLeft: 4, gridTemplateColumns: tab === 'workout' ? '1fr 38px 52px 48px 20px' : '56px 1fr 44px 48px 20px' }}>
-                        {(tab === 'workout' ? ['Exercise','Sets','Reps','Rest',''] : ['Time','Meal','Pro.','Cal','']).map(h => (
-                          <span key={h} style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
-                        ))}
-                      </div>
-                    )}
+                  <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {/* Shared item-card editor (dark variant). Same component
+                        as owner ProgramsPage + TrainerWorkoutsPage so layout
+                        + UX stays in lockstep across the 3 plan-builder flows. */}
                     {tab === 'workout'
                       ? items.map((r, ii) => (
-                          <div key={ii} style={{ display: 'grid', gridTemplateColumns: '1fr 38px 52px 48px 20px', gap: 4, alignItems: 'center' }}>
-                            <input value={r.name ?? ''} onChange={e => updateItem(safeIdx, ii, { name: e.target.value })} placeholder="Exercise" className={inputCls} />
-                            <input value={r.sets ?? ''} onChange={e => updateItem(safeIdx, ii, { sets: e.target.value })} placeholder="4" type="number" className={inputCls} />
-                            <input value={r.reps ?? ''} onChange={e => updateItem(safeIdx, ii, { reps: e.target.value })} placeholder="8-12" className={inputCls} />
-                            <input value={r.rest ?? ''} onChange={e => updateItem(safeIdx, ii, { rest: e.target.value })} placeholder="60s" className={inputCls} />
-                            <button onClick={() => removeItem(safeIdx, ii)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', display: 'flex', justifyContent: 'center', padding: 0 }}>
-                              <X size={13} />
-                            </button>
-                          </div>
+                          <ExerciseCard key={ii} row={r} index={ii} dark
+                            onUpdate={patch => updateItem(safeIdx, ii, patch)}
+                            onRemove={() => removeItem(safeIdx, ii)} />
                         ))
                       : items.map((r, ii) => (
-                          <div key={ii} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 44px 48px 20px', gap: 4, alignItems: 'center' }}>
-                            <input value={r.time ?? ''} onChange={e => updateItem(safeIdx, ii, { time: e.target.value })} placeholder="8 AM" className={inputCls} />
-                            <input value={r.meal_name ?? ''} onChange={e => updateItem(safeIdx, ii, { meal_name: e.target.value })} placeholder="Meal" className={inputCls} />
-                            <input value={r.protein ?? ''} onChange={e => updateItem(safeIdx, ii, { protein: e.target.value })} placeholder="30g" type="number" className={inputCls} />
-                            <input value={r.calories ?? ''} onChange={e => updateItem(safeIdx, ii, { calories: e.target.value })} placeholder="400" type="number" className={inputCls} />
-                            <button onClick={() => removeItem(safeIdx, ii)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', display: 'flex', justifyContent: 'center', padding: 0 }}>
-                              <X size={13} />
-                            </button>
-                          </div>
+                          <MealCard key={ii} row={r} index={ii} dark
+                            onUpdate={patch => updateItem(safeIdx, ii, patch)}
+                            onRemove={() => removeItem(safeIdx, ii)} />
                         ))
                     }
                     <div style={{ marginTop: 4 }}>
@@ -332,6 +315,12 @@ function MemberDetailPanel({ member, gymId, onClose, onPlanAssigned }) {
   const [loading, setLoading]   = useState(true)
   const [assigning, setAssigning] = useState(false)
   const [editingPlan, setEditingPlan] = useState(null)
+  // Trainer-side toggle for the archived-plans accordion. Hidden by default
+  // to keep the active plans visually dominant.
+  const [showArchived, setShowArchived] = useState(false)
+  // Inline-view expand state — clicking an archived plan row reveals its
+  // day-by-day content read-only without opening a separate modal.
+  const [expandedArchivedId, setExpandedArchivedId] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -348,7 +337,34 @@ function MemberDetailPanel({ member, gymId, onClose, onPlanAssigned }) {
   async function handleArchive(plan) {
     if (!await dialog.confirm(`Archive "${plan.title}"?`)) return
     await archiveMemberPlan(plan.id)
-    setPlans(prev => prev.filter(p => p.id !== plan.id))
+    // Update status in place (was: filter out, which lost the row from local
+    // state so the "X archived" badge couldn't reflect this archive until a
+    // refetch). Keep the row so the archived accordion stays accurate.
+    setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, status: 'archived' } : p))
+  }
+
+  async function handleUnarchive(plan) {
+    // If there's already an active plan of the same type, restoring would
+    // produce a duplicate-active state that the conflict-check warns against
+    // on assignment. Surface the trade-off so the trainer chooses with eyes
+    // open — they may want to restore + then manually archive the current one.
+    const conflict = plans.find(p => p.status === 'active' && p.plan_type === plan.plan_type)
+    if (conflict) {
+      const ok = await dialog.confirm(
+        `${member.name} already has an active ${plan.plan_type} plan ("${conflict.title}"). ` +
+        `Restoring "${plan.title}" will leave both active. Continue?`,
+        'Restore archived plan?'
+      )
+      if (!ok) return
+    }
+    try {
+      const row = await unarchiveMemberPlan(plan.id)
+      // Merge the server-returned row so any DB-side defaults stay correct.
+      setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, ...row, status: 'active' } : p))
+      setExpandedArchivedId(null)
+    } catch (err) {
+      dialog.alert(err.message || 'Failed to restore plan')
+    }
   }
 
   const activePlans   = plans.filter(p => p.status === 'active')
@@ -428,7 +444,107 @@ function MemberDetailPanel({ member, gymId, onClose, onPlanAssigned }) {
                   <button onClick={() => handleArchive(p)} style={{ fontSize: 11, fontWeight: 700, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>Archive</button>
                 </div>
               ))}
-              {archivedPlans.length > 0 && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', textAlign: 'center', margin: '4px 0 0' }}>{archivedPlans.length} archived</p>}
+              {archivedPlans.length > 0 && (
+                <div style={{ marginTop: 6, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 10 }}>
+                  <button
+                    onClick={() => setShowArchived(s => !s)}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '6px 4px', background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+                    }}>
+                    <span>ARCHIVED PLANS · {archivedPlans.length}</span>
+                    {showArchived
+                      ? <ChevronUp size={13} style={{ color: 'rgba(255,255,255,0.35)' }} />
+                      : <ChevronDown size={13} style={{ color: 'rgba(255,255,255,0.35)' }} />}
+                  </button>
+                  {showArchived && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                      {archivedPlans.map(p => {
+                        const isExpanded = expandedArchivedId === p.id
+                        const days = Array.isArray(p.data) ? p.data : []
+                        const itemKey = p.plan_type === 'workout' ? 'exercises' : 'meals'
+                        return (
+                          <div key={p.id} style={{
+                            background: 'rgba(255,255,255,0.025)',
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            borderRadius: 12, padding: 10,
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{
+                                width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: 'rgba(255,255,255,0.05)',
+                                color: 'rgba(255,255,255,0.4)',
+                              }}>
+                                {p.plan_type === 'workout' ? <Dumbbell size={14} strokeWidth={2} /> : <Salad size={14} strokeWidth={2} />}
+                              </div>
+                              <button
+                                onClick={() => setExpandedArchivedId(isExpanded ? null : p.id)}
+                                style={{
+                                  flex: 1, minWidth: 0, textAlign: 'left',
+                                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                                }}>
+                                <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.65)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
+                                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>
+                                  {days.length} days · {p.assigned_at ? new Date(p.assigned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                                </p>
+                              </button>
+                              <button
+                                onClick={() => handleUnarchive(p)}
+                                style={{
+                                  fontSize: 10, fontWeight: 700, padding: '5px 10px',
+                                  background: 'rgba(129,140,248,0.15)', color: '#a5b4fc',
+                                  border: '1px solid rgba(129,140,248,0.2)', borderRadius: 8,
+                                  cursor: 'pointer', flexShrink: 0,
+                                }}>
+                                Restore
+                              </button>
+                            </div>
+                            {isExpanded && (
+                              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {days.length === 0 ? (
+                                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', margin: 0, textAlign: 'center', padding: '12px 0' }}>
+                                    No content saved on this plan.
+                                  </p>
+                                ) : days.map((d, di) => {
+                                  const items = d[itemKey] || []
+                                  return (
+                                    <div key={di} style={{
+                                      padding: '8px 10px', borderRadius: 8,
+                                      background: 'rgba(255,255,255,0.025)',
+                                      border: '1px solid rgba(255,255,255,0.05)',
+                                    }}>
+                                      <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', margin: 0 }}>
+                                        {d.name?.trim() || `Day ${di + 1}`}
+                                        {d.rest && <span style={{ marginLeft: 6, color: 'rgba(255,255,255,0.3)', fontWeight: 500 }}>· rest</span>}
+                                      </p>
+                                      {!d.rest && items.length > 0 && (
+                                        <ul style={{ margin: '4px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                          {items.map((it, ii) => (
+                                            <li key={ii} style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', display: 'flex', gap: 6 }}>
+                                              <span style={{ color: 'rgba(255,255,255,0.25)' }}>·</span>
+                                              <span style={{ flex: 1, minWidth: 0 }}>
+                                                {p.plan_type === 'workout'
+                                                  ? `${it.name || 'Exercise'}${it.sets ? ` — ${it.sets}×${it.reps || '–'}` : ''}${it.rest ? ` · ${it.rest}` : ''}`
+                                                  : `${it.time ? `${it.time} · ` : ''}${it.meal_name || 'Meal'}${it.calories ? ` · ${it.calories} kcal` : ''}`}
+                                              </span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )
         ) : (

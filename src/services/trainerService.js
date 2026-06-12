@@ -118,6 +118,22 @@ export async function archiveMemberPlan(id) {
   if (error) throw error
 }
 
+// Restore an archived plan back to active. Mirror of archiveMemberPlan.
+// Caller is responsible for resolving conflicts (e.g. confirming with the
+// trainer if another active plan of the same type already exists) — this
+// service just flips the status. Returns the restored row so the caller
+// can merge it into local state without a refetch.
+export async function unarchiveMemberPlan(id) {
+  const { data, error } = await supabase
+    .from('assigned_plans')
+    .update({ status: 'active' })
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
+}
+
 // ─── Trainer list (used by owner's MembersPage) ───────────────────────────────
 
 export async function fetchTrainers(gymId, branchId) {

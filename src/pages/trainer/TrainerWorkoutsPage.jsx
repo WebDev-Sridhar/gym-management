@@ -10,10 +10,9 @@ import { MEALS } from '../../data/mealsDb'
 import { useDialog } from '../../components/ui/Dialog'
 import FormModal from '../../components/ui/FormModal'
 import { TriangleAlert, X, Plus, Search, Check, Clock, Loader2 } from 'lucide-react'
+import { ExerciseCard, MealCard } from '../../components/programs/PlanItemCards'
 
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-
-const inputCls = 'px-2 py-1.5 bg-white/5 border border-white/10 text-white rounded-lg text-xs outline-none focus:border-indigo-500/60 w-full placeholder:text-white/25'
 
 function AssignModal({ template, planType, members, gymId, onClose, onAssigned }) {
   const dialog = useDialog()
@@ -93,7 +92,7 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
     : []
 
   return (
-    <FormModal title={`Assign — ${template.title}`} onClose={onClose} wide dark>
+    <FormModal title={`Assign — ${template.title}`} onClose={onClose} xl dark>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ── Step 1: Pick member / conflict ── */}
@@ -299,37 +298,20 @@ function AssignModal({ template, planType, members, gymId, onClose, onAssigned }
                 {activeDay.rest ? (
                   <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '24px 0', margin: 0 }}>Rest day — no activities scheduled</p>
                 ) : (
-                  <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {items.length > 0 && (
-                      <div style={{ display: 'grid', gap: 4, paddingLeft: 2, gridTemplateColumns: planType === 'workout' ? '1fr 38px 52px 48px 20px' : '56px 1fr 44px 48px 20px' }}>
-                        {(planType === 'workout' ? ['Exercise','Sets','Reps','Rest',''] : ['Time','Meal','Pro.','Cal','']).map(h => (
-                          <span key={h} style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase' }}>{h}</span>
-                        ))}
-                      </div>
-                    )}
-
+                  <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {/* Card-per-item editor — shared with owner ProgramsPage so
+                        any UX change to the card layout (e.g. additional fields,
+                        textarea sizing) lands in both places at once. */}
                     {planType === 'workout'
                       ? items.map((r, ii) => (
-                          <div key={ii} style={{ display: 'grid', gridTemplateColumns: '1fr 38px 52px 48px 20px', gap: 4, alignItems: 'center' }}>
-                            <input value={r.name ?? ''} onChange={e => updateItem(safeIdx, ii, { name: e.target.value })} placeholder="Exercise" className={inputCls} />
-                            <input value={r.sets ?? ''} onChange={e => updateItem(safeIdx, ii, { sets: e.target.value })} placeholder="4" type="number" className={inputCls} />
-                            <input value={r.reps ?? ''} onChange={e => updateItem(safeIdx, ii, { reps: e.target.value })} placeholder="8-12" className={inputCls} />
-                            <input value={r.rest ?? ''} onChange={e => updateItem(safeIdx, ii, { rest: e.target.value })} placeholder="60s" className={inputCls} />
-                            <button onClick={() => removeItem(safeIdx, ii)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', padding: 0, display: 'flex', justifyContent: 'center' }}>
-                              <X size={13} />
-                            </button>
-                          </div>
+                          <ExerciseCard key={ii} row={r} index={ii} dark
+                            onUpdate={patch => updateItem(safeIdx, ii, patch)}
+                            onRemove={() => removeItem(safeIdx, ii)} />
                         ))
                       : items.map((r, ii) => (
-                          <div key={ii} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 44px 48px 20px', gap: 4, alignItems: 'center' }}>
-                            <input value={r.time ?? ''} onChange={e => updateItem(safeIdx, ii, { time: e.target.value })} placeholder="8 AM" className={inputCls} />
-                            <input value={r.meal_name ?? ''} onChange={e => updateItem(safeIdx, ii, { meal_name: e.target.value })} placeholder="Meal" className={inputCls} />
-                            <input value={r.protein ?? ''} onChange={e => updateItem(safeIdx, ii, { protein: e.target.value })} placeholder="30g" type="number" className={inputCls} />
-                            <input value={r.calories ?? ''} onChange={e => updateItem(safeIdx, ii, { calories: e.target.value })} placeholder="400" type="number" className={inputCls} />
-                            <button onClick={() => removeItem(safeIdx, ii)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.2)', padding: 0, display: 'flex', justifyContent: 'center' }}>
-                              <X size={13} />
-                            </button>
-                          </div>
+                          <MealCard key={ii} row={r} index={ii} dark
+                            onUpdate={patch => updateItem(safeIdx, ii, patch)}
+                            onRemove={() => removeItem(safeIdx, ii)} />
                         ))
                     }
 

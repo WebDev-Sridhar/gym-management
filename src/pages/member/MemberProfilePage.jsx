@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { LogOut, CreditCard, ChevronRight, AlertTriangle, Clock, Loader2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { LogOut, CreditCard, ChevronRight, AlertTriangle, Clock, Loader2, Receipt, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 import { useMemberData } from '../../store/MemberDataContext'
+import { fetchMyPayments } from '../../services/memberService'
 import { isMainHost } from '../../lib/host'
 import ProfileSkeleton from '../../components/member/skeletons/ProfileSkeleton'
 
@@ -34,6 +35,31 @@ export default function MemberProfilePage() {
   const { profile, gymSlug } = useAuth()
   const { member, attendance, pending, isLoading } = useMemberData()
   const [loggingOut, setLoggingOut] = useState(false)
+
+  // Payment history — lazy on expand. Profile is rarely re-visited so
+  // this never re-runs after the first open in a session. Surfaces the
+  // member's billing timeline (paid + due) so "did I pay last month?"
+  // and "what do I owe?" are self-serve instead of a phone call to the gym.
+  const [paymentsOpen, setPaymentsOpen]       = useState(false)
+  const [payments, setPayments]               = useState(null)  // null = not loaded
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
+  // Within the expanded history, default to 5 rows. Long-tenured members
+  // (3+ years on monthly billing, or anyone on weekly packages) shouldn't
+  // get a 50-row wall — "Show all" reveals the rest on demand.
+  const PAYMENTS_PREVIEW = 5
+  const [showAllPayments, setShowAllPayments] = useState(false)
+  async function togglePayments() {
+    const willOpen = !paymentsOpen
+    setPaymentsOpen(willOpen)
+    if (willOpen && payments === null && member?.id) {
+      setPaymentsLoading(true)
+      try {
+        const rows = await fetchMyPayments(member.id)
+        setPayments(rows)
+      } catch { setPayments([]) }
+      finally { setPaymentsLoading(false) }
+    }
+  }
 
   function handleLogout() {
     setLoggingOut(true)
@@ -165,6 +191,125 @@ export default function MemberProfilePage() {
         <Row label="Status" value={member?.status ? member.status.charAt(0).toUpperCase() + member.status.slice(1) : null} accent={expired ? '#f87171' : expiring ? '#fbbf24' : '#4ade80'} />
         <Row label="Joined" value={member?.join_date ? new Date(member.join_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : null} />
         <Row label="Expires" value={expiry ? expiry.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : null} accent={expired ? '#f87171' : expiring ? '#fbbf24' : null} />
+      </motion.div>
+
+      {/* Payment history — collapsible. Slots between Membership and
+          Contact so it sits with other membership-related info but doesn't
+          dominate the profile when the member hasn't asked to see it. */}
+      <motion.div {...fadeUp(0.14)}>
+        <button onClick={togglePayments}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '14px 16px', borderRadius: '20px',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            cursor: 'pointer', color: 'rgba(255,255,255,0.55)',
+            textAlign: 'left',
+          }}>
+          <Receipt size={15} strokeWidth={2} style={{ color: 'rgba(255,255,255,0.4)' }} />
+          <span style={{ flex: 1, fontSize: '13px', fontWeight: 700 }}>
+            Payment history
+            {payments && payments.length > 0 && (
+              <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.35)' }}>
+                {payments.length} {payments.length === 1 ? 'payment' : 'payments'}
+              </span>
+            )}
+          </span>
+          {paymentsOpen
+            ? <ChevronUp size={15} style={{ color: 'rgba(255,255,255,0.35)' }} />
+            : <ChevronDown size={15} style={{ color: 'rgba(255,255,255,0.35)' }} />}
+        </button>
+
+        <AnimatePresence>
+          {paymentsOpen && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              style={{ overflow: 'hidden' }}>
+              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {paymentsLoading ? (
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '20px 0', margin: 0 }}>
+                    Loading…
+                  </p>
+                ) : !payments || payments.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', padding: '20px 0', margin: 0 }}>
+                    No payments recorded yet.
+                  </p>
+                ) : (showAllPayments ? payments : payments.slice(0, PAYMENTS_PREVIEW)).map(p => {
+                  const isPaid    = p.status === 'paid'
+                  const isPending = p.status === 'pending' || p.status === 'verification_pending'
+                  const date = p.paid_at || p.due_date || p.created_at
+                  const dateLabel = date ? new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+                  // Status pill colour scheme: green=paid (confirmed), amber=pending
+                  // (something the member should act on), gray=other terminal states
+                  const pillColor = isPaid ? '#34d399' : isPending ? '#fbbf24' : 'rgba(255,255,255,0.5)'
+                  const pillBg    = isPaid ? 'rgba(52,211,153,0.12)' : isPending ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.06)'
+                  const pillLabel = isPaid ? 'Paid'
+                                  : p.status === 'verification_pending' ? 'Verifying'
+                                  : p.status === 'pending' ? 'Due'
+                                  : p.status?.charAt(0).toUpperCase() + p.status?.slice(1) || '—'
+                  return (
+                    <div key={p.id} style={{
+                      padding: '12px 14px', borderRadius: '14px',
+                      background: 'rgba(255,255,255,0.025)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+                            {isPaid ? 'Paid on' : isPending ? 'Due on' : 'Date'} · {dateLabel}
+                          </p>
+                          <p style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.85)', margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.plan?.name || 'Membership payment'}
+                          </p>
+                          {p.payment_method && isPaid && (
+                            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', margin: '3px 0 0', textTransform: 'capitalize' }}>
+                              via {p.payment_method}
+                            </p>
+                          )}
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <p style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>
+                            ₹{Number(p.amount || 0).toLocaleString('en-IN')}
+                          </p>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '3px',
+                            marginTop: '4px',
+                            fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em',
+                            padding: '2px 7px', borderRadius: '999px',
+                            color: pillColor, background: pillBg,
+                          }}>
+                            {isPaid && <CheckCircle2 size={8} />}
+                            {isPending && <Clock size={8} />}
+                            {pillLabel}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                {/* Show all / Show fewer — only rendered when we're actually
+                    hiding rows so short histories look identical to before. */}
+                {payments && payments.length > PAYMENTS_PREVIEW && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllPayments(s => !s)}
+                    style={{
+                      width: '100%', padding: '10px 0',
+                      background: 'rgba(129,140,248,0.08)',
+                      border: '1px solid rgba(129,140,248,0.15)',
+                      borderRadius: '12px',
+                      color: '#a5b4fc',
+                      fontSize: '12px', fontWeight: 700,
+                      cursor: 'pointer',
+                    }}>
+                    {showAllPayments
+                      ? 'Show fewer'
+                      : `Show all ${payments.length} payments ↓`}
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* Contact info */}

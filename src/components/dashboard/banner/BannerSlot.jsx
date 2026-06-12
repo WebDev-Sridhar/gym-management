@@ -36,6 +36,13 @@ export default function BannerSlot({ pageKey, context, limit = 2 }) {
     [pageKey, fullContext, dismissed, limit],
   )
 
+  // Don't render anything until the snapshot has resolved (unless the
+  // caller passed an explicit context, which means they own the data).
+  // Without this guard, predicates like publish_website's
+  // `!gym?.hero_title && !gym?.description` evaluate to true against the
+  // initial gym=null and a banner flashes for one frame before disappearing.
+  if (!context && snapshot.loading && !snapshot.gym) return null
+
   if (banners.length === 0) return null
 
   return (

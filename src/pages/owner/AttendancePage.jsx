@@ -4,8 +4,8 @@ import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import { fetchAttendance, fetchAttendanceSummary, manualCheckin, fetchMembers, fetchGymDetails } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
-import CustomSelect from '../../components/ui/CustomSelect'
 import Pagination from '../../components/ui/Pagination'
+import { Search, X, Check } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from 'recharts'
 import { Sk } from '../../components/ui/Skeleton'
 
@@ -53,7 +53,11 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [showCheckin, setShowCheckin] = useState(false)
-  const [selectedMemberId, setSelectedMemberId] = useState('')
+  // Multi-select manual check-in. Set<member.id> is cheap to mutate + has O(1)
+  // lookup for the checkbox-row "is this row selected?" check. Reset whenever
+  // the form opens/closes so a stale selection doesn't leak into the next open.
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [pickerSearch, setPickerSearch] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -90,18 +94,51 @@ export default function AttendancePage() {
 
   async function handleManualCheckin(e) {
     e.preventDefault()
-    if (!selectedMemberId) return
+    if (selectedIds.size === 0) return
 
     setSubmitting(true)
-    try {
-      const newCheckin = await manualCheckin({ gymId, memberId: selectedMemberId })
-      setCheckins((prev) => [newCheckin, ...prev])
-      setSelectedMemberId('')
+    // Promise.allSettled (not all): if Rajesh's row fails we still want
+    // Priya and Karthik to be checked in. Then surface the failed names
+    // so the front-desk operator knows who to retry.
+    const ids = Array.from(selectedIds)
+    const idToName = new Map(members.map((m) => [m.id, m.name]))
+    const results = await Promise.allSettled(
+      ids.map((id) => manualCheckin({ gymId, memberId: id })),
+    )
+
+    const newRows = []
+    const failed = []
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') newRows.push(r.value)
+      else failed.push(idToName.get(ids[i]) || 'Unknown member')
+    })
+
+    if (newRows.length > 0) {
+      setCheckins((prev) => [...newRows, ...prev])
+    }
+
+    setSubmitting(false)
+
+    if (failed.length === 0) {
+      // All succeeded — close the form and clear selection
+      setSelectedIds(new Set())
+      setPickerSearch('')
       setShowCheckin(false)
-    } catch (err) {
-      dialog.alert(err.message || 'Failed to mark check-in')
-    } finally {
-      setSubmitting(false)
+    } else if (newRows.length === 0) {
+      dialog.alert(`Failed to mark check-in for ${failed.join(', ')}.`)
+    } else {
+      // Partial success — keep the form open with only the failed members
+      // still selected so the operator can investigate / retry.
+      const failedIds = new Set(
+        results
+          .map((r, i) => (r.status === 'rejected' ? ids[i] : null))
+          .filter(Boolean),
+      )
+      setSelectedIds(failedIds)
+      dialog.alert(
+        `Checked in ${newRows.length} member${newRows.length === 1 ? '' : 's'}. ` +
+        `Failed for: ${failed.join(', ')}.`,
+      )
     }
   }
 
@@ -255,7 +292,14 @@ export default function AttendancePage() {
           />
           {isToday && (
             <button
-              onClick={() => setShowCheckin(!showCheckin)}
+              onClick={() => {
+                if (showCheckin) {
+                  // Closing — wipe any in-progress selection so reopen is clean
+                  setSelectedIds(new Set())
+                  setPickerSearch('')
+                }
+                setShowCheckin(!showCheckin)
+              }}
               className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer"
             >
               {showCheckin ? 'Close' : '+ Mark Check-in'}
@@ -263,37 +307,167 @@ export default function AttendancePage() {
           )}
         </div>
       </div>
-            {/* Manual check-in form */}
-      {showCheckin && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Manual Check-in</h2>
-          <form onSubmit={handleManualCheckin} className="flex items-end gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Member</label>
-              <CustomSelect
-                value={selectedMemberId}
-                onChange={setSelectedMemberId}
-                placeholder="Choose a member..."
-                options={availableMembers.map((m) => ({
-                  value: m.id,
-                  label: m.name,
-                  hint: m.phone || undefined,
-                }))}
-              />
+            {/* Manual check-in form — multi-select with search.
+                Operator can filter by name/phone, tick multiple members, then
+                submit them all in one go. Bulk processing uses Promise.allSettled
+                in handleManualCheckin so a single failing row doesn't block the
+                rest. "Select all" + selected-count chip make a 10-member rush
+                (e.g. a morning batch class) a 3-tap operation. */}
+      {showCheckin && (() => {
+        // Apply picker search filter to available members (already excludes
+        // checked-in + inactive in availableMembers above).
+        const q = pickerSearch.trim().toLowerCase()
+        const visible = q
+          ? availableMembers.filter(
+              (m) =>
+                (m.name || '').toLowerCase().includes(q) ||
+                (m.phone || '').includes(q),
+            )
+          : availableMembers
+
+        const visibleIds = visible.map((m) => m.id)
+        const allVisibleSelected =
+          visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+
+        const toggleOne = (id) => {
+          setSelectedIds((prev) => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+          })
+        }
+        const toggleAllVisible = () => {
+          setSelectedIds((prev) => {
+            const next = new Set(prev)
+            if (allVisibleSelected) visibleIds.forEach((id) => next.delete(id))
+            else visibleIds.forEach((id) => next.add(id))
+            return next
+          })
+        }
+        const clearSelection = () => setSelectedIds(new Set())
+
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Manual Check-in</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Tick members to check in, then submit. {availableMembers.length} available.
+                </p>
+              </div>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="text-xs font-medium text-gray-500 hover:text-gray-700 px-2 py-1 rounded cursor-pointer flex items-center gap-1 shrink-0"
+                >
+                  <X size={12} />
+                  Clear ({selectedIds.size})
+                </button>
+              )}
             </div>
-            <button
-              type="submit"
-              disabled={!selectedMemberId || submitting}
-              className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
-            >
-              {submitting ? 'Marking...' : 'Check In'}
-            </button>
-          </form>
-          {availableMembers.length === 0 && (
-            <p className="text-xs text-gray-400 mt-3">All active members have already checked in today.</p>
-          )}
-        </div>
-      )}
+
+            {availableMembers.length === 0 ? (
+              <p className="text-sm text-gray-400 py-6 text-center">
+                All active members have already checked in today.
+              </p>
+            ) : (
+              <form onSubmit={handleManualCheckin}>
+                {/* Search */}
+                <div className="relative mb-3">
+                  <Search
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                  <input
+                    type="text"
+                    value={pickerSearch}
+                    onChange={(e) => setPickerSearch(e.target.value)}
+                    placeholder="Search by name or phone…"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-shadow"
+                  />
+                </div>
+
+                {/* Select-all row */}
+                {visible.length > 0 && (
+                  <label className="flex items-center gap-2.5 px-3 py-2 border border-gray-100 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors mb-2">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleAllVisible}
+                      className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span className="text-xs font-semibold text-gray-700">
+                      {allVisibleSelected ? 'Deselect all' : 'Select all'}
+                      <span className="text-gray-400 font-normal ml-1">
+                        ({visible.length} shown)
+                      </span>
+                    </span>
+                  </label>
+                )}
+
+                {/* Member list */}
+                <div className="max-h-72 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
+                  {visible.length === 0 ? (
+                    <p className="text-sm text-gray-400 py-6 text-center">
+                      No members match "{pickerSearch}".
+                    </p>
+                  ) : (
+                    visible.map((m) => {
+                      const checked = selectedIds.has(m.id)
+                      return (
+                        <label
+                          key={m.id}
+                          className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+                            checked ? 'bg-indigo-50/50' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleOne(m.id)}
+                            className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{m.name}</p>
+                            {m.phone && (
+                              <p className="text-xs text-gray-500 truncate">{m.phone}</p>
+                            )}
+                          </div>
+                          {checked && (
+                            <Check size={14} className="text-indigo-600 shrink-0" />
+                          )}
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+
+                {/* Submit row */}
+                <div className="flex items-center justify-between gap-3 mt-4">
+                  <span className="text-xs text-gray-500">
+                    {selectedIds.size === 0
+                      ? 'No members selected'
+                      : `${selectedIds.size} selected`}
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={selectedIds.size === 0 || submitting}
+                    className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submitting
+                      ? `Checking in ${selectedIds.size}…`
+                      : selectedIds.size > 1
+                        ? `Check in ${selectedIds.size} members`
+                        : 'Check in'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )
+      })()}
 
       {/* QR Code banner card */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

@@ -54,7 +54,15 @@ export function useDashboardSnapshot() {
     const c = gymId ? cache.get(gymId) : null
     return c?.gym && c?.stats ? { gym: c.gym, stats: c.stats } : { gym: null, stats: null }
   })
-  const [loading, setLoading] = useState(false)
+  // Start true when we don't have a cached snapshot yet, so consumers
+  // (e.g. BannerSlot) can correctly gate predicate evaluation on first
+  // mount. Otherwise predicates like "no hero_title" wrongly evaluate true
+  // against gym=null and render a banner that disappears once data arrives.
+  const [loading, setLoading] = useState(() => {
+    if (!gymId) return false
+    const c = cache.get(gymId)
+    return !(c?.gym && c?.stats)
+  })
 
   useEffect(() => {
     if (!gymId) return

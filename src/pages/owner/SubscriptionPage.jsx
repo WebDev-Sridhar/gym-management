@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContext'
-import { createSubscriptionOrder, openSubscriptionCheckout, fetchFounderSlotsUsed } from '../../services/subscriptionService'
+import { createSubscriptionOrder, openSubscriptionCheckout, fetchFounderSlotsUsed, fetchSubscriptionHistory } from '../../services/subscriptionService'
 import { fetchWhatsappQuota } from '../../services/whatsappQuotaService'
 import { planDisplayName } from '../../lib/featureGates'
 import { Sk } from '../../components/ui/Skeleton'
@@ -12,6 +12,7 @@ const FOUNDER_DISCOUNT    = 0.5
 import {
   Zap, Check, Crown, Rocket, Building, AlertTriangle,
   CheckCircle, RefreshCw, Clock, CreditCard, X, ArrowRight, MessageCircle,
+  Receipt,
 } from 'lucide-react'
 
 // V3 Task 1: `key` is the canonical lowercase enum that matches the DB
@@ -178,6 +179,25 @@ export default function SubscriptionPage() {
     fetchFounderSlotsUsed().then(n => { if (!cancelled) setFounderSlotsUsed(n) })
     return () => { cancelled = true }
   }, [success])
+
+  // Billing history (2026-06-12). Owners need a self-serve paper trail
+  // for GST/ITR filing — previously they had to dig through the
+  // saas_payment_receipt emails. Refetch on `success` so a fresh renewal
+  // shows up immediately without a page reload.
+  const [history, setHistory] = useState(null)
+  // Show top 5 by default; reveal the rest only on demand so long-tenured
+  // gyms (30+ renewals) don't get a wall of rows for what's usually a
+  // "did I pay last month?" lookup.
+  const HISTORY_PREVIEW = 5
+  const [showAllHistory, setShowAllHistory] = useState(false)
+  useEffect(() => {
+    if (!profile?.gym_id) return
+    let cancelled = false
+    fetchSubscriptionHistory(profile.gym_id)
+      .then(rows => { if (!cancelled) setHistory(rows) })
+      .catch(() => { if (!cancelled) setHistory([]) })
+    return () => { cancelled = true }
+  }, [profile?.gym_id, success])
   const founderSlotsLeft = founderSlotsUsed != null
     ? Math.max(0, FOUNDER_TOTAL_SLOTS - founderSlotsUsed)
     : null
@@ -566,6 +586,136 @@ export default function SubscriptionPage() {
           <RefreshCw size={10} /> Payments are processed securely via Razorpay. Your card data never touches our servers.
         </p>
       </div>
+
+      {/* Billing history — paid renewals shown newest first. Surfaces the
+          paper trail owners need for GST/ITR filing. Hides entirely until
+          there's at least one row so brand-new accounts don't see an empty
+          card next to their first checkout. */}
+      {history && history.length > 0 && (() => {
+        const visible = showAllHistory ? history : history.slice(0, HISTORY_PREVIEW)
+        const hasMore = history.length > HISTORY_PREVIEW
+        return (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Receipt size={15} className="text-indigo-600" />
+              <h2 className="text-sm font-semibold text-gray-900">Billing history</h2>
+            </div>
+            <span className="text-[11px] text-gray-400">
+              {history.length} payment{history.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          {/* Desktop / tablet table layout */}
+          <div className="hidden sm:block overflow-x-auto -mx-2">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                  <th className="text-left py-2 px-2 font-bold">Date</th>
+                  <th className="text-left py-2 px-2 font-bold">Plan</th>
+                  <th className="text-right py-2 px-2 font-bold">Amount</th>
+                  <th className="text-left py-2 px-2 font-bold">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map(row => {
+                  const isActive = row.status === 'active'
+                  const periodLabel = row.duration_days
+                    ? `${row.duration_days >= 365 ? Math.round(row.duration_days / 365) + 'yr' : Math.round(row.duration_days / 30) + 'mo'}`
+                    : null
+                  return (
+                    <tr key={row.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/40 transition-colors">
+                      <td className="py-3 px-2 text-gray-900 whitespace-nowrap">
+                        {fmtDate(row.paid_at || row.created_at)}
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-gray-800">{planDisplayName(row.plan_name)}</span>
+                          {periodLabel && (
+                            <span className="text-xs text-gray-400">· {periodLabel}</span>
+                          )}
+                          {row.is_founder_pricing && (
+                            <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                              Founder
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-right font-semibold text-gray-900 tabular-nums whitespace-nowrap">
+                        ₹{Number(row.amount || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="py-3 px-2">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                          isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {isActive ? <CheckCircle size={9} /> : <Clock size={9} />}
+                          {isActive ? 'Active' : 'Expired'}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile card layout */}
+          <div className="sm:hidden space-y-2.5">
+            {visible.map(row => {
+              const isActive = row.status === 'active'
+              const periodLabel = row.duration_days
+                ? `${row.duration_days >= 365 ? Math.round(row.duration_days / 365) + 'yr' : Math.round(row.duration_days / 30) + 'mo'}`
+                : null
+              return (
+                <div key={row.id} className="border border-gray-100 rounded-lg p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-400">{fmtDate(row.paid_at || row.created_at)}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-900">{planDisplayName(row.plan_name)}</p>
+                        {periodLabel && <span className="text-xs text-gray-400">· {periodLabel}</span>}
+                        {row.is_founder_pricing && (
+                          <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                            Founder
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm font-bold text-gray-900 tabular-nums shrink-0">
+                      ₹{Number(row.amount || 0).toLocaleString('en-IN')}
+                    </p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full self-start ${
+                    isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {isActive ? <CheckCircle size={9} /> : <Clock size={9} />}
+                    {isActive ? 'Active' : 'Expired'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Show all / Show fewer toggle — only rendered when there's
+              something hidden so short histories look identical to before. */}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setShowAllHistory(s => !s)}
+              className="w-full mt-3 py-2 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/40 rounded-lg transition-colors cursor-pointer"
+            >
+              {showAllHistory
+                ? `Show fewer`
+                : `Show all ${history.length} payments ↓`}
+            </button>
+          )}
+
+          <p className="text-[11px] text-gray-400 mt-3 flex items-center gap-1">
+            <Receipt size={10} /> A confirmation email is sent to your registered address on each successful payment.
+          </p>
+        </div>
+        )
+      })()}
 
       {/* FAQ */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
