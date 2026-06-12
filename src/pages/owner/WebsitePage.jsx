@@ -57,6 +57,7 @@ import LocationPicker from '../../components/LocationPicker'
 
 // CMS Components
 import FeatureGate from './cms/components/FeatureGate'
+import LegalPanel from './cms/components/LegalPanel'
 import ImageUploader from './cms/components/ImageUploader'
 import PreviewPanel from './cms/components/PreviewPanel'
 
@@ -164,6 +165,14 @@ const PAGES = [
       { id: 'cta_contact',       label: 'Call to Action', desc: 'Contact page bottom CTA' },
     ],
   },
+  {
+    id: 'legal_pages',
+    label: 'Legal Pages',
+    minPlan: 'Starter',
+    sections: [
+      { id: 'legal', label: 'Legal Pages', desc: 'Privacy, terms, refund & more' },
+    ],
+  },
 ]
 
 // Maps each section ID to its parent page ID
@@ -174,6 +183,7 @@ const SECTION_PAGE_MAP = {
   page_hero_pricing: 'pricing_page', pricing: 'pricing_page', faq: 'pricing_page', cta_pricing: 'pricing_page',
   page_hero_trainers: 'trainers_page', trainers: 'trainers_page', cta_trainers: 'trainers_page',
   page_hero_contact: 'contact_page', contact: 'contact_page', cta_contact: 'contact_page',
+  legal: 'legal_pages',
 }
 
 const PREVIEW_SECTIONS = new Set([
@@ -3143,6 +3153,7 @@ export default function WebsitePage() {
           {activeSection === 'page_hero_contact'  && <PageHeroForm pageKey="contact"  content={content} gymId={gymId} planName={planName} onSave={handleContentSave} setPreviewData={setPreviewData} />}
           {activeSection === 'contact'            && <ContactPanel gym={gym} gymId={gymId} onSave={setGym} />}
           {activeSection === 'cta_contact'        && <SingleCTAPanel fieldKey="cta_contact" pageLabel="Contact Page" content={content} gymId={gymId} onSave={handleContentSave} setPreviewData={setPreviewData} />}
+          {activeSection === 'legal'              && <LegalPanel gymId={gymId} gym={gym} />}
         </div>
 
         {/* Live preview panel — Pro+ only, sticky */}

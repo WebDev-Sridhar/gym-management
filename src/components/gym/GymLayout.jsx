@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, Link, Navigate, useLocation } from 'react-router-dom'
 import { GymProvider, useGym } from '../../store/GymContext'
 import GymNavbar from './GymNavbar'
@@ -7,6 +7,8 @@ import { getFullThemeCSSVars, getFontStack } from '../../lib/gymTheme'
 import { SocialIcon } from '../../lib/socialPlatforms.jsx'
 import { useDocumentHead } from '../../hooks/useDocumentHead'
 import { getPublicBasePath } from '../../lib/host'
+import { LEGAL_PAGES } from '../../lib/content/gym-legal'
+import { fetchPublicLegalRows } from '../../services/gymLegalService'
 
 // V3 CMS rebuild: Solo Coach (free plan) has a single-page site. Multi-
 // page paths that exist for paid plans (/about, /pricing, etc.) get
@@ -30,6 +32,21 @@ export default function GymLayout() {
 function GymLayoutInner() {
   const { gym, loading, error, isSoloCoach } = useGym()
   const location = useLocation()
+
+  // Which legal pages the owner has switched off (so the footer hides them).
+  // A page with no row, or a row with enabled=true, stays visible.
+  const [disabledLegal, setDisabledLegal] = useState(() => new Set())
+  useEffect(() => {
+    if (!gym?.id) return
+    let cancelled = false
+    fetchPublicLegalRows(gym.id)
+      .then(rows => {
+        if (cancelled) return
+        setDisabledLegal(new Set(rows.filter(r => r.enabled === false).map(r => r.page_key)))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [gym?.id])
 
   // Per-gym browser tab + social-share metadata. Auto-restores SaaS defaults
   // when the user navigates away from the gym public site.
@@ -227,13 +244,10 @@ function GymLayoutInner() {
             <div className="md:col-span-3">
               <h4 className="text-xs tracking-[0.2em] uppercase mb-5 font-sans font-bold" style={{ color: 'var(--gym-text-muted)' }}>Legal</h4>
               <ul className="space-y-3">
-                {[
-                  { to: `${base}/privacy`, label: 'Privacy Policy' },
-                  { to: `${base}/terms`, label: 'Terms & Conditions' },
-                  { to: `${base}/refund`, label: 'Refund & Cancellation' },
-                  { to: `${base}/membership`, label: 'Membership Agreement' },
-                  { to: `${base}/waiver`, label: 'Health & Liability Waiver' },
-                ].map(link => (
+                {LEGAL_PAGES
+                  .filter(p => !disabledLegal.has(p.key))
+                  .map(p => ({ to: `${base}/${p.path}`, label: p.label }))
+                  .map(link => (
                   <li key={link.to}>
                     <Link
                       to={link.to}

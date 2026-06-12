@@ -219,6 +219,7 @@ import {
   fetchCmsTestimonials, createCmsTestimonial, updateCmsTestimonial, deleteCmsTestimonial,
 } from '../../services/gymCmsService'
 import ImageUploader from './cms/components/ImageUploader'
+import LegalPanel from './cms/components/LegalPanel'
 import { SocialIcon, SOCIAL_PLATFORMS } from '../../lib/socialPlatforms.jsx'
 import LocationPicker from '../../components/LocationPicker'
 import HeroForm from './cms/sections/HeroForm'
@@ -1347,6 +1348,7 @@ const STARTER_SECTIONS = [
   { id: 'coaches',  label: 'Coach Profiles',   desc: 'Team & bios' },
   { id: 'gallery',  label: 'Gallery',          desc: 'Photo grid' },
   { id: 'contact',  label: 'Contact Info',     desc: 'Phone, email & address' },
+  { id: 'legal',    label: 'Legal Pages',      desc: 'Privacy, terms & more' },
 ]
 
 // V3 CMS rebuild: Solo Coach single-page variant. Subset focused on what
@@ -1362,6 +1364,7 @@ const SOLO_SECTIONS = [
   { id: 'plans',    label: 'Plans & Pricing', desc: 'Membership plans' },
   { id: 'reviews',  label: 'Reviews',        desc: 'Member feedback' },
   { id: 'contact',  label: 'Contact Info',   desc: 'Phone, email & address' },
+  { id: 'legal',    label: 'Legal Pages',    desc: 'Privacy, terms & more' },
 ]
 
 // Kept for backwards compat — older references to SECTIONS still resolve
@@ -1558,6 +1561,9 @@ export default function StarterWebsitePage({ variant = 'starter' } = {}) {
           )}
           {activeSection === 'contact' && (
             <ContactPanel gym={gym} gymId={gymId} onSave={setGym} />
+          )}
+          {activeSection === 'legal' && (
+            <LegalPanel gymId={gymId} gym={gym} />
           )}
         </div>
       </div>
