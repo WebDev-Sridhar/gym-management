@@ -6,6 +6,7 @@ import {
   Dumbbell, Flame, MapPin, Check, CreditCard,
   Zap, Salad, ChevronRight, Lightbulb, Droplets,
   AlertCircle, ClipboardList, CheckCircle2, Loader2, X,
+  Moon, Heart, Activity, Brain, Wind, Timer,
 } from 'lucide-react'
 import { useAuth } from '../../store/AuthContext'
 import { selfCheckIn } from '../../services/memberService'
@@ -31,6 +32,36 @@ function greeting() {
   if (h < 12) return 'Good morning'
   if (h < 17) return 'Good afternoon'
   return 'Good evening'
+}
+
+// Daily-rotating "Today's Tip" pool. Index is computed from day-of-year so
+// the same member sees the same tip all day (no jitter mid-session) but a
+// different one tomorrow. Modular wrap means we never run out — array can
+// grow without code changes. Colors track tip subject for at-a-glance variety.
+const TIPS = [
+  { Icon: Droplets,     color: '#60a5fa', text: 'Stay hydrated — drink at least 3–4L of water on training days. Recovery starts with hydration.' },
+  { Icon: Moon,         color: '#a78bfa', text: 'Sleep is when muscle actually grows. Aim for 7–8 hours; bad sleep wipes out a great workout.' },
+  { Icon: Salad,        color: '#34d399', text: 'Eat 1.6–2.2g of protein per kg of bodyweight on training days. Spread it across 3–4 meals.' },
+  { Icon: Activity,     color: '#fbbf24', text: 'Warm up for 5–10 minutes before lifting. Cold muscles tear; warm ones move better and lift heavier.' },
+  { Icon: Dumbbell,     color: '#818cf8', text: 'Form beats weight, every time. A clean rep with lighter weight builds more than an ugly rep with heavy weight.' },
+  { Icon: CheckCircle2, color: '#34d399', text: 'Consistency > intensity. Three 45-minute sessions a week beat one brutal 2-hour session.' },
+  { Icon: Wind,         color: '#60a5fa', text: 'Breathe through your lifts — exhale on the push, inhale on the lower. Held breath kills power and spikes BP.' },
+  { Icon: Heart,        color: '#fb7185', text: 'Add 20–30 min of zone-2 cardio twice a week. Builds the engine your strength training rides on.' },
+  { Icon: Timer,        color: '#a78bfa', text: 'Rest 60–90s between sets for hypertrophy, 2–3 min for strength. Phone-scrolling time = quality reps lost.' },
+  { Icon: Flame,        color: '#fb7185', text: 'Progressive overload is non-negotiable. Add 0.5–1 kg or one rep every week — small steps, big gains.' },
+  { Icon: Brain,        color: '#a78bfa', text: 'Mind–muscle connection: focus on the muscle working, not just moving the weight. Better growth, same time.' },
+  { Icon: Zap,          color: '#fbbf24', text: "Don't skip rest days. Recovery is when you actually adapt — training without rest is just digging a hole." },
+  { Icon: Salad,        color: '#34d399', text: 'Whole foods first. A grilled chicken meal beats a protein bar nine times out of ten — chew your protein.' },
+  { Icon: Dumbbell,     color: '#818cf8', text: 'Track your lifts. What gets measured gets improved — even a notes app beats memory.' },
+]
+
+function todaysTipIndex() {
+  // Days since 2026-01-01 (arbitrary epoch). Modulo wraps cleanly so the
+  // tip cycle restarts as the array grows. Double-modulo handles dates
+  // before the epoch (negative result) — pure defence, never trips today.
+  const start = new Date(2026, 0, 1).getTime()
+  const days  = Math.floor((Date.now() - start) / 86400000)
+  return ((days % TIPS.length) + TIPS.length) % TIPS.length
 }
 
 // Month calendar — replaces the old 35-day dot heatmap. Dot grid had no
@@ -670,19 +701,25 @@ export default function MemberApp() {
           </motion.div>
         )}
 
-        {/* Tips */}
-        <motion.div {...fadeUp(0.3)} style={{ borderRadius: '20px', background: 'linear-gradient(145deg,rgba(99,102,241,0.06),rgba(139,92,246,0.06))', border: '1px solid rgba(99,102,241,0.12)', padding: '16px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '8px' }}>
-            <Lightbulb size={14} color="rgba(255,255,255,0.4)" strokeWidth={2} />
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Today's Tip</p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-            <Droplets size={16} color="#60a5fa" strokeWidth={2} style={{ flexShrink: 0, marginTop: '2px' }} />
-            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '13px', lineHeight: 1.6 }}>
-              Stay hydrated — drink at least 3–4L of water on training days. Recovery starts with hydration.
-            </p>
-          </div>
-        </motion.div>
+        {/* Tips — rotates daily from the TIPS pool (see todaysTipIndex). */}
+        {(() => {
+          const tip = TIPS[todaysTipIndex()]
+          const TipIcon = tip.Icon
+          return (
+            <motion.div {...fadeUp(0.3)} style={{ borderRadius: '20px', background: 'linear-gradient(145deg,rgba(99,102,241,0.06),rgba(139,92,246,0.06))', border: '1px solid rgba(99,102,241,0.12)', padding: '16px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '8px' }}>
+                <Lightbulb size={14} color="rgba(255,255,255,0.4)" strokeWidth={2} />
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Today's Tip</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <TipIcon size={16} color={tip.color} strokeWidth={2} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '13px', lineHeight: 1.6 }}>
+                  {tip.text}
+                </p>
+              </div>
+            </motion.div>
+          )
+        })()}
 
         <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
       </div>

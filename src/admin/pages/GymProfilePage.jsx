@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Ban, CheckCircle2, Users, Dumbbell, Building, Globe, CreditCard,
-  MessageSquare, ScrollText, Gauge, Mail, Phone, ExternalLink,
+  MessageSquare, ScrollText, Gauge, Mail, Phone, ExternalLink, Copy, Check,
 } from 'lucide-react'
 import Card, { SectionTitle } from '../components/ui/Card'
 import Sk from '../components/ui/Sk'
@@ -40,6 +40,17 @@ export default function GymProfilePage() {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [actionErr, setActionErr] = useState('')
+
+  // Gym ID copy affordance — admins use the UUID for DB lookups, cron-log
+  // grep, and Razorpay dashboard cross-ref. UUID is too long to show inline
+  // so we display the first 8 chars + "…" and copy the full value on click.
+  const [idCopied, setIdCopied] = useState(false)
+  function copyGymId() {
+    if (!gymId) return
+    navigator.clipboard?.writeText(gymId)
+    setIdCopied(true)
+    setTimeout(() => setIdCopied(false), 1500)
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -115,6 +126,22 @@ export default function GymProfilePage() {
                 {currentSub?.is_founder_pricing && <span style={{ color: 'var(--a-accent-text)' }}>Founder</span>}
                 {owner?.email && <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{owner.email}</span>}
                 {owner?.phone && <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{owner.phone}</span>}
+                {/* Gym UUID — click to copy full value */}
+                <button
+                  type="button"
+                  onClick={copyGymId}
+                  title={idCopied ? 'Copied!' : `Copy gym ID (${gymId})`}
+                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] transition-colors cursor-pointer"
+                  style={{
+                    background: idCopied ? 'rgba(52,211,153,0.12)' : 'var(--a-surface-2)',
+                    color: idCopied ? '#34d399' : 'var(--a-text-dim)',
+                  }}
+                >
+                  <span>ID: {gymId.slice(0, 8)}…</span>
+                  {idCopied
+                    ? <Check className="h-3 w-3" />
+                    : <Copy className="h-3 w-3" />}
+                </button>
               </div>
             </div>
           </div>
