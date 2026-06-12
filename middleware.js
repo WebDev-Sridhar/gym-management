@@ -130,27 +130,37 @@ async function fetchGymBy(column, value) {
   }
 }
 
-// Lookup helper for payment-link OG injection. Joins the minimum we need to
-// build a "Complete your payment — {Gym}" preview when the /pay/{token}
-// URL is shared on WhatsApp / Slack / LinkedIn / Telegram. The token-keyed
-// payments row is publicly addressable by design (the whole point of the
-// /pay/{token} page is anonymous access) so RLS-via-anon-key is safe here.
+// Lookup helper for payment-link OG injection. Calls a SECURITY DEFINER RPC
+// (get_payment_preview_by_token) instead of REST-on-payments because the
+// payments table has no anon SELECT policy — owner/member/admin only. The
+// RPC is the smallest safe public surface: it accepts the token as an
+// argument (unforgeable) and returns only the preview fields (gym name,
+// logo, theme + amount/status/plan/member) — never full row data. So
+// link previews work for WhatsApp/Slack/LinkedIn while bulk enumeration
+// stays impossible.
+//
+// Previous REST query silently returned [] (RLS-blocked) so previews fell
+// back to the default Gymmobius OG — fixed 2026-06-12.
 async function fetchPaymentByToken(token) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null
   if (!token || token.length < 16) return null
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/payments?pay_token=eq.${encodeURIComponent(token)}&select=amount,status,due_date,member:members(name),plan:plans(name,duration_days),gym:gyms(name,logo_url,theme_color)&limit=1`,
+      `${SUPABASE_URL}/rest/v1/rpc/get_payment_preview_by_token`,
       {
+        method: 'POST',
         headers: {
           apikey: SUPABASE_KEY,
           authorization: `Bearer ${SUPABASE_KEY}`,
+          'content-type': 'application/json',
         },
+        body: JSON.stringify({ p_token: token }),
       },
     )
     if (!res.ok) return null
-    const rows = await res.json()
-    return rows[0] || null
+    // RPC returns the jsonb directly (or null if no row matched)
+    const body = await res.json()
+    return body || null
   } catch {
     return null
   }
@@ -163,6 +173,44 @@ function formatINR(amount) {
   const n = Number(amount)
   if (!Number.isFinite(n)) return ''
   return n.toLocaleString('en-IN')
+}
+
+// Build the OG meta block for /checkin?gymId=… links. WhatsApp/Slack
+// previews used to render the Gymmobius default copy because /checkin is a
+// reserved path and middleware passed it through. We now look up the gym
+// by id (anon-readable gyms row) and emit a gym-branded preview so members
+// who see the link in chat recognise their gym instantly.
+//
+// Failure modes (missing/unknown gymId, supabase down) fall through to the
+// SPA which already shows a friendly "Invalid QR Code" screen — never error.
+function buildCheckinMetaBlock(gym, requestUrl) {
+  const origin    = new URL(requestUrl).origin
+  const gymName   = gym.name || 'your gym'
+  const cityPart  = gym.city ? ` in ${gym.city}` : ''
+  const title     = `Check in at ${gymName}`
+  const description = `Tap to record your visit at ${gymName}${cityPart}. Quick QR check-in for members.`
+  const image      = gym.logo_url || `${origin}/logo.png`
+  const themeColor = gym.theme_color || '#8B5CF6'
+
+  return [
+    `<title>${escapeHtml(title)}</title>`,
+    `<meta name="description" content="${escapeHtml(description)}" />`,
+
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:title" content="${escapeHtml(title)}" />`,
+    `<meta property="og:description" content="${escapeHtml(description)}" />`,
+    `<meta property="og:image" content="${escapeHtml(image)}" />`,
+    `<meta property="og:url" content="${escapeHtml(requestUrl)}" />`,
+    `<meta property="og:site_name" content="${escapeHtml(gymName)}" />`,
+
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+    `<meta name="twitter:image" content="${escapeHtml(image)}" />`,
+
+    `<meta name="theme-color" content="${escapeHtml(themeColor)}" />`,
+    gym.logo_url ? `<link rel="icon" type="image/png" href="${escapeHtml(gym.logo_url)}" />` : '',
+  ].filter(Boolean).join('\n    ')
 }
 
 function buildPaymentMetaBlock(payment, requestUrl) {
@@ -347,6 +395,26 @@ export default async function middleware(request) {
 
     const html = await rewriteIndexHtml(origin, gym, request.url)
     return html ? htmlResponse(html) : undefined
+  }
+
+  // ── PATH A-checkin: /checkin?gymId={uuid} — check-in QR OG injection ──
+  // Owner shares the QR / link via WhatsApp; members previously saw the
+  // generic Gymmobius preview because /checkin is a reserved path that
+  // falls through to the SPA's static shell. We now look up the gym by id
+  // (anon-readable) and inject "Check in at {Gym}" branding so the link in
+  // chat is instantly recognisable. Fixed 2026-06-12.
+  if (path === '/checkin') {
+    const gymId = url.searchParams.get('gymId')
+    // Loose UUID shape check — keeps us from hitting Supabase on garbage.
+    if (gymId && /^[0-9a-f-]{32,40}$/i.test(gymId)) {
+      const gym = await fetchGymBy('id', gymId)
+      if (gym) {
+        const block = buildCheckinMetaBlock(gym, request.url)
+        const html  = await rewriteIndexHtmlWithBlock(origin, block)
+        if (html) return htmlResponse(html)
+      }
+    }
+    return  // unknown gymId / fetch failed → SPA handles invalid-QR screen
   }
 
   // ── PATH A0: /pay/{token} — payment-link OG injection ──────────────
