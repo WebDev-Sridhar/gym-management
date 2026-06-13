@@ -67,6 +67,29 @@ export async function fetchNotifications(gymId, { type = null, status = null, li
   return data || []
 }
 
+// Member-scoped notification history surfaced in MemberDrawer InfoTab.
+// 30-day window matches what owners reasonably want to scan ("did we
+// remind Rajesh about his last payment?"); older context belongs in the
+// gym-wide activity log via fetchNotifications.
+//
+// Excludes 'skipped' rows by default — they're audit-only, not
+// member-facing actions. SaaS receipts are excluded for the same reason
+// as fetchNotifications (they're for the owner, not the member).
+export async function fetchMemberNotifications(memberId, { days = 30, limit = 50 } = {}) {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString()
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, type, channels, status, metadata, channel_results, created_at, sent_at')
+    .eq('member_id', memberId)
+    .not('type', 'in', `(${SAAS_NOTIFICATION_TYPES.join(',')})`)
+    .neq('status', 'skipped')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
+}
+
 // ─── Test send ────────────────────────────────────────────────────────────
 
 export async function sendTestNotification(channel) {

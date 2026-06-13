@@ -6,6 +6,8 @@ import {
   X, Pencil, Trash2, Phone, Mail, Calendar, Clock,
   Dumbbell, Utensils, CreditCard, User, Plus, Archive,
   TriangleAlert, Link2, Check, Activity, BellOff, Bell,
+  MessageCircle, ChevronDown, ChevronUp, Inbox,
+  CheckCircle2, AlertCircle, MinusCircle,
 } from 'lucide-react'
 import { calculateBMI } from '../../lib/calculators'
 import {
@@ -23,6 +25,7 @@ import { supabaseData as supabase } from '../../services/supabaseClient'
 import { markPaymentPaid, recordManualPayment, deletePayment, canDeletePayment } from '../../services/paymentService'
 import { sendPaymentReminder, fetchLastReminders } from '../../services/reminderService'
 import { fetchWhatsappQuota } from '../../services/whatsappQuotaService'
+import { fetchMemberNotifications } from '../../services/notificationService'
 import { useAuth } from '../../store/AuthContext'
 import UpgradeRequiredModal from './UpgradeRequiredModal'
 import CustomSelect from './CustomSelect'
@@ -100,6 +103,27 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
   const [savingTrainer, setSavingTrainer]     = useState(false)
   const [togglingOptOut, setTogglingOptOut]   = useState(false)
 
+  // Notification history — lazy on expand. Drawer can open + close many
+  // times in a single owner session; deferring the fetch until the owner
+  // actually wants to see history avoids N pointless round-trips. Cleared
+  // when the drawer re-opens for a different member via the member.id
+  // dependency on toggleHistory's first call.
+  const [historyOpen, setHistoryOpen]       = useState(false)
+  const [history, setHistory]               = useState(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  async function toggleHistory() {
+    const willOpen = !historyOpen
+    setHistoryOpen(willOpen)
+    if (willOpen && history === null) {
+      setHistoryLoading(true)
+      try {
+        const rows = await fetchMemberNotifications(member.id)
+        setHistory(rows)
+      } catch { setHistory([]) }
+      finally { setHistoryLoading(false) }
+    }
+  }
+
   async function handleToggleOptOut() {
     // Two paths:
     //   - currently subscribed → confirm before muting (rare; owner should
@@ -146,7 +170,39 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
     <div className="divide-y divide-gray-100">
       <div className="px-5 py-5 space-y-4">
         <SectionLabel>Contact</SectionLabel>
-       <Row Icon={Phone} label="Phone" value={member.phone || '—'} />
+        {/* Phone row with inline quick-action icons. Tapping Call opens the
+            native dialer; WhatsApp opens wa.me/<digits> which handles app
+            vs. web automatically. Strip non-digits because saved formats
+            vary ("+91 98765 43210" / "9876543210" / etc.) and wa.me wants
+            digits only. We DON'T force-prepend 91 — that's brittle for
+            non-Indian numbers; the saved value is the source of truth. */}
+        <div className="flex items-start gap-3">
+          <Phone size={14} className="text-gray-400 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-gray-400 mb-0.5">Phone</p>
+            <p className="text-sm font-medium text-gray-900">{member.phone || '—'}</p>
+          </div>
+          {member.phone && (
+            <div className="flex items-center gap-1 shrink-0">
+              <a
+                href={`tel:${member.phone.replace(/\s/g, '')}`}
+                title="Call"
+                className="w-8 h-8 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <Phone size={14} />
+              </a>
+              <a
+                href={`https://wa.me/${member.phone.replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open WhatsApp"
+                className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <MessageCircle size={14} />
+              </a>
+            </div>
+          )}
+        </div>
         <Row Icon={Mail}  label="Email" value={member.email || '—'} />
       </div>
 
@@ -390,8 +446,113 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
           </div>
         </div>
       </div>
+
+      {/* Notification history (last 30 days) — collapsible at the bottom
+          of the Info tab. Shows per-channel outcomes so the owner can see
+          "did Rajesh get the 3-day-out reminder? Did WhatsApp succeed?"
+          without leaving the drawer. Lazy on expand. */}
+      <div className="px-5 py-5">
+        {/* Use a plain span (not the shared SectionLabel) inside this flex
+            row — SectionLabel carries mb-3 which throws off items-center
+            alignment because flexbox aligns margin boxes, not content boxes.
+            leading-none on the text removes the line-height padding so the
+            icon and the all-caps label sit on the exact same baseline. */}
+        <button
+          type="button"
+          onClick={toggleHistory}
+          className="w-full flex items-center gap-2 text-left cursor-pointer mb-3"
+        >
+          <Inbox size={14} className="text-gray-400 shrink-0" />
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
+            Notification history
+            {history && history.length > 0 && (
+              <span className="ml-2 font-medium normal-case tracking-normal">
+                {history.length} in last 30 days
+              </span>
+            )}
+          </span>
+          <div className="ml-auto shrink-0">
+            {historyOpen
+              ? <ChevronUp size={14} className="text-gray-400" />
+              : <ChevronDown size={14} className="text-gray-400" />}
+          </div>
+        </button>
+
+        {historyOpen && (
+          <div className="mt-3 space-y-1.5">
+            {historyLoading ? (
+              <p className="text-xs text-gray-400 text-center py-4">Loading…</p>
+            ) : !history || history.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">
+                No messages sent in the last 30 days.
+              </p>
+            ) : history.map(n => <NotifHistoryRow key={n.id} notif={n} />)}
+          </div>
+        )}
+      </div>
     </div>
   )
+}
+
+// Tight per-row renderer for the notification history dropdown. Each row
+// shows the type label, when, plus a status pill per attempted channel so
+// the owner can see at-a-glance which channels reached the member.
+function NotifHistoryRow({ notif }) {
+  const wa    = notif.channel_results?.whatsapp
+  const email = notif.channel_results?.email
+  const type  = NOTIF_TYPE_LABEL[notif.type] || notif.type
+  return (
+    <div className="border border-gray-100 rounded-lg px-3 py-2 hover:bg-gray-50/50 transition-colors">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-gray-800 truncate">{type}</p>
+        <p className="text-[10px] text-gray-400 shrink-0">
+          {fmtRelative(notif.sent_at || notif.created_at)}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 mt-1.5">
+        {wa && <ChannelPill channel="WhatsApp" status={wa.status} error={wa.error} />}
+        {email && <ChannelPill channel="Email" status={email.status} error={email.error} />}
+        {!wa && !email && (
+          <span className="text-[10px] text-gray-400">No channel result recorded</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ChannelPill({ channel, status, error }) {
+  // Channel status semantics from the engine:
+  //   'sent'    — successful delivery to the provider
+  //   'failed'  — provider rejected the send
+  //   'skipped' — channel was disabled at engine time (shouldn't show here
+  //               since we filter status='skipped' at the row level, but
+  //               defensive)
+  const cfg = status === 'sent'
+    ? { bg: 'bg-green-50', text: 'text-green-700', Icon: CheckCircle2, label: 'sent' }
+    : status === 'failed'
+      ? { bg: 'bg-red-50', text: 'text-red-700', Icon: AlertCircle, label: 'failed' }
+      : { bg: 'bg-gray-100', text: 'text-gray-500', Icon: MinusCircle, label: status || 'unknown' }
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.text}`}
+      title={error || `${channel} ${cfg.label}`}
+    >
+      <cfg.Icon size={9} />
+      {channel}
+    </span>
+  )
+}
+
+// Notification type → human label. Keep in sync with Communication page's
+// TYPE_LABEL — kept inline here so the drawer doesn't import from the page.
+const NOTIF_TYPE_LABEL = {
+  payment_reminder:     'Payment reminder',
+  payment_confirmation: 'Payment receipt',
+  expiry_alert:         'Membership expiry alert',
+  welcome:              'Welcome message',
+  member_invite:        'Member invite',
+  weekly_summary:       'Weekly summary',
+  ghost_reminder:       'Inactivity nudge',
 }
 
 // ─── Plans Tab ────────────────────────────────────────────────────────────────

@@ -84,12 +84,12 @@ function SidebarLink({ to, label, Icon, end, badge }) {
         <span
           aria-label={`${badge} pending`}
           style={{
-            background: '#ef4444',
+            background: '#6366f1',
             color: '#fff',
             fontSize: 10,
             fontWeight: 700,
             padding: '1px 7px',
-            borderRadius: 999,
+            borderRadius: 5,
             lineHeight: 1.4,
             minWidth: 18,
             textAlign: 'center',
