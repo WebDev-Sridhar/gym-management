@@ -5,13 +5,14 @@ import { useDialog } from './Dialog'
 import {
   X, Pencil, Trash2, Phone, Mail, Calendar, Clock,
   Dumbbell, Utensils, CreditCard, User, Plus, Archive,
-  TriangleAlert, Link2, Check, Activity,
+  TriangleAlert, Link2, Check, Activity, BellOff, Bell,
 } from 'lucide-react'
 import { calculateBMI } from '../../lib/calculators'
 import {
   updateMember, deleteMember,
   assignPlan as assignMembershipPlan,
   computeDefaultExpiry,
+  setMemberUnsubscribed,
 } from '../../services/membershipService'
 import {
   fetchWorkoutTemplates, fetchDietTemplates,
@@ -93,9 +94,35 @@ function TabBar({ tabs, active, onChange }) {
 // ─── Info Tab ─────────────────────────────────────────────────────────────────
 
 function InfoTab({ member, trainers, onMemberUpdate }) {
+  const dialog = useDialog()
   const [changingTrainer, setChangingTrainer] = useState(false)
   const [selTrainer, setSelTrainer]           = useState(member.trainer_id || '')
   const [savingTrainer, setSavingTrainer]     = useState(false)
+  const [togglingOptOut, setTogglingOptOut]   = useState(false)
+
+  async function handleToggleOptOut() {
+    // Two paths:
+    //   - currently subscribed → confirm before muting (rare; owner should
+    //     only do this if the member explicitly asked or sent STOP)
+    //   - currently unsubscribed → restore. Show the "ask the member to
+    //     text START" caveat so the owner knows BSP-side state may still
+    //     need a fresh opt-in from the member's WhatsApp.
+    const next = !member.unsubscribed
+    const prompt = next
+      ? `Block all WhatsApp + email messages to ${member.name || 'this member'}? They will not receive payment reminders, expiry alerts, or payment receipts until you unblock.`
+      : `Resume messaging ${member.name || 'this member'}? Note: if they previously sent STOP on WhatsApp, our messages will still be blocked by the carrier until they text START to re-opt-in.`
+    const ok = await dialog.confirm(prompt, next ? 'Block messages?' : 'Resubscribe?')
+    if (!ok) return
+    setTogglingOptOut(true)
+    try {
+      const row = await setMemberUnsubscribed(member.id, next)
+      onMemberUpdate({ ...member, ...row })
+    } catch (err) {
+      dialog.alert(err.message || 'Failed to update preference')
+    } finally {
+      setTogglingOptOut(false)
+    }
+  }
 
   const today    = new Date().toISOString().split('T')[0]
   const daysLeft = member.expiry_date
@@ -122,6 +149,8 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
        <Row Icon={Phone} label="Phone" value={member.phone || '—'} />
         <Row Icon={Mail}  label="Email" value={member.email || '—'} />
       </div>
+
+      
 
       <div className="px-5 py-5 space-y-4">
         <SectionLabel>Membership</SectionLabel>
@@ -312,6 +341,55 @@ function InfoTab({ member, trainers, onMemberUpdate }) {
           </div>
         )
       })()}
+      {/* Messaging preferences — block/resubscribe toggle. Honored by the
+          notification engine: when unsubscribed=true, all dispatches log
+          as 'skipped' with suppressed_reason='member_unsubscribed'. */}
+      <div className="px-5 py-5 space-y-3">
+        <SectionLabel>Messaging</SectionLabel>
+        <div className="flex items-start gap-3">
+          {member.unsubscribed
+            ? <BellOff size={14} className="text-amber-500 mt-0.5 shrink-0" />
+            : <Bell size={14} className="text-green-500 mt-0.5 shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-medium text-gray-900">
+                {member.unsubscribed ? 'Opted out' : 'Receiving messages'}
+              </p>
+              {member.unsubscribed && (
+                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                  Blocked
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
+              {member.unsubscribed
+                ? 'No automated WhatsApp or email is sent to this member. Resubscribe when they ask to receive messages again.'
+                : 'Receives payment reminders, expiry alerts, and payment receipts on enabled channels.'}
+            </p>
+            {!member.unsubscribed && (
+              <p className="text-[10px] text-gray-400 mt-1 leading-relaxed italic">
+                Tip: if you see WhatsApp repeatedly failing for this member in Announcements → Recent activity, they may have replied STOP. Use Block messages below to stop sending messages.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleToggleOptOut}
+              disabled={togglingOptOut}
+              className={`mt-2 text-xs font-semibold cursor-pointer disabled:opacity-50 ${
+                member.unsubscribed
+                  ? 'text-indigo-600 hover:text-indigo-700'
+                  : 'text-red-500 hover:text-red-600'
+              }`}
+            >
+              {togglingOptOut
+                ? 'Updating…'
+                : member.unsubscribed
+                  ? 'Resubscribe →'
+                  : 'Block messages'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

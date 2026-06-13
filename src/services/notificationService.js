@@ -51,7 +51,7 @@ const SAAS_NOTIFICATION_TYPES = ['saas_payment_receipt', 'saas_expiry_alert']
 export async function fetchNotifications(gymId, { type = null, status = null, limit = 50, branchId = null, excludeStatus = null } = {}) {
   let q = supabase
     .from('notifications')
-    .select('id, type, channels, status, metadata, channel_results, triggered_by, created_at, sent_at, member:members(id, name, phone, email)')
+    .select('id, type, channels, status, metadata, channel_results, triggered_by, created_at, sent_at, member:members(id, name, phone, email, unsubscribed)')
     .eq('gym_id', gymId)
     .not('type', 'in', `(${SAAS_NOTIFICATION_TYPES.join(',')})`)
     .order('created_at', { ascending: false })

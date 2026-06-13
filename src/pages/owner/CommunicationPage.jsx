@@ -1,14 +1,16 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../store/AuthContext'
 import { useBranch } from '../../store/BranchContext'
 import {
   fetchGymCommSettings, updateGymCommSettings,
   fetchNotifications, sendTestNotification,
 } from '../../services/notificationService'
+import { setMemberUnsubscribed } from '../../services/membershipService'
 import { useDialog } from '../../components/ui/Dialog'
 import Pagination from '../../components/ui/Pagination'
 import { Sk } from '../../components/ui/Skeleton'
 import CustomSelect from '../../components/ui/CustomSelect'
+import { BellOff, TriangleAlert } from 'lucide-react'
 
 function CommunicationSkeleton() {
   return (
@@ -155,6 +157,71 @@ export default function CommunicationPage() {
   const notifTotalPages = Math.max(1, Math.ceil(notifs.length / PAGE_SIZE))
   const safeNotifPage = Math.min(notifPage, notifTotalPages)
   const pagedNotifs = notifs.slice((safeNotifPage - 1) * PAGE_SIZE, safeNotifPage * PAGE_SIZE)
+
+  // Failure-spike detection. On Starter-tier Interakt we don't get inbound
+  // STOP webhooks, so a member who replied STOP just starts generating
+  // silent WhatsApp failures here.
+  //
+  // CRUCIAL: the engine sends WhatsApp + email in parallel and merges the
+  // results. When WhatsApp fails but email succeeds, the row's TOP-LEVEL
+  // status is 'partial', not 'failed' — so filtering by n.status='failed'
+  // would miss ~all real STOP scenarios (every gym has email as fallback).
+  // The actual signal lives at channel_results.whatsapp.status='failed'
+  // regardless of the top-level row outcome. Verified against real DB rows
+  // 2026-06-12.
+  //
+  // Excludes members already flagged unsubscribed=true (they fall off the
+  // list once blocked). Excludes notifs without a member (owner/system).
+  const [blockingMemberId, setBlockingMemberId] = useState(null)
+  const failureSpikes = useMemo(() => {
+    const cutoff = Date.now() - 7 * 86_400_000
+    const byMember = new Map()
+    for (const n of notifs) {
+      const wa = n.channel_results?.whatsapp
+      if (!wa || wa.status !== 'failed') continue
+      if (!n.member || n.member.unsubscribed) continue
+      const t = new Date(n.sent_at || n.created_at).getTime()
+      if (!Number.isFinite(t) || t < cutoff) continue
+      const cur = byMember.get(n.member.id)
+        || { member: n.member, count: 0, latest: 0, latestError: null }
+      cur.count += 1
+      if (t > cur.latest) {
+        cur.latest = t
+        // Surface the most recent error so the owner can see WHY it's
+        // failing — auth issues look very different from "user opted out".
+        cur.latestError = wa.error || null
+      }
+      byMember.set(n.member.id, cur)
+    }
+    return Array.from(byMember.values())
+      .filter(x => x.count >= 3)
+      .sort((a, b) => b.count - a.count)
+  }, [notifs])
+
+  async function handleBlockMember(member, failureCount) {
+    const ok = await dialog.confirm(
+      `Block all WhatsApp + email messages to ${member.name}? ` +
+      `${failureCount} WhatsApp send${failureCount === 1 ? '' : 's'} failed in the last 7 days, ` +
+      `which usually means they replied STOP. Blocking will stop the cron from retrying.`,
+      'Block messages?',
+    )
+    if (!ok) return
+    setBlockingMemberId(member.id)
+    try {
+      await setMemberUnsubscribed(member.id, true)
+      // Mark the member as unsubscribed in local state so they fall off the
+      // spike list immediately, without a full refetch of the activity log.
+      setNotifs(prev => prev.map(n =>
+        n.member?.id === member.id
+          ? { ...n, member: { ...n.member, unsubscribed: true } }
+          : n
+      ))
+    } catch (err) {
+      dialog.alert(err.message || 'Failed to block messages')
+    } finally {
+      setBlockingMemberId(null)
+    }
+  }
 
   async function refreshNotifs() {
     try {
@@ -326,6 +393,58 @@ export default function CommunicationPage() {
       </div>
 
       {/* ── Activity log ── */}
+      {/* Failure-spike hint. On Starter-tier Interakt we can't auto-detect
+          inbound STOP messages, so this surfaces members whose WhatsApp
+          sends are repeatedly failing — the strongest signal we have that
+          they've opted out at the carrier. One-click Block from here flips
+          unsubscribed=true so the cron stops retrying. Card hides entirely
+          when there are no spikes — zero footprint when nothing's wrong. */}
+      {failureSpikes.length > 0 && (
+        <div className="bg-amber-50 rounded-xl border border-amber-200 p-5 space-y-3">
+          <div className="flex items-start gap-2.5">
+            <TriangleAlert size={18} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-amber-900">
+                {failureSpikes.length} member{failureSpikes.length === 1 ? '' : 's'} may have opted out
+              </h3>
+              <p className="text-xs text-amber-800/80 mt-0.5 leading-relaxed">
+                WhatsApp sends to these members keep failing — often because they replied STOP and the carrier blocked us. Blocking here stops the cron from retrying and clears the noise from your activity log.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            {failureSpikes.map(({ member, count, latest, latestError }) => (
+              <div key={member.id} className="flex items-center gap-3 bg-white border border-amber-100 rounded-lg px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{member.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {count} WhatsApp failure{count === 1 ? '' : 's'} · last {formatRelative(new Date(latest).toISOString())}
+                    {member.phone && <> · <span className="text-gray-400">{member.phone}</span></>}
+                  </p>
+                  {latestError && (
+                    <p className="text-[10px] text-amber-700 mt-0.5 font-mono truncate" title={latestError}>
+                      {latestError}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleBlockMember(member, count)}
+                  disabled={blockingMemberId === member.id}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                  title="Stop trying to send messages to this member"
+                >
+                  <BellOff size={12} />
+                  {blockingMemberId === member.id ? 'Blocking…' : 'Block'}
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-amber-800/70 leading-relaxed">
+            To resubscribe a member later, open their profile → Messaging → Resubscribe.
+          </p>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="p-6 pb-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
           <div>

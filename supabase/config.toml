@@ -37,6 +37,13 @@ verify_jwt = false
 [functions.razorpay-webhook]
 verify_jwt = false
 
+# Inbound WhatsApp webhook from Interakt (STOP / opt-out capture).
+# Signature is HMAC-SHA256 of the raw body against INTERAKT_WEBHOOK_SECRET.
+# Function self-disables (401 to everything) until that secret is set —
+# safe to deploy dormant.
+[functions.interakt-webhook]
+verify_jwt = false
+
 
 # ─── Public-facing endpoints ─────────────────────────────────────────────────
 # Called from each gym's public website / payment links without an

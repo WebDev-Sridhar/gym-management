@@ -532,6 +532,25 @@ export async function updateMember({ memberId, name, phone, email }) {
   return data
 }
 
+// Suppression flag for outbound notifications. When TRUE, the notification
+// engine (supabase/functions/_shared/notifications.ts) short-circuits any
+// dispatch to this member, logging the attempt as 'skipped' with
+// metadata.suppressed_reason='member_unsubscribed'. Owner-flipped today;
+// in P2 the Interakt webhook will auto-flip on inbound STOP messages.
+//
+// Returns the updated row so the drawer can rebind local state without a
+// separate refetch.
+export async function setMemberUnsubscribed(memberId, value) {
+  const { data, error } = await supabase
+    .from('members')
+    .update({ unsubscribed: !!value })
+    .eq('id', memberId)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function deleteMember(memberId) {
   // Calls a SECURITY DEFINER RPC that atomically:
   //   1. Soft-deletes the members row

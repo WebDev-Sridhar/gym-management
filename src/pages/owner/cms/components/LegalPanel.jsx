@@ -28,7 +28,12 @@ function Toggle({ on, onChange }) {
       onClick={onChange}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer shrink-0 ${on ? 'bg-indigo-600' : 'bg-gray-300'}`}
     >
-      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
+      {/* Inline white — bg-white is remapped to the dark surface in dark mode,
+          which would turn the knob black. The knob must stay white in both. */}
+      <span
+        style={{ background: '#ffffff' }}
+        className={`inline-block h-4 w-4 transform rounded-full transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`}
+      />
     </button>
   )
 }
@@ -154,7 +159,7 @@ export default function LegalPanel({ gymId, gym }) {
 
       <div className="flex items-start gap-2.5 rounded-lg bg-indigo-50 border border-indigo-100 p-3">
         <Info size={15} className="text-indigo-600 mt-0.5 shrink-0" />
-        <p className="text-xs text-indigo-900/80 leading-relaxed">
+        <p className="text-xs text-indigo-800 leading-relaxed">
           The default wording is a general template, not legal advice. Review it for your gym and local laws — and consider having a professional check it before you rely on it.
         </p>
       </div>
