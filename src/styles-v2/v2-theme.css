@@ -1,0 +1,13 @@
+/* V2 marketing site theme overrides.
+   Imported only by V2LandingPage — neutralizes V1's global dark-theme
+   body styles (src/index.css) for the .v2-root subtree via :has(),
+   without touching the V1 file or affecting any other route. */
+
+body:has(.v2-root) {
+  background-color: #ffffff;
+  color: #111827;
+}
+
+body:has(.v2-root)::after {
+  display: none;
+}

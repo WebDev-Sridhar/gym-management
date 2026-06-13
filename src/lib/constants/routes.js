@@ -1,6 +1,23 @@
 export const ROUTES = {
   HOME: '/',
 
+  // V2 marketing site (isolated redesign, comparison draft)
+  V2: {
+    HOME: '/v2',
+    FEATURES: '/v2/features',
+    PRICING: '/v2/pricing',
+    DEMO: '/v2/demo',
+    CHANGELOG: '/v2/changelog',
+    ABOUT: '/v2/about',
+    BLOG: '/v2/blog',
+    CAREERS: '/v2/careers',
+    CONTACT: '/v2/contact',
+    PRIVACY: '/v2/privacy',
+    TERMS: '/v2/terms',
+    SECURITY: '/v2/security',
+    REFUND: '/v2/refund-policy',
+  },
+
   // Marketing
   FEATURES: '/features',
   PRICING: '/pricing',

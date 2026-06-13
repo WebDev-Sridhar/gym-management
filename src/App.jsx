@@ -83,6 +83,21 @@ const HOST_KIND = typeof window !== 'undefined'
 const IS_ADMIN_HOST = typeof window !== 'undefined'
   && isAdminHost(window.location.hostname)
 
+// V2 marketing site — isolated redesign, not wired up yet (revisit later).
+// const V2LandingPage = lazy(() => import('./pages-v2/V2LandingPage'))
+// const FeaturesPageV2 = lazy(() => import('./pages-v2/FeaturesPageV2'))
+// const PricingPageV2 = lazy(() => import('./pages-v2/PricingPageV2'))
+// const DemoPageV2 = lazy(() => import('./pages-v2/DemoPageV2'))
+// const ChangelogPageV2 = lazy(() => import('./pages-v2/ChangelogPageV2'))
+// const AboutPageV2 = lazy(() => import('./pages-v2/AboutPageV2'))
+// const BlogPageV2 = lazy(() => import('./pages-v2/BlogPageV2'))
+// const CareersPageV2 = lazy(() => import('./pages-v2/CareersPageV2'))
+// const ContactPageV2 = lazy(() => import('./pages-v2/ContactPageV2'))
+// const PrivacyPageV2 = lazy(() => import('./pages-v2/PrivacyPageV2'))
+// const TermsPageV2 = lazy(() => import('./pages-v2/TermsPageV2'))
+// const SecurityPageV2 = lazy(() => import('./pages-v2/SecurityPageV2'))
+// const RefundPolicyPageV2 = lazy(() => import('./pages-v2/RefundPolicyPageV2'))
+
 // Lazy-load marketing & legal pages — they're public, not the hot path.
 const FeaturesPage = lazy(() => import('./pages/landing/FeaturesPage'))
 const PricingPage = lazy(() => import('./pages/landing/PricingPage'))
@@ -214,6 +229,21 @@ export default function App() {
         <Routes>
           {/* Public routes */}
           <Route path={ROUTES.HOME} element={<LandingPage />} />
+          {/* V2 marketing site — not wired up yet (revisit later).
+          <Route path={ROUTES.V2.HOME} element={<V2LandingPage />} />
+          <Route path={ROUTES.V2.FEATURES} element={<FeaturesPageV2 />} />
+          <Route path={ROUTES.V2.PRICING} element={<PricingPageV2 />} />
+          <Route path={ROUTES.V2.DEMO} element={<DemoPageV2 />} />
+          <Route path={ROUTES.V2.CHANGELOG} element={<ChangelogPageV2 />} />
+          <Route path={ROUTES.V2.ABOUT} element={<AboutPageV2 />} />
+          <Route path={ROUTES.V2.BLOG} element={<BlogPageV2 />} />
+          <Route path={ROUTES.V2.CAREERS} element={<CareersPageV2 />} />
+          <Route path={ROUTES.V2.CONTACT} element={<ContactPageV2 />} />
+          <Route path={ROUTES.V2.PRIVACY} element={<PrivacyPageV2 />} />
+          <Route path={ROUTES.V2.TERMS} element={<TermsPageV2 />} />
+          <Route path={ROUTES.V2.SECURITY} element={<SecurityPageV2 />} />
+          <Route path={ROUTES.V2.REFUND} element={<RefundPolicyPageV2 />} />
+          */}
           <Route path="/checkin" element={<CheckinPage />} />
           <Route path="/pay/:token" element={<PayLandingPage />} />
           {/* Local-dev entry to the internal admin app (prod uses
